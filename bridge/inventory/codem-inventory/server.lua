@@ -48,7 +48,7 @@ return {
       if v.name == item then 
         if not count or count <= v.count then 
           if not slot or slot == v.slot then
-            if not md or table.compare(v.metadata, md) then 
+            if not md or lib.table.compare(v.metadata, md) then 
               return v.count
             end
           end 
@@ -71,12 +71,3 @@ return {
   end,
   
 } 
-
-function table.compare(t1, t2)
-  for k,v in pairs(t1) do 
-    if t2[k] ~= v then 
-      return false
-    end
-  end
-  return true
-end

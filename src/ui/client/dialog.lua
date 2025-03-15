@@ -217,4 +217,3 @@ lib.closeDialog    = function(id, keep_cam)
     end
   end
 end
-=

@@ -39,7 +39,7 @@ return {
   end,
 
   registerStash = function(id, data)
-    return exports.dirk_inventory:registerInventory(nil, {
+    return exports.dirk_inventory:registerInventory(id, {
       type = data.type or 'stash', 
       maxWeight = data.maxWeight or 1000,
       maxSlots = data.maxSlots or 50,

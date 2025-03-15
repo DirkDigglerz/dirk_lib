@@ -30,5 +30,11 @@ return {
 
     local has = exports.ox_inventory:Search('count', itemName, metadata)
     return has >= count and has or 0 
-  end
+  end,
+
+
+  openStash = function(id, data)
+    TriggerServerEvent(('%s_exploitableEvent:openInventory'):format(cache.resource), id, data)
+  end, 
+
 }

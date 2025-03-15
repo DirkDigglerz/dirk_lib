@@ -236,6 +236,17 @@ lib.table = {
 
     return tbl
   end,
+
+  compare = function(t1, t2)
+    for k,v in pairs(t1) do 
+      if type(v) == 'table' then
+        if not lib.table.compare(v, t2[k]) then return false; end
+      else
+        if t2[k] ~= v then return false; end
+      end
+    end
+    return true
+  end
 }
 
 

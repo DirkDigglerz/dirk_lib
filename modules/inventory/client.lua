@@ -22,4 +22,11 @@ return {
   ---@param slot?: number
   ---@return nil | number | boolean  Returns nil if player does not have item, returns number of items if they have it
   hasItem           = inventory_bridge.hasItem or framework_bridge.hasItem,
+
+
+  ---@function lib.inventory.openStash 
+  ---@description # Open a stash inventory
+  ---@param id string | number # Inventory ID or Player ID
+  ---@param data table # Inventory data
+  openStash = inventory_bridge.openStash or framework_bridge.openStash,
 }

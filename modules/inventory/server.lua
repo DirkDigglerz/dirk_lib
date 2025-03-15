@@ -53,9 +53,7 @@ return {
   getItemLabel      = inventory_bridge.getItemLabel or framework_bridge.getItemLabel,
 
   ---@param invId: string
-  ---@param label: string
-  ---@param max_slots: number
-  ---@param max_weight: number
+  ---@param data: {type: string, maxWeight: number, maxSlots: number}
   registerStash     = inventory_bridge.registerStash or framework_bridge.registerStash,
 
   ---@param invId: string
