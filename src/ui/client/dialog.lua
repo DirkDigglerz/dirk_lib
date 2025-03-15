@@ -217,28 +217,4 @@ lib.closeDialog    = function(id, keep_cam)
     end
   end
 end
-
--- RegisterCommand('test_dialog', function()
---   lib.registerDialog('test_dialog', {
---     title = 'Test Dialog',
---     dialog = 'This is a test dialog',
---     responses = {
---       {
---         label = 'Close',
- 
---         action = function()
---           print('Closed')
---         end
---       },
---       {
---         label = 'Open Another',
---         action = function()
---           print('Opened another')
---         end
---       }
---     }
---   })
---   Wait(1)
---   lib.openDialog(cache.ped, 'test_dialog')
--- end)
-
+=

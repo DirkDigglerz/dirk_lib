@@ -1,15 +1,19 @@
 local settings = lib.settings
 
-local parse_options = function(opts)
+local parseOptions = function(opts)
   for k,v in pairs(opts) do 
     if lib.settings.target == 'ox_target' then 
       opts[k].onSelect = v.action
-    else 
-      opts[k].action = v.action and function(entity)
-        v.action({
-          entity = entity, 
-        })
-      end or nil 
+    else
+      if v.action then 
+        v.onSelect = v.action
+        local action = function(entity)
+          v.onSelect({
+            entity = entity,
+          })
+        end
+        opts[k].action = action
+      end
     end 
   end
   return opts
@@ -21,7 +25,7 @@ lib.target = {
     assert(data.pos, 'Missing position')
     assert(data.height, 'Missing height')
     assert(data.options, 'Missing options')
-    data.options = parse_options(data.options)
+    data.options = parseOptions(data.options)
     if settings.target == 'qb-target' or settings.target == 'qtarget' then 
       exports[settings.target]:AddBoxZone(id, vector3(data.pos.x, data.pos.y, data.pos.z), (data.length or 1.0), (data.width or 1.0), {
         name      = id, -- This is the name of the zone recognized by PolyZone, this has to be unique so it doesn't mess up with other zones
@@ -53,7 +57,7 @@ lib.target = {
     assert(data.height, 'Missing height')
     assert(data.options, 'Missing options')
     
-    data.options = parse_options(data.options)
+    data.options = parseOptions(data.options)
     local temp_target_system = nil
     if settings.target == "qb-target" or settings.target == "qtarget" or settings.target == "ox_target" then
       if settings.target == "ox_target" then temp_target_system = "qb-target" else temp_target_system = settings.target;  end
@@ -73,7 +77,7 @@ lib.target = {
         minZ = minZ, -- This is the bottom of the polyzone, this can be different from the Z value in the coords, this has to be a float value
         maxZ = minZ + data.height, -- This is the top of the polyzone, this can be different from the Z value in the coords, this has to be a float value
       }, {
-        options = parse_options(data.options),
+        options = parseOptions(data.options),
         distance = data.distance or 1.5, -- This is the distance for you to be at for the target to turn blue, this is in GTA units and has to be a float value
       })
       return name
@@ -93,7 +97,7 @@ lib.target = {
   entity = function(entity,data)
     assert(data.options, 'Missing options')
     assert(data.distance, 'Missing distance')
-    data.options = parse_options(data.options)
+    data.options = parseOptions(data.options)
     if settings.target == "qb-target" or settings.target == "qtarget" then
       exports[settings.target]:AddTargetEntity(entity, {
         options = data.options,
@@ -122,7 +126,7 @@ lib.target = {
   end,
 
   addModels = function(data)
-    data.options = parse_options(data.options)
+    data.options = parseOptions(data.options)
     if settings.target == "qb-target" or settings.target == "qtarget" then
       exports[settings.target]:AddTargetModel(data.models, {
         distance = (data.distance or 1.5),
@@ -134,7 +138,7 @@ lib.target = {
   end, 
 
   addGlobalVehicle = function(data)
-    data.options = parse_options(data.options)
+    data.options = parseOptions(data.options)
     if settings.target == "qb-target" then 
       exports[settings.target]:AddGlobalVehicle({
         options = data.options,
@@ -152,7 +156,7 @@ lib.target = {
   
 
   addGlobalPed = function(data)
-    data.options = parse_options(data.options)
+    data.options = parseOptions(data.options)
     if settings.target == "qb-target" then 
       exports[settings.target]:AddGlobalPed({
         options = data.options,
@@ -170,7 +174,7 @@ lib.target = {
 
 
   addGlobalPlayer = function(data)
-    data.options = parse_options(data.options)
+    data.options = parseOptions(data.options)
     if settings.target == "qb-target" then 
       exports[settings.target]:AddGlobalPlayer({
         options = data.options,

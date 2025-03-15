@@ -10,7 +10,9 @@ return {
   ---@param labels table | string # table of metadata to display the string of the metadata key
   ---@param value? string # value of the metadata key
   ---@return boolean 
-  displayMetadata = inventory_bridge.displayMetadata or framework_bridge.displayMetadata,
+  displayMetadata = inventory_bridge.displayMetadata or framework_bridge.displayMetadata or function()
+    lib.print.info(('displayMetadata not implemented for % go manually add your metadata displays or dont'):format(settings.inventory))
+  end,
 
   ---@function lib.inventory.hasItem
   ---@description # Check if player has item in inventory
