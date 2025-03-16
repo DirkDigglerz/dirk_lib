@@ -6,14 +6,22 @@ local parseOptions = function(opts)
       opts[k].onSelect = v.action
     else
       if v.action then 
-        v.onSelect = v.action
-        local action = function(entity)
-          v.onSelect({
+        local action = v.action
+        opts[k].action = function(entity)
+          action({
             entity = entity,
           })
         end
-        opts[k].action = action
       end
+
+      if v.canInteract then 
+        local canInteract = v.canInteract
+        opts[k].canInteract = function(entity)
+          return canInteract({
+            entity = entity,
+          })
+        end
+      end 
     end 
   end
   return opts
