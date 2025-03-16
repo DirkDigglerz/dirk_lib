@@ -47,12 +47,14 @@ function object:__init()
     end, 
 
     onInside = function()
-      local can_spawn = self.canSpawn and self.canSpawn() or true
-      if not can_spawn then 
-        self:despawn()
-        return 
+      if self.canSpawn then 
+        local result = self.canSpawn()
+        if not result then 
+          self:despawn()
+          return 
+        end
       end
-    
+
       self:spawn()
     end,
   }
