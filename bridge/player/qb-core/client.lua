@@ -9,8 +9,10 @@ return {
     return player.charinfo.firstname, player.charinfo.lastname
   end,
 
-  getPlayerData = function()
-    return lib.FW.Functions.GetPlayerData()
+  getPlayerData = function(_key)
+    local playerData = lib.FW.Functions.GetPlayerData()
+    if _key then return playerData[_key] end
+    return playerData
   end,
 
   getMetadata = function(_key)

@@ -10,7 +10,8 @@ return {
 
   getPlayerData = function(_key)
     local playerData = lib.FW.Functions.GetPlayerData()
-    return _key and playerData[_key] or playerData
+    if _key then return playerData[_key] end
+    return playerData
   end,
 
   getMetadata = function(_key)
