@@ -19,22 +19,29 @@ return {
   ---@return nil | number | boolean  Returns nil if player does not have item, returns number of items if they have it
   hasItem           = function(itemName, count, metadata, slot)
     count = count or 1
-    if slot then 
-      local found = exports.ox_inventory:Search('slots', itemName, metadata)
-      for k,v in pairs(found) do 
-        if v.slot == slot and v.count >= count then
-          return true
+    local items = lib.player.getPlayerData('items')
+    local found = 0
+    for k,v in pairs(items) do 
+      if v.name == itemName then 
+        local match = (not slot or v.slot == slot) and (not metadata or lib.table.compare(v.metadata, metadata))
+        if match then 
+          found = found + (v.amount or v.count)
         end
       end
-    end 
-
-    local has = exports.ox_inventory:Search('count', itemName, metadata)
-    return has >= count and has or 0 
+    end
+    return found >= count and found or false
   end,
-
 
   openStash = function(id, data)
     TriggerServerEvent(('%s_exploitableEvent:openInventory'):format(cache.resource), id, data)
   end, 
+
+  getItemLabel = function(item)
+    local items = lib.FW?.Shared?.Items
+    if not items then return false, 'NoItems' end
+    local item = items[item]
+    if not item then return false, 'NoItem' end
+    return item.label
+  end,
 
 }

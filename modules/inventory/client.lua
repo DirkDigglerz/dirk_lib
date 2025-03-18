@@ -29,4 +29,10 @@ return {
   ---@param id string | number # Inventory ID or Player ID
   ---@param data table # Inventory data
   openStash = inventory_bridge.openStash or framework_bridge.openStash,
+
+  ---@function lib.inventory.getItemLabel 
+  ---@description # Get the label of an item
+  ---@param item string # Item name
+  ---@return string
+  getItemLabel      = inventory_bridge.getItemLabel or framework_bridge.getItemLabel,
 }

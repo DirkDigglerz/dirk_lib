@@ -58,11 +58,27 @@ return {
     end
     return hasCount > 0 and hasCount or false
   end,
-  
+
+  getItemBySlot     = function(src, slot)
+    if type(src) == 'string' then return false, 'DoesntSupportInvId' end
+    local item = exports['qb-inventory']:GetItemBySlot(src, slot)
+    if not item then return false, 'NoItem' end
+    return {
+      name     = item.name,
+      count    = item.count or item.amount,
+      metadata = item.metadata,
+    }
+  end,
+
   getItemLabel = function(item)
     local item_exists =  lib.FW?.Shared?.Items[item]
     if not item_exists then return false, 'NoLabel' end
     return item_exists.label
+  end,
+
+  canCarryItem = function(src, item, count, md)
+    if type(src) == 'string' then return false, 'DoesntSupportInvId' end
+    return exports['qb-inventory']:CanAddItem(src, item, count, md)
   end,
 
   registerStash = function(id, data)

@@ -48,6 +48,13 @@ return {
   ---@return nil | number | boolean  Returns nil if player does not have item, returns number of items if they have it
   hasItem           = inventory_bridge.hasItem or framework_bridge.hasItem,
 
+  ---@function lib.inventory.getItemBySlot
+  ---@description # Get item by slot
+  ---@param invId: string
+  ---@param slot: number
+  ---@return table
+  getItemBySlot     = inventory_bridge.getItemBySlot or framework_bridge.getItemBySlot,
+
   ---@param item: string
   ---@return string
   getItemLabel      = inventory_bridge.getItemLabel or framework_bridge.getItemLabel,
@@ -91,6 +98,15 @@ return {
   ---@param item: string
   ---@return table
   item              = inventory_bridge.item or framework_bridge.item,
+
+  ---@function lib.inventory.canCarryItem
+  ---@description # Check if player can carry item
+  ---@param invId: string
+  ---@param itemName: string
+  ---@param count: number
+  ---@param metadata: table
+  ---@return boolean
+  canCarryItem      = inventory_bridge.canCarryItem or framework_bridge.canCarryItem,
 
   
 
