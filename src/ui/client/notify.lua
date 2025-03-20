@@ -84,23 +84,25 @@ RegisterCommand('test_notify', function()
     description = 'This is an error notification',
     sound = { name = 'ERROR', set = 'HUD_LIQUOR_STORE_SOUNDSET' }
   })
-
+  Wait(2500)
   lib.notify({
     type = 'success',
     description = 'This is a success notification',
     sound = { name = 'NAV', set = 'HUD_LIQUOR_STORE_SOUNDSET' }
   })
-
+  Wait(1000)
   lib.notify({
     type = 'inform',
     description = 'This is an inform notification',
     sound = { name = 'NAV', set = 'HUD_LIQUOR_STORE_SOUNDSET' }
   })
-
+  Wait(2500)
   lib.notify({
     type = 'warning',
     description = 'This is a warning notification',
     sound = { name = 'NAV', set = 'HUD_LIQUOR_STORE_SOUNDSET' }
   })
 end, false)
+
+
 

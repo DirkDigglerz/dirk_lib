@@ -2,6 +2,7 @@ import { Flex } from "@mantine/core";
 import { useEffect, useState } from "react";
 import { useNuiEvent } from "../../hooks/useNuiEvent";
 import Notification, { NotificationProps } from "./Notification";
+import { internalEvent } from "../../utils/internalEvent";
 
 export type NotificationContainerProps = {
   position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';

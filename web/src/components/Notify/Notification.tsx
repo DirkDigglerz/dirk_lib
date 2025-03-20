@@ -1,8 +1,8 @@
 import { IconProp } from "@fortawesome/fontawesome-svg-core"
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import { Box, Flex, Image, Text, useMantineTheme } from "@mantine/core"
-import colorWithAlpha from "../../utils/colorWithAlpha"
 import { useEffect, useMemo, useState } from "react"
+import colorWithAlpha from "../../utils/colorWithAlpha"
 import getImageType from "../../utils/getImagePath"
 
 export type NotificationProps = {
@@ -22,6 +22,8 @@ export type NotificationProps = {
   hide?: boolean
   count?: number
 }
+
+
 
 export default function Notification(props: NotificationProps){
   const theme = useMantineTheme();
@@ -179,3 +181,4 @@ function NotificationImage (props: NotificationProps & {imageType: false | {type
     </Box>
   )
 }
+

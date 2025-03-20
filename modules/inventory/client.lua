@@ -11,7 +11,7 @@ return {
   ---@param value? string # value of the metadata key
   ---@return boolean 
   displayMetadata = inventory_bridge.displayMetadata or framework_bridge.displayMetadata or function()
-    lib.print.info(('displayMetadata not implemented for % go manually add your metadata displays or dont'):format(settings.inventory))
+    lib.print.info(('displayMetadata not implemented for %s go manually add your metadata displays or dont'):format(settings.inventory))
   end,
 
   ---@function lib.inventory.hasItem
