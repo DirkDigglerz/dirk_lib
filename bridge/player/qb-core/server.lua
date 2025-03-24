@@ -28,15 +28,15 @@ return {
   end, 
 
   deleteCharacter = function(src, citizenId)
-    return lib.FW.DeleteCharacter(src, citizenId)
+    return lib.FW.Player.DeleteCharacter(src, citizenId)
   end,
 
   loginCharacter = function(src, citizenId, newData)
-    return lib.FW.Login(src, citizenId, newData)
+    return lib.FW.Player.Login(src, citizenId, newData)
   end,
 
   logoutCharacter = function(src, citizenId)
-    return lib.FW.Logout(src, citizenId)
+    return lib.FW.Player.Logout(src, citizenId)
   end,
 
   getJob = function(src)
