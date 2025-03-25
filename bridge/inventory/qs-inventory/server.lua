@@ -60,7 +60,7 @@ return {
   end,
   
   useableItem = function(itemName, callback)
-    exports['qs-inventory']:CreateUseableItem(itemName, function(src, item)
+    exports['qs-inventory']:CreateUsableItem(itemName, function(src, item)
       callback(src, item)
     end)
   end
