@@ -1,3 +1,5 @@
+-- thank you to https://github.com/overextended/ox_lib/blob/master/imports/locale/shared.lua
+
 ---@type { [string]: string }
 local dict = {}
 
