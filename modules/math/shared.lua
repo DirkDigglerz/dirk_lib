@@ -1,4 +1,4 @@
---- THANK YOU OX LIB
+--- THANK YOU OX LIB https://github.com/overextended/ox_lib/blob/master/imports/math/shared.lua
 lib.math = math
 
 local function parseNumber(input, min, max, round)
