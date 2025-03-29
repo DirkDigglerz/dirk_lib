@@ -1,3 +1,5 @@
+-- thanks to linden at overextended for happily providing me with this code, such a guy https://github.com/overextended/ox_lib/blob/master/imports/disableControls/client.lua
+
 --- Call on frame to disable all stored keys.
 --- ```
 --- disableControls()
