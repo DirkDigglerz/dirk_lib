@@ -1,4 +1,4 @@
-
+-- thanks to https://github.com/overextended/ox_lib/edit/master/imports/callback/server.lua 
 local awaitingCallbacks = {}
 local callback_event = '__dirk_cb_%s'
 local callback_timeout = 300000 
