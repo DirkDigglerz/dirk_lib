@@ -1,3 +1,4 @@
+-- thanks to https://github.com/overextended/ox_lib/blob/master/imports/logger/server.lua
 local service = GetConvar('dirk:logger', 'datadog')
 local buffer
 local bufferSize = 0
