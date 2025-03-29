@@ -1,3 +1,4 @@
+-- Thanks to the little guy at ox_lib https://github.com/overextended/ox_lib/blob/master/imports/string/shared.lua
 ---@class oxstring : stringlib
 lib.string = string
 
