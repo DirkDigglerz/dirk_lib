@@ -1,3 +1,5 @@
+-- thanks to https://github.com/overextended/ox_lib/blob/master/imports/addCommand/server.lua for the code
+
 if cache.game == 'redm' then return end
 
 ---@class KeybindProps
