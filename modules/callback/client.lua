@@ -1,3 +1,4 @@
+-- thanks to https://github.com/overextended/ox_lib/edit/master/imports/callback/client.lua 
 local awaitingCallbacks = {}
 local timers = {}
 local callback_event = '__dirk_cb_%s'
