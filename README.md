@@ -4,9 +4,6 @@ A useful library for script developement, includes all the standards set by ox_l
 
 [📖Documentation](https://docs.dirkscripts.com/resources/dirk-lib)
 [🦜Discord](discord.gg/dirkscripts)
-# Credits 
-Thank you for a few of the modules and the loading method. big brayn ox
-  - [ox_lib](https://github.com/overextended/ox_lib)
 # Convars
 ```properties
 
