@@ -1,4 +1,4 @@
--- THANKS OX FOR BACKEND OF PROG BARS LAZY BOI HERE
+-- THANKS TO THE DIVA AT OX FOR BACKEND OF PROG BARS LAZY BOI HERE https://github.com/overextended/ox_lib/blob/master/resource/interface/client/progress.lua
 local progress
 local DisableControlAction = DisableControlAction
 local DisablePlayerFiring = DisablePlayerFiring
