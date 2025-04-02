@@ -81,7 +81,7 @@ jobs:
         id: auto_release
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          title: "Release v${{ env.NEW_VERSION }}"
+          title: "Release ${{ env.NEW_VERSION }}"
           prerelease: false
           files: dirk_lib.zip
           automatic_release_tag: 'latest_production'
