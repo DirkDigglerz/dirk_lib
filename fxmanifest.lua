@@ -26,6 +26,7 @@ files {
   'src/stores/paymentMethods.lua',
   'src/devtools/modelNames.lua',
   'src/settings.lua',
+  'src/autodetect.lua',
   'src/oxCompat.lua',
   --\\ NUI WHEN ADDED \\--
   'web/build/index.html',
@@ -33,11 +34,6 @@ files {
 }
 
 shared_script 'src/init.lua'
-
-shared_scripts {
-  'src/**/shared.lua',
-}
-
 client_scripts {
   'src/**/client.lua',
   'src/**/client/*.lua'

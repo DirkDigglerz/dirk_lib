@@ -87,7 +87,6 @@ _ENV.lib = lib
 -- MODIFIED FROM (OX_LIB github.com/overextended/ox_lib)
 --## Override require with ox's lovely require module
 require = lib.require
-print('call from internal init')
 local settings = require 'src.settings'
 lib.settings = settings
 
@@ -129,13 +128,19 @@ lib.FW = setmetatable({}, {
 	end
 })
 
-
-
-
-
-
-
 _ENV.cache = cache
+
+for i = 1, GetNumResourceMetadata(cache.resource, 'dirk_lib') do
+  local name = GetResourceMetadata(cache.resource, 'dirk_lib', i - 1)
+  if not rawget(lib, name) then
+    local module = load_module(lib, name)
+    if type(module) == 'function' then pcall(module) end
+  end
+end
+
+
+
+-- NATIVE CHANGES 
 
 -- INTERVALS 
 SetInterval = function(cb, ms, reps)
@@ -155,6 +160,7 @@ ClearInterval = function(id)
   ClearTimeout(id)
 end
 
+-- POOL NATIVES SERVER SIDED
 if context == 'server' then 
   -- USEFUL CONVERSION FOR SERVER SIDE GAMEPOOLS THANKS OX (OX_LIB github.com/overextended/ox_lib)
   local poolNatives = {
@@ -171,11 +177,3 @@ if context == 'server' then
     return fn and fn() --[[@as number[] ]]
   end
 end 
-
-for i = 1, GetNumResourceMetadata(cache.resource, 'dirk_lib') do
-  local name = GetResourceMetadata(cache.resource, 'dirk_lib', i - 1)
-  if not rawget(lib, name) then
-    local module = load_module(lib, name)
-    if type(module) == 'function' then pcall(module) end
-  end
-end

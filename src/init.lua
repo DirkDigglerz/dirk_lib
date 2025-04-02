@@ -64,7 +64,6 @@ local settings = require 'src.settings'
 lib.settings = settings
 
 --## FRAMEWORK/SETTINGS
-
 local framework_bridge = lib.loadBridge('framework', settings.framework, 'shared')
 
 lib.FW = setmetatable({}, {
@@ -102,3 +101,51 @@ if context == 'client' then
 end 
 
 
+if context == 'client' then return false; end 
+CreateThread(function()
+  --- PRINT INFO FOR AUTODETCTION
+  SetTimeout(1000, function()
+    local strVers = GetResourceMetadata('dirk_lib', 'version')
+    local detectables = {
+      'framework',
+      'inventory',
+      'target',
+      'time',
+      'keys',
+      'fuel',
+      'phone',
+      'garage',
+      'ambulance',
+      'prison',
+      'dispatch'
+    }
+
+    local topBorder = '┌' .. string.rep('─', 45) .. '┐'
+    local bottomBorder = '└' .. string.rep('─', 45) .. '┘'
+    print(topBorder)
+    print('│' .. '^2 DIRK_LIB ^3V'..strVers .. string.rep(' ', 27) .. '^7│')
+    print('│' .. '^6 RESOURCE AUTO-DETECTION' .. string.rep(' ', 21) .. '^7│')
+    print('│' .. '^7 WWW.DIRKSCRIPTS.COM' .. string.rep(' ', 25) .. '^7│')
+    print('│' .. string.rep('─', 45) .. '│')
+    local maxKeyLength = 0
+    for _, v in ipairs(detectables) do
+      maxKeyLength = math.max(maxKeyLength, #v)
+    end
+
+    for _, system in pairs(detectables) do
+      local value = lib.settings[system]
+      if value then 
+        local keyStr = string.upper(system)
+        local valueStr = tostring(value)
+        local keySpacing = string.rep(' ', maxKeyLength - #system)
+        local valueColor = valueStr == "NOT FOUND" and "^1" or "^2"
+        local line = '│ ^5' .. keyStr .. keySpacing .. '  ' .. valueColor .. valueStr
+        local totalLength = #keyStr + #valueStr + 2 + (maxKeyLength - #system)
+        local rightPadding = string.rep(' ', 44 - totalLength)
+        
+        print(line .. rightPadding .. '^7│')
+      end
+    end
+    print(bottomBorder)
+  end)
+end)
