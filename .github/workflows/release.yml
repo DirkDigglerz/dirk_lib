@@ -30,9 +30,6 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: 'web/pnpm-lock.yaml'
 
-      - name: Set env
-        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
-
       - name: Install dependencies
         run: pnpm install
         working-directory: web
@@ -49,8 +46,7 @@ jobs:
 
       - name: Bump manifest version
         run: node .github/actions/bump-manifest-version.js
-        env:
-          TGT_RELEASE_VERSION: ${{ github.ref_name }}
+        # The script now writes NEW_VERSION to GITHUB_ENV
 
       - name: Push manifest change
         uses: EndBug/add-and-commit@v8
@@ -59,17 +55,22 @@ jobs:
           push: true
           author_name: Manifest Bumper
           author_email: 41898282+github-actions[bot]@users.noreply.github.com
-          message: 'chore: bump manifest version to ${{ github.ref_name }}'
+          message: 'chore: bump manifest version to ${{ env.NEW_VERSION }}'
 
       - name: Update branch
         working-directory: ./
         run: git push origin HEAD:main
 
-      # - name: Update tag ref
-      #   uses: EndBug/latest-tag@latest 
-      #   with:
-      #     ref: ${{ github.ref_name }}
-          
+      - name: Create version tag
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: `refs/tags/v${process.env.NEW_VERSION}`,
+              sha: context.sha
+            })
 
       - name: Bundle files
         run: |
@@ -82,16 +83,16 @@ jobs:
           cp -r ./modules ./temp/dirk_lib
           cp -r ./web/build ./temp/dirk_lib/web/
           cd ./temp && zip -r ../dirk_lib.zip ./dirk_lib
+
       - name: Create Release
         uses: marvinpinto/action-automatic-releases@v1.2.1
         id: auto_release
         with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }} # Use the GitHub token from the repository secrets
-          title: "Release ${{ env.RELEASE_VERSION }}" # Use the version extracted from the workflow
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          title: "Release v${{ env.NEW_VERSION }}"
           prerelease: false
-          files: dirk_lib.zip # Specify the file to attach to the release
-          automatic_release_tag: 'latest_production' # Tag name for the release
+          files: dirk_lib.zip
+          automatic_release_tag: "v${{ env.NEW_VERSION }}"
         env:
           CI: false
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Ensure this matches the repo token
-
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

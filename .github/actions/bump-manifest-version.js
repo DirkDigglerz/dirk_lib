@@ -25,4 +25,7 @@ const newFileContent = manifestFile.replace(/\bversion\s+'[\d.]+'/, `version    
 // Write the updated content back to the file
 fs.writeFileSync('fxmanifest.lua', newFileContent);
 
+// Export the new version for GitHub Actions to use
+fs.writeFileSync(process.env.GITHUB_ENV, `NEW_VERSION=${newVersion}\n`, { flag: 'a' });
+
 console.log(`Version updated to ${newVersion}`);
