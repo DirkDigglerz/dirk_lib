@@ -118,6 +118,7 @@ CreateThread(function()
       'ambulance',
       'prison',
       'dispatch',
+      'clothing',
       'skills',
     }
 
