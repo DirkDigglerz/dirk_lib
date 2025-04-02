@@ -30,6 +30,9 @@ jobs:
           cache: 'pnpm'
           cache-dependency-path: 'web/pnpm-lock.yaml'
 
+      - name: Set env
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+
       - name: Install dependencies
         run: pnpm install
         working-directory: web
@@ -61,17 +64,6 @@ jobs:
         working-directory: ./
         run: git push origin HEAD:main
 
-      - name: Create version tag
-        uses: actions/github-script@v6
-        with:
-          script: |
-            github.rest.git.createRef({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: `refs/tags/v${process.env.NEW_VERSION}`,
-              sha: context.sha
-            })
-
       - name: Bundle files
         run: |
           mkdir -p ./temp/dirk_lib
@@ -92,7 +84,7 @@ jobs:
           title: "Release v${{ env.NEW_VERSION }}"
           prerelease: false
           files: dirk_lib.zip
-          automatic_release_tag: "v${{ env.NEW_VERSION }}"
+          automatic_release_tag: 'latest_production'
         env:
           CI: false
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
