@@ -1,3 +1,4 @@
+local context = IsDuplicityVersion() and 'server' or 'client'
 
 local debug_getinfo = debug.getinfo
 
@@ -58,13 +59,12 @@ end
 
 --## Override require with ox's lovely require module
 require = lib.require
-
-
 --## FRAMEWORK/SETTINGS
 local settings = require 'src.settings'
 lib.settings = settings
 
 --## FRAMEWORK/SETTINGS
+
 local framework_bridge = lib.loadBridge('framework', settings.framework, 'shared')
 
 lib.FW = setmetatable({}, {
@@ -89,3 +89,16 @@ local GetGamePool = function(poolName)
   local fn = poolNatives[poolName]
   return fn and fn() --[[@as number[] ]]
 end
+
+
+if context == 'client' then
+  RegisterNuiCallback('GET_SETTINGS', function(data, cb)
+    cb(lib.settings)
+  end)
+  
+  RegisterNuiCallback('GET_LOCALES', function(data, cb)
+    cb(lib.getLocales())
+  end)
+end 
+
+

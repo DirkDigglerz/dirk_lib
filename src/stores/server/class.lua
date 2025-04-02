@@ -1,4 +1,4 @@
-local paymentMethods = require 'src.paymentMethods'
+local paymentMethods = require 'src.stores.paymentMethods'
 local Stores = {}
 
 Store = {}

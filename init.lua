@@ -1,3 +1,4 @@
+
 if not _VERSION:find('5.4') then 
   error("This library is only compatible with Lua 5.4")
 end
@@ -83,8 +84,10 @@ local lib = setmetatable({
 
 _ENV.lib = lib
 
+-- MODIFIED FROM (OX_LIB github.com/overextended/ox_lib)
 --## Override require with ox's lovely require module
 require = lib.require
+print('call from internal init')
 local settings = require 'src.settings'
 lib.settings = settings
 
@@ -153,7 +156,7 @@ ClearInterval = function(id)
 end
 
 if context == 'server' then 
-  -- USEFUL CONVERSION FOR SERVER SIDE GAMEPOOLS THANKS OX 
+  -- USEFUL CONVERSION FOR SERVER SIDE GAMEPOOLS THANKS OX (OX_LIB github.com/overextended/ox_lib)
   local poolNatives = {
     CPed = GetAllPeds,
     CObject = GetAllObjects,
@@ -168,7 +171,6 @@ if context == 'server' then
     return fn and fn() --[[@as number[] ]]
   end
 end 
-
 
 for i = 1, GetNumResourceMetadata(cache.resource, 'dirk_lib') do
   local name = GetResourceMetadata(cache.resource, 'dirk_lib', i - 1)

@@ -1,3 +1,4 @@
+local autodetected = require 'src.autodetect'
 return {
   primaryColor    = GetConvar('dirk_lib:primaryColor', 'dirk'),
   primaryShade    = GetConvarInt('dirk_lib:primaryShade', 9),
@@ -17,25 +18,25 @@ return {
   debug           = GetConvar('dirk_lib:debug', 'true') == 'true',
   currency        = GetConvar('dirk_lib:currency', '$'),
   language        = GetConvar('dirk_lib:language', 'en'),
+  primaryIdentifier = GetConvar('dirk_lib:primaryIdentifier', 'license'),
   serverName      = GetConvar('dirk_lib:serverName', 'DirkRP'),
   logo              = GetConvar('dirk_lib:logo', 'https://via.placeholder.com/150'),
 
-  framework         = GetConvar('dirk_lib:framework', 'qbx_core'),
-  inventory         = GetConvar('dirk_lib:inventory', 'ox_inventory'),
-  itemImgPath       = GetConvar('dirk_lib:itemImgPath', 'nui://dirk_inventory/web/images/'),
-  primaryIdentifier = GetConvar('dirk_lib:primaryIdentifier', 'license'),
-  target            = GetConvar('dirk_lib:target', 'ox_target'),
-  interact          = GetConvar('dirk_lib:interact', 'sleepless_interact'),
-  time              = GetConvar('dirk_lib:time', 'dirk_weather'),
-  phone             = GetConvar('dirk_lib:phone', 'lb-phone'),
+  framework         = GetConvar('dirk_lib:framework', autodetected.framework),
+  inventory         = GetConvar('dirk_lib:inventory', autodetected.inventory),
+  itemImgPath       = GetConvar('dirk_lib:itemImgPath', autodetected.itemImgPath),
+  target            = GetConvar('dirk_lib:target', autodetected.target),
+  interact          = GetConvar('dirk_lib:interact', autodetected.interact),
+  time              = GetConvar('dirk_lib:time', autodetected.time),
+  phone             = GetConvar('dirk_lib:phone', autodetected.phone),
 
-  keys            = GetConvar('dirk_lib:keys', 'ox_keys'),
-  garage          = GetConvar('dirk_lib:garage', 'ox_garage'),
-  fuel            = GetConvar('dirk_lib:fuel', 'ox_fuel'),
+  keys            = GetConvar('dirk_lib:keys', autodetected.keys),
+  garage          = GetConvar('dirk_lib:garage', autodetected.garage),
+  fuel            = GetConvar('dirk_lib:fuel', autodetected.fuel),
   
-  ambulance       = GetConvar('dirk_lib:ambulance', 'qb-ambulancejob'),
-  prison          = GetConvar('dirk_lib:prison', 'ox_jail'),
-  dispatch        = GetConvar('dirk_lib:dispatch', 'ox_dispatch'),
+  ambulance       = GetConvar('dirk_lib:ambulance', autodetected.ambulance),
+  prison          = GetConvar('dirk_lib:prison', autodetected.prison),
+  dispatch        = GetConvar('dirk_lib:dispatch', autodetected.dispatch),
 
   --## Menus/Progress etc  
   notify          = GetConvar('dirk_lib:notify', 'dirk_lib'),

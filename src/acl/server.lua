@@ -1,3 +1,4 @@
+-- Thanks ox_lib https://github.com/overextended/ox_lib/blob/master/resource/acl/server.lua
 local function allowAce(allow)
 	return allow == false and 'deny' or 'allow'
 end

@@ -2,9 +2,33 @@ if cache.game == 'redm' then return end
 
 local gizmoEnabled = false
 
+-- A simple ArrayBuffer implementation for storing floats
+local ArrayBuffer = {}
+ArrayBuffer.__index = ArrayBuffer
+
+function ArrayBuffer.new(size)
+  local self = setmetatable({}, ArrayBuffer)
+  self.size = size
+  self.buffer = {}
+  for i = 1, size do
+    self.buffer[i] = 0
+  end
+  return self
+end
+
+function ArrayBuffer:SetFloat32(offset, value)
+  self.buffer[offset / 4 + 1] = value -- offset is in bytes, so divide by 4 for float32
+  return self
+end
+
+function ArrayBuffer:GetFloat32(offset)
+  return self.buffer[offset / 4 + 1] -- offset is in bytes, so divide by 4 for float32
+end
+
+-- Now we can use this ArrayBuffer in your code
 local function makeEntityMatrix(entity)
   local f, r, u, a = GetEntityMatrix(entity)
-  local view = lib.dataView.ArrayBuffer(60)
+  local view = ArrayBuffer.new(60)
 
   view:SetFloat32(0, r[1])
     :SetFloat32(4, r[2])

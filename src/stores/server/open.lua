@@ -1,4 +1,4 @@
-local paymentMethods = require 'src.paymentMethods'
+local paymentMethods = require 'src.stores.paymentMethods'
 
 function Store:openStore(src)
   local canOpen = self.canOpen and self.canOpen(src) or true

@@ -23,23 +23,19 @@ files {
   'bridge/**/client.lua',
   'bridge/**/server.lua',
   'bridge/**/shared.lua',
-  'src/modelNames.lua',
+  'src/stores/paymentMethods.lua',
+  'src/devtools/modelNames.lua',
   'src/settings.lua',
-  'src/ox_compat.lua',
-  'src/paymentMethods.lua',
-
+  'src/oxCompat.lua',
   --\\ NUI WHEN ADDED \\--
   'web/build/index.html',
   'web/build/**/*',
 }
 
-
-shared_script 'src/settings.lua'
 shared_script 'src/init.lua'
 
 shared_scripts {
   'src/**/shared.lua',
-  -- 'src/**/shared/*.lua'
 }
 
 client_scripts {
