@@ -75,7 +75,7 @@ jobs:
         run: |
           mkdir -p ./temp/dirk_lib
           mkdir -p ./temp/dirk_lib/web/
-          cp ./fxmanifest.lua ./init.lua ./README.md ./LICENSE.md ./temp/dirk_lib/
+          cp ./fxmanifest.lua ./init.lua ./README.md ./LICENSE ./temp/dirk_lib/
           cp -r ./src ./temp/dirk_lib
           cp -r ./bridge ./temp/dirk_lib
           cp -r ./locales ./temp/dirk_lib
