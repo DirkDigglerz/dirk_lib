@@ -117,21 +117,22 @@ CreateThread(function()
       'garage',
       'ambulance',
       'prison',
-      'dispatch'
+      'dispatch',
+      'skills',
     }
 
-    local topBorder = '┌' .. string.rep('─', 45) .. '┐'
-    local bottomBorder = '└' .. string.rep('─', 45) .. '┘'
+    local topBorder = '┌' .. string.rep('─', 46) .. '┐'
+    local bottomBorder = '└' .. string.rep('─', 46) .. '┘'
     print(topBorder)
-    print('│' .. '^2 DIRK_LIB ^3V'..strVers .. string.rep(' ', 27) .. '^7│')
-    print('│' .. '^6 RESOURCE AUTO-DETECTION' .. string.rep(' ', 21) .. '^7│')
-    print('│' .. '^7 WWW.DIRKSCRIPTS.COM' .. string.rep(' ', 25) .. '^7│')
-    print('│' .. string.rep('─', 45) .. '│')
+    print('│' .. '^2 DIRK_LIB ^3V'..strVers .. string.rep(' ', 28) .. '^7│')
+    print('│' .. '^6 RESOURCE AUTO-DETECTION' .. string.rep(' ', 22) .. '^7│')
+    print('│' .. '^7 WWW.DIRKSCRIPTS.COM' .. string.rep(' ', 26) .. '^7│')
+    print('│' .. string.rep('─', 46) .. '│')
     local maxKeyLength = 0
     for _, v in ipairs(detectables) do
       maxKeyLength = math.max(maxKeyLength, #v)
     end
-
+    
     for _, system in ipairs(detectables) do
       local value = lib.settings[system]
       if value then 
@@ -141,11 +142,17 @@ CreateThread(function()
         local valueColor = valueStr == "NOT FOUND" and "^1" or "^2"
         local line = '│ ^5' .. keyStr .. keySpacing .. '  ' .. valueColor .. valueStr
         local totalLength = #keyStr + #valueStr + 2 + (maxKeyLength - #system)
-        local rightPadding = string.rep(' ', 44 - totalLength)
+        local rightPadding = string.rep(' ', 45 - totalLength)
         
         print(line .. rightPadding .. '^7│')
       end
     end
+    print('│^7                                              ^7│')
+    print('│^7 If you are running something other than what ^7│')
+    print('│^7 is autodetected, its because the resource    ^7│')
+    print('│^7 you use has "provide xyz" in the fxmanifest. ^7│')
+    print('│^7 If they are using this correctly it should   ^7│')
+    print('│^7 work fine otherwise overwrite with convars   ^7│')
     print(bottomBorder)
   end)
 end)
