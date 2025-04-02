@@ -12,7 +12,6 @@ DevTool.register = function(name, data)
   if data.command then 
     RegisterCommand(name, data.action)
   end
-  lib.print.info(('DevTool registered: %s'):format(name))
   DevTools[name] = self
   return self
 end 

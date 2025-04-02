@@ -132,7 +132,7 @@ CreateThread(function()
       maxKeyLength = math.max(maxKeyLength, #v)
     end
 
-    for _, system in pairs(detectables) do
+    for _, system in ipairs(detectables) do
       local value = lib.settings[system]
       if value then 
         local keyStr = string.upper(system)

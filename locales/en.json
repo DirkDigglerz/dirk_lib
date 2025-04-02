@@ -14,5 +14,7 @@
   "open_store": "Open Store",
   "dont_have_item": "You don't have this item",
   "transaction_complete": "Transaction Complete",
-  "transaction_complete_message": "Thank you for shopping with us!"
+  "transaction_complete_message": "Thank you for shopping with us!",
+  "GroupMenuChatSuggestion": "Chat Suggestion",
+  "CancelProgress": "Cancelled"
 }
