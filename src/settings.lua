@@ -1,4 +1,4 @@
-local autodetected = require 'src.autodetect'
+local autodetected = require 'src.resourceDetection'
 
 local settings = {
   primaryColor    = GetConvar('dirk_lib:primaryColor', 'dirk'),
@@ -15,7 +15,6 @@ local settings = {
     "#692d9d",
     "#5c258b"
   }))),
-
   debug           = GetConvar('dirk_lib:debug', 'true') == 'true',
   currency        = GetConvar('dirk_lib:currency', '$'),
   language        = GetConvar('dirk_lib:language', 'en'),

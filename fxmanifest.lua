@@ -26,7 +26,7 @@ files {
   'src/stores/paymentMethods.lua',
   'src/devtools/modelNames.lua',
   'src/settings.lua',
-  'src/autodetect.lua',
+  'src/resourceDetection.lua',
   'src/oxCompat.lua',
   --\\ NUI WHEN ADDED \\--
   'web/build/index.html',
