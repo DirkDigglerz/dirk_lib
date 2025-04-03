@@ -4,11 +4,7 @@ games { 'rdr3', 'gta5' }
 use_experimental_fxv2_oal 'yes'
 name         'dirk_lib'
 author       'DirkScripts'
-<<<<<<< HEAD
-version      '1.0.121'
-=======
 version      '1.0.123'
->>>>>>> 512140df29d9c73704fad65d87c0361ab3d0f746
 description  'A library for FiveM developers to use in their projects, accepting of new features and contributions.'
 
 dependencies {
