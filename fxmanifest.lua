@@ -4,7 +4,7 @@ games { 'rdr3', 'gta5' }
 use_experimental_fxv2_oal 'yes'
 name         'dirk_lib'
 author       'DirkScripts'
-version      '1.0.122'
+version      '1.0.121'
 description  'A library for FiveM developers to use in their projects, accepting of new features and contributions.'
 
 dependencies {
@@ -26,7 +26,7 @@ files {
   'src/stores/paymentMethods.lua',
   'src/devtools/modelNames.lua',
   'src/settings.lua',
-  'src/resourceDetection.lua',
+  'src/autodetect.lua',
   'src/oxCompat.lua',
   --\\ NUI WHEN ADDED \\--
   'web/build/index.html',

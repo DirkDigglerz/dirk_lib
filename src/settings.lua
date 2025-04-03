@@ -1,4 +1,4 @@
-local autodetected = require 'src.resourceDetection'
+local autodetected = require 'src.autodetect'
 
 local settings = {
   primaryColor    = GetConvar('dirk_lib:primaryColor', 'dirk'),
