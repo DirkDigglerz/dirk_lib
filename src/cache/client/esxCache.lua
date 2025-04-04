@@ -18,7 +18,7 @@ CreateThread(function()
   cache:set('playerLoaded', true)
 end)
 
-AddEventHandler('esx:playerLoaded', function(xPlayer)
+RegisterNetEvent('esx:playerLoaded', function(xPlayer)
   cache:set('citizenId', xPlayer.identifier)
   cache:set('job', {
     name = xPlayer.job.name,
@@ -33,7 +33,7 @@ AddEventHandler('esx:playerLoaded', function(xPlayer)
   cache:set('playerLoaded', true)
 end)
 
-AddEventHandler('esx:setJob', function(job)
+RegisterNetEvent('esx:setJob', function(job)
   cache:set('job', {
     name = job.name,
     type = job.type,
