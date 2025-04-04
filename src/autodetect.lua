@@ -11,7 +11,7 @@ local supportedResources = {
   clothing          = {'qb-clothing', 'rcore_clothing', 'illenium_appearance', 'fivem-appearance', 'dirk_charCreator', 'tgiann_clothing'},
   ambulance         = {'qb-ambulancejob', 'wasabi_ambulance', 'core_ambulance'},
   prison            = {'qb-prison', 'rcore_prison', 'wasabi_jail'},
-  dispatch          = {'qb-dispatch', 'ps-dispatch', 'cd_dispatch', 'core_dispatch'},
+  dispatch          = {'bub_mdt', 'cd_dispatch', 'linden_outlawalert', 'qs_dispatch', 'ps-dispatch', 'tk_dispatch'},
   skills            = {'sd_skills', 'evolent_skills', 'core_skills', 'B1-skillz', 'skill_system_v1.5',  'skillsystem_v3', 'boii_skills', 'skillsystem_v2', 'ot_skill_system'},
 }
 
