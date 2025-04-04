@@ -1,9 +1,9 @@
 return {
   addKeys = function(veh, plate)
-    return exports.MrNewbVehicleKeys:GiveKeys(veh)
+    return exports.MrNewbVehicleKeys:GiveKeysByPlate(plate)
   end, 
 
   removeKeys = function(veh, plate)
-    return exports.MrNewbVehicleKeys:RemoveKeys(veh)
+    return exports.MrNewbVehicleKeys:RemoveKeysByPlate(plate)
   end,
 }
