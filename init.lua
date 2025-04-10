@@ -1,3 +1,6 @@
+-- Adapted from ox_lib (https://github.com/overextended/ox_lib)
+-- This file is licensed under LGPL-3.0: https://www.gnu.org/licenses/lgpl-3.0.html
+-- and is used under the same license.
 
 if not _VERSION:find('5.4') then 
   error("This library is only compatible with Lua 5.4")

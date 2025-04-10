@@ -2,27 +2,25 @@ local settings = lib.settings
 
 local parseOptions = function(opts)
   for k,v in pairs(opts) do 
-    if lib.settings.target == 'ox_target' then 
-      opts[k].onSelect = v.action
-    else
-      if v.action then 
-        local action = v.action
-        opts[k].action = function(entity)
-          action({
-            entity = entity,
-          })
-        end
+    opts[k].onSelect = v.action
+    if v.action then 
+      local action = v.action
+      opts[k].action = function(entity)
+        action({
+          entity = entity,
+        })
       end
+    end
 
-      if v.canInteract then 
-        local canInteract = v.canInteract
-        opts[k].canInteract = function(entity)
-          return canInteract({
-            entity = entity,
-          })
-        end
-      end 
+    if v.canInteract then 
+      local canInteract = v.canInteract
+      opts[k].canInteract = function(entity)
+        return canInteract({
+          entity = entity,
+        })
+      end
     end 
+
   end
   return opts
 end

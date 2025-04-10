@@ -65,7 +65,6 @@ local placeEntity = function(_type, model_name, bounds, networked)
       removeEntity()
       lib.copyToClipboard(('position = vector4(%s, %s, %s, %s)\nrotation = vector3(%s, %s, %s)'):format(finalCoords.x, finalCoords.y, finalCoords.z, GetEntityHeading(entity), rotation.x, rotation.y, rotation.z))
       return ret_data
-
     elseif IsControlJustPressed(0, 58) then
       removeEntity()
       return false

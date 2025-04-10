@@ -1,4 +1,7 @@
--- thanks to https://github.com/overextended/ox_lib/edit/master/imports/callback/client.lua 
+-- Adapted from ox_lib (https://github.com/overextended/ox_lib/blob/master/imports/callback/client.lua)
+-- Licensed under LGPL-3.0: https://www.gnu.org/licenses/lgpl-3.0.html
+-- and is used under the same license.
+
 local awaitingCallbacks = {}
 local timers = {}
 local callback_event = '__dirk_cb_%s'

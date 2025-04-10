@@ -1,4 +1,5 @@
--- thanks to linden at overextended for happily providing me with this code, such a guy https://github.com/overextended/ox_lib/blob/master/imports/disableControls/client.lua
+-- Adapted from ox_lib (https://github.com/overextended/ox_lib/blob/master/imports/disableControls/client.lua)
+-- Licensed under LGPL-3.0: https://www.gnu.org/licenses/lgpl-3.0.html
 
 --- Call on frame to disable all stored keys.
 --- ```

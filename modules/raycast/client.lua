@@ -1,3 +1,6 @@
+-- Adapted from ox_lib (https://github.com/overextended/ox_lib/blob/master/imports/raycast/client.lua)
+-- Licensed under LGPL-3.0: https://www.gnu.org/licenses/lgpl-3.0.html
+-- and is used under the same license.
 lib.raycast = {}
 
 local StartShapeTestLosProbe = StartShapeTestLosProbe

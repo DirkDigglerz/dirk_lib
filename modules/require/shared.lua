@@ -1,5 +1,6 @@
--- Thanks to https://github.com/overextended/ox_lib/blob/master/imports/require/shared.lua
-
+-- Adapted from ox_lib (https://github.com/overextended/ox_lib/blob/master/imports/require/shared.lua)
+-- Licensed under LGPL-3.0: https://www.gnu.org/licenses/lgpl-3.0.html
+-- and is used under the same license.
 local loaded = {}
 local _require = require
 

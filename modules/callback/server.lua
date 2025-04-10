@@ -1,4 +1,6 @@
--- thanks to https://github.com/overextended/ox_lib/edit/master/imports/callback/server.lua 
+-- Adapted from ox_lib (https://github.com/overextended/ox_lib/blob/master/imports/callback/server.lua)
+-- Licensed under LGPL-3.0: https://www.gnu.org/licenses/lgpl-3.0.html
+-- and is used under the same license.
 local awaitingCallbacks = {}
 local callback_event = '__dirk_cb_%s'
 local callback_timeout = 300000 

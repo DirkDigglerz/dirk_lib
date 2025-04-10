@@ -1,4 +1,6 @@
--- Thanks to the little guy at ox_lib https://github.com/overextended/ox_lib/blob/master/imports/string/shared.lua
+-- Adapted from ox_lib (https://github.com/overextended/ox_lib/blob/master/imports/string/shared.lua)
+-- Licensed under LGPL-3.0: https://www.gnu.org/licenses/lgpl-3.0.html
+-- and is used under the same license.
 ---@class oxstring : stringlib
 lib.string = string
 

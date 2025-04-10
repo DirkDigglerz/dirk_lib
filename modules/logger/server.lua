@@ -1,4 +1,6 @@
--- thanks to https://github.com/overextended/ox_lib/blob/master/imports/logger/server.lua
+-- Adapted from ox_lib (https://github.com/overextended/ox_lib/blob/master/imports/logger/server.lua)
+-- Licensed under LGPL-3.0: https://www.gnu.org/licenses/lgpl-3.0.html
+-- and is used under the same license.
 local service = GetConvar('dirk:logger', 'datadog')
 local buffer
 local bufferSize = 0
