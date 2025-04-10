@@ -59,10 +59,10 @@ function object:__init()
     end,
   }
 
-  if type(self.renderDist) == 'table' then --\\ Poly? 
+  if type(self.pos) == 'table' then --\\ Poly? 
     local settings = {
       type   = 'poly', 
-      points = self.renderDist,
+      points = self.pos,
     }
     settings.onEnter  = stock_funcs.onEnter
     settings.onExit   = stock_funcs.onExit
