@@ -45,6 +45,7 @@ function lib.raycast.fromCoords(coords, destination, flags, ignore)
   local _, hit, endCoords, surfaceNormal, entityHit = GetShapeTestResult(rayHandle)
   if entityHit <= 0 then
     Wait(0)
+    print('wait?')
     return lib.raycast.fromCoords(coords, destination, flags, ignore, true)
   end
   return hit, endCoords, entityHit, surfaceNormal
@@ -90,9 +91,9 @@ end
 ---@param flags ShapetestFlags? Defaults to 511.
 ---@param ignore ShapetestIgnore? Defaults to 4.
 ---@param distance number? Defaults to 10.
-function lib.raycast.fromCamera(flags, ignore, distance)
-  local camRot = GetGameplayCamRot(0)
-  local camPos = GetGameplayCamCoord()
+function lib.raycast.fromCamera(flags, ignore, distance, cam)
+  local camRot = not cam and GetGameplayCamRot(0) or GetCamRot(cam, 0)
+  local camPos = not cam and GetGameplayCamCoord() or GetCamCoord(cam)
   local posX = 0.5
   local posY = 0.5
   local cam3DPos, forwardDir = screenRelToWorld(camPos, camRot, vector2(posX, posY))

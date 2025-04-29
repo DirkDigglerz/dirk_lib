@@ -33,7 +33,7 @@ return {
   end,
 
   openStash = function(id, data)
-    TriggerServerEvent(('%s_exploitableEvent:openInventory'):format(cache.resource), id, data)
+    TriggerServerEvent(('%s:openInventory'):format(cache.resource), id, {})
   end, 
 
   getItemLabel = function(item)

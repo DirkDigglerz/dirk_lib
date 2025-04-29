@@ -1,7 +1,7 @@
 
 local settings = lib.settings 
 
-RegisterNetEvent(('%s_exploitableEvent:openInventory'):format(cache.resource), function(invId, data)
+RegisterNetEvent(('%s:openInventory'):format(cache.resource), function(invId, data)
   local src = source
   exports['qb-inventory']:OpenInventory(src, invId, {
     label = data.label or 'Stash',
@@ -82,6 +82,10 @@ return {
   end,
 
   registerStash = function(id, data)
-    return 
+    return exports['qb-inventory']:CreateInventory(id, {
+      label = data.label or 'Stash',
+      slots = data.maxSlots or 32,
+      maxweight = data.maxWeight or 64000,
+    })
   end,
 }
