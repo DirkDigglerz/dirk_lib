@@ -1,5 +1,5 @@
 local supportedResources = {
-  framework         = {'es_extended', 'qbx_core', 'qb-core', 'nd-framework'},
+  framework         = {'es_extended', 'qbx_core', 'qb-core', 'nd-framework', 'vorp_core'},
   inventory         = {'dirk_inventory', 'ox_inventory', 'qb-inventory', 'qs-inventory', 'codem-inventory', 'tgiann_inventory', 'mf-inventory', 'core_inventory'},
   target            = {'ox_target', 'qb-target', 'q-target', 'bt-target'},
   interact          = {'sleepless_interact'},

@@ -57,7 +57,9 @@ function zone:__init()
   end
 
   if self.center_pos then 
-    self.chunk_zone = GetNameOfZone(self.center_pos.x, self.center_pos.y, self.center_pos.z)
+    self.chunk_zone = cache.game == 'fivem' 
+      and GetNameOfZone(self.center_pos.x, self.center_pos.y, self.center_pos.z) or 
+      GetMapZoneAtCoords(self.center_pos.x, self.center_pos.y, self.center_pos.z)
   end
   -- lib.print.debug(('zone %s has been created n chunkZone %s'):format(self.id, self.chunk_zone))
   local myPos = GetEntityCoords(cache.ped)
@@ -84,7 +86,8 @@ function zone:is_inside(data)
   elseif self.type == 'poly' then
     return self.polygon:contains(current_pos.xyz, self.height)
   elseif self.type == 'game_zone' then 
-    return self.game_zone == GetNameOfZone(pos.x, pos.y, pos.z)
+    local curZone = cache.game == 'fivem' and GetNameOfZone(current_pos.x, current_pos.y, current_pos.z) or GetMapZoneAtCoords(current_pos.x, current_pos.y, current_pos.z) 
+    return self.game_zone == curZone
   elseif self.type == 'box' then 
     return current_pos.x >= self.pos.x and current_pos.x <= self.pos.x + self.size.x and current_pos.y >= self.pos.y and current_pos.y <= self.pos.y + self.size.y and current_pos.z >= self.pos.z and current_pos.z <= self.pos.z + self.size.z
   end
@@ -173,7 +176,7 @@ CreateThread(function()
     local wait_time = 1000
     local ply = cache.ped
     local my_pos = GetEntityCoords(ply)
-    local gta_zone = GetNameOfZone(my_pos)
+    local gta_zone = cache.game == 'fivem' and GetNameOfZone(my_pos.x, my_pos.y, my_pos.z) or GetMapZoneAtCoords(my_pos.x, my_pos.y, my_pos.z) 
     local current_state = {
       pos = my_pos,
       game_zone = gta_zone

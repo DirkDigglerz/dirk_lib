@@ -40,6 +40,7 @@ end)
 
 AddEventHandler('onResourceStop', function(resource)
   if resource == GetCurrentResourceName() then 
+    if cache.game == 'redm' then return end
     TriggerScreenblurFadeOut(500)
   end
 end)
