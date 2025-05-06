@@ -8,7 +8,7 @@ local supportedResources = {
   fuel              = {'cdn-fuel', 'LegacyFuel', 'ox_fuel', 'ps-fuel', 'Renewed-Fuel', 'ti_fuel', 'x-fuel', 'wasabi_fuel'},
   phone             = {'lb-phone', 'qb-phone', 'gksphone', 'high-phone', 'npwd'},
   garage            = {'qb-garages', 'wasabi_garage', 'renewed-garage'},
-  clothing          = {'qb-clothing', 'rcore_clothing', 'illenium_appearance', 'fivem-appearance', 'dirk_charCreator', 'tgiann_clothing'},
+  clothing          = {'qb-clothing', 'rcore_clothing', 'illenium-appearance', 'fivem-appearance', 'dirk_charCreator', 'tgiann_clothing'},
   ambulance         = {'qb-ambulancejob', 'wasabi_ambulance', 'core_ambulance'},
   prison            = {'qb-prison', 'rcore_prison', 'wasabi_jail'},
   dispatch          = {'bub_mdt', 'cd_dispatch', 'linden_outlawalert', 'qs_dispatch', 'ps-dispatch', 'tk_dispatch'},
@@ -20,7 +20,7 @@ local autodetected = {}
 for system, resources in pairs(supportedResources) do 
   for _, resource in ipairs(resources) do 
     local resourceState = GetResourceState(resource) 
-    if resourceState == 'starting' or resourceState == 'started' then 
+    if resourceState == 'starting' or resourceState == 'started' or resourceState ~= 'missing' then
       autodetected[system] = resource 
       goto continue
     end
