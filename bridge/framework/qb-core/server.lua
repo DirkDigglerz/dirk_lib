@@ -1,6 +1,15 @@
 return {
   canUseItem = function(item)
-    return lib.FW.Functions.CanUseItem(item)
+    local itemInfo = lib.FW.Functions.CanUseItem(item)
+    if type(itemInfo) ~= 'table' then
+      return false
+    end
+
+    if not itemInfo.func then 
+      return false
+    end
+
+    return itemInfo.func 
   end,
 
   useableItem = function(item, cb)

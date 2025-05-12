@@ -24,7 +24,9 @@ CreateThread(function()
   local wait_time = 100
   while true do
     local ped = PlayerPedId()
+    local dead = IsEntityDead(ped)
     cache:set('ped', ped)
+    cache:set('dead', dead)
 
     local vehicle = GetVehiclePedIsIn(ped, false)
     if vehicle > 0 then
