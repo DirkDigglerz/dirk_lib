@@ -14,7 +14,7 @@ jobs:
         run: sudo apt install zip
 
       - name: Checkout source code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
         with:
           fetch-depth: 0
           ref: ${{ github.event.repository.default_branch }}
@@ -24,7 +24,7 @@ jobs:
           version: 8.6.1
 
       - name: Setup node
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: 22.x
           cache: 'pnpm'
