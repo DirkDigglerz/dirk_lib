@@ -44,4 +44,17 @@ return {
     }
     return ret
   end,
+
+  isDead = function()
+    if IsEntityDead(cache.ped) then return true end
+    local playerMetadata = lib.player.getMetadata() 
+    if not playerMetadata then return false end
+    return playerMetadata.inlaststand or playerMetadata.isdead
+  end, 
+
+  isCuffed = function()
+    local playerMetadata = lib.player.getMetadata() 
+    if not playerMetadata then return false end
+    return playerMetadata.ishandcuffed
+  end,
 }
