@@ -38,7 +38,7 @@ lib.player = {
   ---@function lib.player.getJob
   ---@description # Get the job of a player
   ---@return {name: string, type: string, label: string, grade: number, isBoss: boolean, bankAuth: boolean, gradeLabel: string, duty: boolean}
-  getJob        = bridge.getJob
+  getJob        = bridge.getJob,
 
   ---@function lib.player.isDead 
   ---@description # Check if a player is dead
