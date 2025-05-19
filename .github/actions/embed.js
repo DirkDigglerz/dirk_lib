@@ -23,16 +23,13 @@ if (!webhookUrl) {
 // Determine the appropriate download links based on repository visibility
 const downloadLinks = isPrivate 
   ? {
-      primaryLink: "https://portal.cfx.re/assets/granted-assets",
-      primaryLabel: "Get Latest Release From Portal",
-      secondaryLink: "https://keymaster.fivem.net/assets",
-      secondaryLabel: "Get Latest From Keymaster"
+      link: "https://portal.cfx.re/assets/granted-assets",
+      label: "Get Latest Release From Keymaster",
     }
   : {
-      primaryLink: "https://portal.cfx.re/assets/granted-assets",
-      primaryLabel: "Get Latest Release From Portal",
-      secondaryLink: `https://github.com/${owner}/${repo}/tree/main`,
-      secondaryLabel: `Get Latest ${repo} Release`
+      // LINK TO LATEST RELEASE
+      link: `https://github.com/${owner}/${repo}/releases/tag/latest_production`,
+      label: 'Download Latest Release from Github',
     };
 
 // Construct payload
@@ -53,31 +50,31 @@ const payload = JSON.stringify({
       fields: [
         {
           name: "📥 Downloads",
-          value: `[${downloadLinks.primaryLabel}](${downloadLinks.primaryLink})\n[${downloadLinks.secondaryLabel}](${downloadLinks.secondaryLink})`,
+          value: `[${downloadLinks.label}](${downloadLinks.link})`,
           inline: false
         }
       ]
     },
   ],
-  components: [
-    {
-      type: 1,  // Action Row
-      components: [
-        {
-          type: 2,  // Button
-          style: 5,  // Link button
-          label: downloadLinks.primaryLabel,
-          url: downloadLinks.primaryLink,
-        },
-        {
-          type: 2,  // Button
-          style: 5,  // Link button
-          label: downloadLinks.secondaryLabel,
-          url: downloadLinks.secondaryLink,
-        },
-      ],
-    },
-  ],
+  // components: [
+  //   {
+  //     type: 1,  // Action Row
+  //     components: [
+  //       {
+  //         type: 2,  // Button
+  //         style: 5,  // Link button
+  //         label: downloadLinks.primaryLabel,
+  //         url: downloadLinks.primaryLink,
+  //       },
+  //       {
+  //         type: 2,  // Button
+  //         style: 5,  // Link button
+  //         label: downloadLinks.secondaryLabel,
+  //         url: downloadLinks.secondaryLink,
+  //       },
+  //     ],
+  //   },
+  // ],
 });
 
 // Send the webhook via HTTPS
