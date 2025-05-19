@@ -2,18 +2,14 @@ const https = require("https");
 
 const { env } = process;
 
-const fs = require("fs");
-
-// Load event data
-const eventPath = env.GITHUB_EVENT_PATH;
-const eventData = JSON.parse(fs.readFileSync(eventPath, "utf8"));
-
-// Extract data
+// Extract data from env variables or fallbacks
 const repoFull = env.GITHUB_REPOSITORY || "unknown/unknown";
 const [owner, repo] = repoFull.split("/");
-const version = eventData.release?.tag_name || "Unknown Version";
-const description = eventData.release?.body || "No description provided.";
-const title = `${repo} ${version}`;
+
+// Use env vars from workflow or fallback values
+const version = env.RELEASE_TAG || "Unknown Version";
+const description = env.RELEASE_DESCRIPTION || "No description provided.";
+const title = env.RELEASE_TITLE || `${repo} ${version}`;
 const avatarUrl = `https://github.com/${owner}.png`;
 const webhookUrl = env.WEBHOOK_URL;
 
