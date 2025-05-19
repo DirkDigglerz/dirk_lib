@@ -56,6 +56,7 @@ async function fetchLatestCommits() {
       let data = '';
       
       res.on('data', (chunk) => {
+  
         data += chunk;
       });
       
@@ -75,13 +76,23 @@ async function fetchLatestCommits() {
               const commits = response || [];
 
               if (commits.length > 0) {
-                commits.slice(0, 10).forEach(commit => {
-                  let message = commit.commit.message.split('\n')[0];
-                  if (message.length > 100) {
-                    message = message.substring(0, 97) + '...';
-                  }
-                  description += `• ${message} ([${commit.sha.substring(0, 7)}](${commit.html_url}))\n`;
+                // Filter out chore and merge commits
+                const filteredCommits = commits.filter(commit => {
+                  const msg = commit.commit.message.toLowerCase();
+                  return !msg.startsWith("chore:") && !msg.startsWith("merge");
                 });
+
+                if (filteredCommits.length > 0) {
+                  filteredCommits.slice(0, 10).forEach(commit => {
+                    let message = commit.commit.message.split('\n')[0];
+                    if (message.length > 100) {
+                      message = message.substring(0, 97) + '...';
+                    }
+                    description += `• ${message} ([${commit.sha.substring(0, 7)}](${commit.html_url}))\n`;
+                  });
+                } else {
+                  description += "No relevant commits found.\n";
+                }
 
                 resolve(description);
               } else {
