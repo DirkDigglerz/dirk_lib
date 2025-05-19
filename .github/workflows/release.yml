@@ -92,7 +92,9 @@ jobs:
         env:
           WEBHOOK_URL: ${{ secrets.RELEASE_WEBHOOK_URL }}
           RELEASE_TAG: ${{ env.NEW_VERSION }}
-          RELEASE_DESCRIPTION: ${{ github.event.release.body || '' }}
+          PREVIOUS_TAG: latest_production
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Optionally add RELEASE_DESCRIPTION here if you want
+          IS_PRIVATE_REPO: ${{ github.event.repository.private }}
+          # Using a default description since there's no release body
+          RELEASE_DESCRIPTION: "New version of dirk_lib released!"
         run: node .github/actions/embed.js
