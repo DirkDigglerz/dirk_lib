@@ -9,6 +9,7 @@ const [owner, repo] = repoFull.split("/");
 // Use env vars from workflow or fallback values
 const version = env.RELEASE_TAG || "Unknown Version";
 const description = env.RELEASE_DESCRIPTION || "No description provided.";
+const isPrivate = env.IS_PRIVATE_REPO === "true";
 
 const title = env.RELEASE_TITLE ? repo + ' ' + env.RELEASE_TITLE : `${repo} ${version}`;
 const avatarUrl = `https://github.com/${owner}.png`;
@@ -18,6 +19,21 @@ if (!webhookUrl) {
   console.error("❌ WEBHOOK_URL not set");
   process.exit(1);
 }
+
+// Determine the appropriate download links based on repository visibility
+const downloadLinks = isPrivate 
+  ? {
+      primaryLink: "https://portal.cfx.re/assets/granted-assets",
+      primaryLabel: "Get Latest Release From Portal",
+      secondaryLink: "https://keymaster.fivem.net/assets",
+      secondaryLabel: "Get Latest From Keymaster"
+    }
+  : {
+      primaryLink: "https://portal.cfx.re/assets/granted-assets",
+      primaryLabel: "Get Latest Release From Portal",
+      secondaryLink: `https://github.com/${owner}/${repo}/tree/main`,
+      secondaryLabel: `Get Latest ${repo} Release`
+    };
 
 // Construct payload
 const payload = JSON.stringify({
@@ -37,7 +53,7 @@ const payload = JSON.stringify({
       fields: [
         {
           name: "📥 Downloads",
-          value: `[Get Latest Release From Portal](https://portal.cfx.re/assets/granted-assets)\n[Get Latest ${repo} Release](https://github.com/${owner}/${repo}/tree/main)`,
+          value: `[${downloadLinks.primaryLabel}](${downloadLinks.primaryLink})\n[${downloadLinks.secondaryLabel}](${downloadLinks.secondaryLink})`,
           inline: false
         }
       ]
@@ -50,14 +66,14 @@ const payload = JSON.stringify({
         {
           type: 2,  // Button
           style: 5,  // Link button
-          label: "Get The Latest Release From Portal",
-          url: "https://portal.cfx.re/assets/granted-assets",
+          label: downloadLinks.primaryLabel,
+          url: downloadLinks.primaryLink,
         },
         {
           type: 2,  // Button
           style: 5,  // Link button
-          label: `Get The Latest ${repo} Release`,
-          url: `https://github.com/${owner}/${repo}/tree/main`,
+          label: downloadLinks.secondaryLabel,
+          url: downloadLinks.secondaryLink,
         },
       ],
     },
