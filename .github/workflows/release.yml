@@ -13,7 +13,7 @@ jobs:
       - name: Send webhook notification
         env:
           WEBHOOK_URL: ${{ secrets.RELEASE_WEBHOOK_URL }}
-        run: node ./actions/send-webhook.js
+        run: node .github/actions/bump-manifest-version.js
 
       - name: Install archive tools
         run: sudo apt install zip
