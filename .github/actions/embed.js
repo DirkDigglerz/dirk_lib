@@ -27,7 +27,7 @@ const payload = JSON.stringify({
     {
       title,
       description,
-      color: 15105570,
+      color: 2067276,
       footer: {
         text: `🔄 Download the latest version of ${repo} to ensure compatibility.`,
       },
