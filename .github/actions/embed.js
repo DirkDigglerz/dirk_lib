@@ -133,7 +133,7 @@ const downloadLinks = isPrivate
     }
   : {
       // LINK TO LATEST RELEASE
-      link: `https://github.com/${owner}/${repo}/releases/tag/latest_production`,
+      link: `https://github.com/${owner}/${repo}/releases/tag/${version}`,
       label: 'Latest Release from Github',
     };
 
