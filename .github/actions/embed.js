@@ -124,7 +124,7 @@ async function fetchLatestCommits() {
     req.end();
   });
 }
-
+  
 // Determine the appropriate download links based on repository visibility
 const downloadLinks = isPrivate 
   ? {
