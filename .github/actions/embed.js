@@ -9,7 +9,8 @@ const [owner, repo] = repoFull.split("/");
 // Use env vars from workflow or fallback values
 const version = env.RELEASE_TAG || "Unknown Version";
 const description = env.RELEASE_DESCRIPTION || "No description provided.";
-const title = env.RELEASE_TITLE || `${repo} ${version}`;
+
+const title = env.GITHUB_REPOSITORY + env.RELEASE_TITLE || `${repo} ${version}`;
 const avatarUrl = `https://github.com/${owner}.png`;
 const webhookUrl = env.WEBHOOK_URL;
 
