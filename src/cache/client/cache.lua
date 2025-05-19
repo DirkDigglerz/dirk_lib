@@ -3,15 +3,36 @@ cache.playerId = PlayerId()
 cache.serverId = GetPlayerServerId(cache.playerId)
 
 
-function cache:set(key,value)
-  if value ~= self[key] then
-    TriggerEvent(('dirk_lib:cache:%s'):format(key), value, self[key])
+local function deepEqual(a, b)
+  if a == b then return true end
+  if type(a) ~= "table" or type(b) ~= "table" then return false end
+
+  for k, v in pairs(a) do
+    if not deepEqual(v, b[k]) then
+      return false
+    end
+  end
+  for k in pairs(b) do
+    if a[k] == nil then
+      return false
+    end
+  end
+
+  return true
+end
+
+function cache:set(key, value)
+  local current = self[key]
+  local isDifferent = type(value) == "table" and not deepEqual(current, value) or value ~= current
+
+  if isDifferent then
+    TriggerEvent(('dirk_lib:cache:%s'):format(key), value, current)
     self[key] = value
     return true
   end
+
   return false
 end
-
 
 
 local GetVehiclePedIsIn = GetVehiclePedIsIn
@@ -24,9 +45,7 @@ CreateThread(function()
   local wait_time = 100
   while true do
     local ped = PlayerPedId()
-    local dead = IsEntityDead(ped)
     cache:set('ped', ped)
-    cache:set('dead', dead)
 
     local vehicle = GetVehiclePedIsIn(ped, false)
     if vehicle > 0 then

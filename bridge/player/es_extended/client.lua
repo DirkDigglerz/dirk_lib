@@ -48,4 +48,10 @@ return {
     }
     return ret
   end,
+
+  editStatus = function(status, value)
+    TriggerEvent(value > 0 and 'esx_status:add' or 'esx_status:remove', status, math.abs(value))
+  end
+
 }
+

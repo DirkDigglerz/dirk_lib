@@ -125,5 +125,8 @@ return {
     local ply = lib.player.get(src)
     if not ply then return end
     return ply.Functions.SetMoney(acc, count)
-  end
+  end, 
+
+  
 }
+

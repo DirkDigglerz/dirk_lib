@@ -33,8 +33,9 @@ return {
     if type(invId) ~= 'number' then 
       items = exports['qs-inventory']:GetStashItems(invId)
     else 
-      items = exports['qs-inventory']:GetInventory(number)
+      items = exports['qs-inventory']:GetInventory(invId)
     end
+    if not items then return false end
     for k,v in pairs(items) do 
       if v.name == item then 
         if not count or ((v.count and count <= v.count) or (v.amount and count <= v.amount)) then 

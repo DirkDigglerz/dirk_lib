@@ -40,25 +40,10 @@ lib.player = {
   ---@return {name: string, type: string, label: string, grade: number, isBoss: boolean, bankAuth: boolean, gradeLabel: string, duty: boolean}
   getJob        = bridge.getJob,
 
-  ---@function lib.player.isDead 
-  ---@description # Check if a player is dead
-  ---@return boolean
-  isDead        = bridge.isDead,
-
-  ---@function lib.player.isCuffed
-  ---@description # Check if a player is handcuffed
-  ---@return boolean
-  isCuffed      = bridge.isCuffed
-
-  setPlayerStatus = function(status, value)
-    local playerState = LocalPlayer.state
-    for name, value in pairs(values) do
-      if value > 100 or value < -100 then
-        value = value * 0.0001
-      end
-      playerState:set(name, playerState[name] + value, true)
-    end
-  end, 
+  ---@function lib.player.editStatus
+  ---@description # Add to the status of a player, you can use negative values to remove status
+  ---@param status string
+  editStatus    = bridge.editStatus,
 }
 
 return lib.player

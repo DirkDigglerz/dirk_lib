@@ -45,20 +45,4 @@ return {
     }
     return ret
   end,
-
-
-  isDead = function()
-    if IsEntityDead(cache.ped) then return true end
-    local playerMetadata = lib.player.getMetadata() 
-    if not playerMetadata then return false end
-    local qbcoreDead =  playerMetadata.inlaststand or playerMetadata.isdead or false
-    local qbxAmbulanceDead = qbx_medical and (qbx_medical:IsDead() or qbx_medical:IsLaststand()) or false
-    return qbcoreDead or qbxAmbulanceDead
-  end,
-
-  isCuffed = function()
-    local playerMetadata = lib.player.getMetadata() 
-    if not playerMetadata then return false end
-    return playerMetadata.ishandcuffed
-  end,
 }

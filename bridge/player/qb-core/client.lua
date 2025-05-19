@@ -45,16 +45,30 @@ return {
     return ret
   end,
 
-  isDead = function()
-    if IsEntityDead(cache.ped) then return true end
-    local playerMetadata = lib.player.getMetadata() 
-    if not playerMetadata then return false end
-    return playerMetadata.inlaststand or playerMetadata.isdead
-  end, 
-
-  isCuffed = function()
-    local playerMetadata = lib.player.getMetadata() 
-    if not playerMetadata then return false end
-    return playerMetadata.ishandcuffed
-  end,
+  editStatus = function(status, value)
+    local events = {
+      hunger = 'consumables:server:addHunger',
+      thirst = 'consumables:server:addThirst',
+      addStress = 'hud:server:GainStress',
+      removeStress = 'hud:server:RemoveStress',
+    }
+    -- For using values in 1000s (ESX OLD STYLE)
+    if value > 100 or value < -100 then
+      value = value * 0.0001
+    end
+    
+    if status ~= 'stress' then 
+      local current = lib.FW.Functions.GetPlayerData().metadata[status]
+      current = current or 0
+      local event = events[status]
+      if event then
+        TriggerServerEvent(event, current + value)
+      else 
+        lib.print.info(('There is no event for status:%s in qb-core if it exists please add it to the events table bridge/player/qb-core/client.lua'):format(status))  
+      end
+    else 
+      local event = value > 0 and events['addStress'] or events['removeStress']
+      TriggerServerEvent(event, math.abs(value))
+    end 
+  end
 }
