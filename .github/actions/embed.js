@@ -36,7 +36,7 @@ async function fetchLatestCommits() {
     console.log(`Fetching commits between ${previousTag} and ${version || 'HEAD'}`);
     
     // Prepare the API request to get commits between tags/branches
-    const apiPath = `/repos/${owner}/${repo}/compare/${encodeURIComponent(previousTag)}...${encodeURIComponent(version || 'HEAD')}`;
+   const apiPath = `/repos/${owner}/${repo}/commits?per_page=10`;
     
     const options = {
       hostname: "api.github.com",
