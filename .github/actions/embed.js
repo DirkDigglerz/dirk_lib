@@ -1,4 +1,3 @@
-
 const https = require("https");
 
 const { env } = process;
@@ -32,11 +31,15 @@ async function fetchLatestCommits() {
       return;
     }
 
-    const previousTag = env.PREVIOUS_TAG || "latest_production";
-    console.log(`Fetching commits between ${previousTag} and ${version || 'HEAD'}`);
+    console.log("Env variables:");
+    console.log(`- GITHUB_REPOSITORY: ${env.GITHUB_REPOSITORY}`);
+    console.log(`- RELEASE_TAG: ${version}`);
+    console.log(`- PREVIOUS_TAG: ${env.PREVIOUS_TAG || "release"}`);
+    console.log(`- GITHUB_TOKEN present: ${!!githubToken}`);
     
-    // Prepare the API request to get commits between tags/branches
-   const apiPath = `/repos/${owner}/${repo}/commits?per_page=10`;
+    // Get the most recent commits directly instead of comparing tags
+    const apiPath = `/repos/${owner}/${repo}/commits?per_page=10`;
+    console.log(`Using API path: ${apiPath}`);
     
     const options = {
       hostname: "api.github.com",
@@ -57,55 +60,55 @@ async function fetchLatestCommits() {
       });
       
       res.on('end', () => {
-        if (res.statusCode === 200) {
-          try {
-            const response = JSON.parse(data);
-            const commits = response.commits;
-            
-            if (commits && commits.length > 0) {
-              // Format commits into a nice description
-              let description = defaultDescription ? defaultDescription + "\n\n**Latest Changes:**\n" : "**Latest Changes:**\n";
-              
-              // Limit to 10 most recent commits to avoid too long descriptions
-              const recentCommits = commits.slice(-10);
-              
-              recentCommits.forEach(commit => {
-                // Format commit message: remove newlines and truncate if needed
-                let message = commit.commit.message.split('\n')[0];
-                if (message.length > 100) {
-                  message = message.substring(0, 97) + '...';
-                }
-                
-                // Add commit to description with link to commit
-                description += `• ${message} ([${commit.sha.substring(0, 7)}](${commit.html_url}))\n`;
-              });
-              
-              if (commits.length > 10) {
-                description += `\n*...and ${commits.length - 10} more commits not shown*`;
+        try {
+          console.log(`GitHub API response status: ${res.statusCode}`);
+
+          if (res.statusCode === 200) {
+            try {
+              const response = JSON.parse(data);
+              console.log(`API data received. Found ${response.length || 0} commits`);
+
+              let description = defaultDescription
+                ? defaultDescription + "\n\n**Latest Changes:**\n"
+                : "**Latest Changes:**\n";
+
+              const commits = response || [];
+
+              if (commits.length > 0) {
+                commits.slice(0, 10).forEach(commit => {
+                  let message = commit.commit.message.split('\n')[0];
+                  if (message.length > 100) {
+                    message = message.substring(0, 97) + '...';
+                  }
+                  description += `• ${message} ([${commit.sha.substring(0, 7)}](${commit.html_url}))\n`;
+                });
+
+                resolve(description);
+              } else {
+                console.log("No commits found");
+                resolve(defaultDescription);
               }
-              
-              resolve(description);
-            } else {
-              console.log("No commits found between releases");
+            } catch (parseError) {
+              console.error('❌ Failed to parse GitHub response JSON:', parseError);
               resolve(defaultDescription);
             }
-          } catch (err) {
-            console.error("❌ Error parsing GitHub API response:", err);
+          } else {
+            console.error(`❌ GitHub API returned status code ${res.statusCode}`);
+            console.error(`Full response: ${data}`);
             resolve(defaultDescription);
           }
-        } else {
-          console.error(`❌ GitHub API returned status code ${res.statusCode}`);
-          console.error(data);
+        } catch (err) {
+          console.error('❌ Unexpected error while processing GitHub response:', err);
           resolve(defaultDescription);
         }
       });
-    });
-    
+          
     req.on('error', (err) => {
       console.error("❌ Error fetching commits:", err);
       resolve(defaultDescription);
     });
     
+    console.log("Sending GitHub API request...");
     req.end();
   });
 }
@@ -125,8 +128,10 @@ const downloadLinks = isPrivate
 // Main function to run the webhook
 async function sendWebhook() {
   try {
+    console.log("Starting webhook process...");
     // Get the description with latest commits
     const description = await fetchLatestCommits();
+    console.log("Commit description generated:", description.substring(0, 100) + "...");
     
     // Construct payload
     const payload = JSON.stringify({
@@ -154,7 +159,8 @@ async function sendWebhook() {
       ],
     });
 
-    // Send the webhook via HTTPS
+    console.log("Webhook payload prepared, sending to Discord...");
+
     const url = new URL(webhookUrl);
     const req = https.request(
       {
