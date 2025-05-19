@@ -10,7 +10,7 @@ const [owner, repo] = repoFull.split("/");
 const version = env.RELEASE_TAG || "Unknown Version";
 const description = env.RELEASE_DESCRIPTION || "No description provided.";
 
-const title = env.GITHUB_REPOSITORY + env.RELEASE_TITLE || `${repo} ${version}`;
+const title = repo + ' ' + env.RELEASE_TITLE || `${repo} ${version}`;
 const avatarUrl = `https://github.com/${owner}.png`;
 const webhookUrl = env.WEBHOOK_URL;
 
