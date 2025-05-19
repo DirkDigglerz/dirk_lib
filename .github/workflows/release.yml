@@ -10,6 +10,11 @@ jobs:
     name: Build and Create Tagged Release
     runs-on: ubuntu-latest
     steps:
+      - name: Send webhook notification
+        env:
+          WEBHOOK_URL: ${{ secrets.RELEASE_WEBHOOK_URL }}
+        run: node ./actions/send-webhook.js
+
       - name: Install archive tools
         run: sudo apt install zip
 
