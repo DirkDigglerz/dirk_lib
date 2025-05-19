@@ -34,6 +34,13 @@ const payload = JSON.stringify({
       thumbnail: {
         url: avatarUrl,
       },
+      fields: [
+        {
+          name: "📥 Downloads",
+          value: `[Get Latest Release From Portal](https://portal.cfx.re/assets/granted-assets)\n[Get Latest ${repo} Release](https://github.com/${owner}/${repo}/tree/main)`,
+          inline: false
+        }
+      ]
     },
   ],
   components: [
