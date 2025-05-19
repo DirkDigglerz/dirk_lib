@@ -88,3 +88,10 @@ jobs:
         env:
           CI: false
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Send webhook notification
+        env:
+          WEBHOOK_URL: ${{ secrets.RELEASE_WEBHOOK_URL }}
+          RELEASE_TAG: ${{ env.NEW_VERSION }}
+          RELEASE_TITLE: Release ${{ env.NEW_VERSION }}
+          # Optionally add RELEASE_DESCRIPTION here if you want
+        run: node .github/actions/embed.js
