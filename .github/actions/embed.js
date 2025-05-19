@@ -21,8 +21,8 @@ if (!webhookUrl) {
 
 // Construct payload
 const payload = JSON.stringify({
-  content: "<@&1337224918710095882>",
-  // allowed_mentions: { parse: ["roles"] },
+  content: "<@&1327654778934919230>",
+  allowed_mentions: { parse: ["roles"] },
   embeds: [
     {
       title,
