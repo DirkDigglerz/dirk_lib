@@ -32,7 +32,7 @@ async function fetchLatestCommits() {
       return;
     }
 
-    const previousTag = env.PREVIOUS_TAG || "release";
+    const previousTag = env.PREVIOUS_TAG || "latest_production";
     console.log(`Fetching commits between ${previousTag} and ${version || 'HEAD'}`);
     
     // Prepare the API request to get commits between tags/branches
