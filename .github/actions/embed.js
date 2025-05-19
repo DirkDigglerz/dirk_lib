@@ -102,7 +102,8 @@ async function fetchLatestCommits() {
           resolve(defaultDescription);
         }
       });
-          
+    });
+    
     req.on('error', (err) => {
       console.error("❌ Error fetching commits:", err);
       resolve(defaultDescription);
