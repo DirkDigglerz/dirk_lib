@@ -18,7 +18,7 @@ return {
   ---@param md table [Optional] Item Metadata
   ---@return boolean
   removeItem = function(invId, item, count, md, slot)
-    return type(invId) ~= 'number' and exports['qs-inventory']:RemoveItem(invId, item, count, slot, md) or exports['qs-inventory']:RemoveItemFromStash(invId, item, count, slot, md)
+    return type(invId) ~= 'number' and exports['qs-inventory']:RemoveItem(invId, item, count, slot, md) or exports['qs-inventory']:RemoveItemIntoStash(invId, item, count, slot, md)
   end,
 
   --- Check if player has item in inventory
