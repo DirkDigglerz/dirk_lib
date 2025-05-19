@@ -59,7 +59,7 @@ async function fetchLatestCommits() {
   
         data += chunk;
       });
-      
+       
       res.on('end', () => {
         try {
           console.log(`GitHub API response status: ${res.statusCode}`);
