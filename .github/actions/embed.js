@@ -24,12 +24,12 @@ if (!webhookUrl) {
 const downloadLinks = isPrivate 
   ? {
       link: "https://portal.cfx.re/assets/granted-assets",
-      label: "Get Latest Release From Keymaster",
+      label: "Latest Release from CFX Portal",
     }
   : {
       // LINK TO LATEST RELEASE
       link: `https://github.com/${owner}/${repo}/releases/tag/latest_production`,
-      label: 'Download Latest Release from Github',
+      label: 'Latest Release from Github',
     };
 
 // Construct payload
@@ -49,7 +49,7 @@ const payload = JSON.stringify({
       },
       fields: [
         {
-          name: "📥 Downloads",
+          name: "📥 Download",
           value: `[${downloadLinks.label}](${downloadLinks.link})`,
           inline: false
         }
