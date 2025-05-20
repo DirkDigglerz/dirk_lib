@@ -58,20 +58,18 @@ jobs:
           cp -r ./web/build ./temp/dirk_lib/web/
           cd ./temp && zip -r ../dirk_lib.zip ./dirk_lib
 
-      - name: Create Release
-        uses: marvinpinto/action-automatic-releases@v1.2.1
-        id: auto_release
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          title: "v${{ env.NEW_VERSION }}"
-          prerelease: false
-          files: dirk_lib.zip
-          automatic_release_tag: ${{ env.NEW_VERSION }}
-        env:
-          CI: false
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Checkout
-        uses: actions/checkout@v3 
+        uses: actions/checkout@v3
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ env.NEW_VERSION }}
+        run: |
+          gh release create "v${NEW_VERSION}" dirk_lib.zip \
+            --title "v${NEW_VERSION}" \
+            --notes "Automated release for v${NEW_VERSION}" \
+            --latest
+
   # notify-discord:
   #   runs-on: ubuntu-latest
   #   needs: create-release
