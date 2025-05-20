@@ -6,15 +6,25 @@ on:
       - main
 
 jobs:
+  draft_release_notes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Draft Release Notes
+        uses: release-drafter/release-drafter@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   create-release:
-    name: Build and Create Tagged Release
+    needs: draft_release_notes
     runs-on: ubuntu-latest
     steps:
       - name: Install zip
         run: sudo apt install zip
 
       - name: Checkout source code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -50,6 +60,15 @@ jobs:
           author_name: Manifest Bumper
           author_email: 41898282+github-actions[bot]@users.noreply.github.com
           message: 'chore: bump manifest version to ${{ env.NEW_VERSION }}'
+
+      # Create and push tag for new version
+      - name: Create git tag
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag -a "v${{ env.NEW_VERSION }}" -m "Release v${{ env.NEW_VERSION }}"
+          git push origin "v${{ env.NEW_VERSION }}"
+
       - name: Bundle files
         run: |
           mkdir -p ./temp/dirk_lib/web/
@@ -57,31 +76,24 @@ jobs:
           cp -r ./src ./bridge ./locales ./modules ./temp/dirk_lib/
           cp -r ./web/build ./temp/dirk_lib/web/
           cd ./temp && zip -r ../dirk_lib.zip ./dirk_lib
-      - name: Create GitHub Release
+
+      - id: create_release
+        name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "v${{ env.NEW_VERSION }}"
+          name: "Release v${{ env.NEW_VERSION }}"
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NEW_VERSION: ${{ env.NEW_VERSION }}
-        run: |
-          gh release create "v${NEW_VERSION}" dirk_lib.zip \
-            --title "v${NEW_VERSION}" \
-            --notes "Automated release for v${NEW_VERSION}" \
-            --latest
-      - name: Checkout
-        uses: actions/checkout@v4
-  # notify-discord:
-  #   runs-on: ubuntu-latest
-  #   needs: create-release
-  #   steps:
-  #     - name: Github Releases To Discord
-  #       uses: SethCohen/github-releases-to-discord@v1.16.2
-  #       with:
-  #         webhook_url: ${{ secrets.WEBHOOK_URL }}
-  #         color: "2105893"
-  #         username: "Release Changelog"
-  #         avatar_url: "https://cdn.discordapp.com/avatars/487431320314576937/bd64361e4ba6313d561d54e78c9e7171.png"
-  #         content: "||@everyone||"
-  #         footer_title: "Changelog"
-  #         footer_icon_url: "https://cdn.discordapp.com/avatars/487431320314576937/bd64361e4ba6313d561d54e78c9e7171.png"
-  #         footer_timestamp: true
-  #         max_description: '4096'
-  #         reduce_headings: true
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dirk_lib.zip
+          asset_name: dirk_lib.zip
+          asset_content_type: application/zip
