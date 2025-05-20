@@ -78,12 +78,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Send Discord Webhook
-        run: node .github/actions/embed.js
-        env:
-          WEBHOOK_URL: ${{ secrets.RELEASE_WEBHOOK_URL }}
-          RELEASE_TAG: v${{ env.NEW_VERSION }}
-          PREVIOUS_TAG: latest_production
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          IS_PRIVATE_REPO: ${{ github.event.repository.private }}
-          RELEASE_DESCRIPTION: "New version of dirk_lib released!"
+      # - name: Send Discord Webhook
+      #   run: node .github/actions/embed.js
+      #   env:
+      #     WEBHOOK_URL: ${{ secrets.RELEASE_WEBHOOK_URL }}
+      #     RELEASE_TAG: v${{ env.NEW_VERSION }}
+      #     PREVIOUS_TAG: latest_production
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     IS_PRIVATE_REPO: ${{ github.event.repository.private }}
+      #     RELEASE_DESCRIPTION: "New version of dirk_lib released!"
