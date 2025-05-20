@@ -66,6 +66,7 @@ jobs:
           title: "v${{ env.NEW_VERSION }}"
           prerelease: false
           files: dirk_lib.zip
+          automatic_release_tag: 'latest_production'
         env:
           CI: false
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
