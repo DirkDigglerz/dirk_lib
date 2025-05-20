@@ -8,6 +8,7 @@ const [owner, repo] = repoFull.split("/");
 
 // Use env vars from workflow or fallback values
 const version = env.RELEASE_TAG || "Unknown Version";
+const previousTag = env.PREVIOUS_TAG || null;
 const defaultDescription = env.RELEASE_DESCRIPTION || "No description provided.";
 const isPrivate = env.IS_PRIVATE_REPO === "true";
 
@@ -21,8 +22,8 @@ if (!webhookUrl) {
   process.exit(1);
 }
 
-// Function to fetch the latest commits
-async function fetchLatestCommits() {
+// Function to fetch commits between releases
+async function fetchReleaseCommits() {
   return new Promise((resolve, reject) => {
     // Default in case we can't fetch commits
     if (!githubToken) {
@@ -34,11 +35,21 @@ async function fetchLatestCommits() {
     console.log("Env variables:");
     console.log(`- GITHUB_REPOSITORY: ${env.GITHUB_REPOSITORY}`);
     console.log(`- RELEASE_TAG: ${version}`);
-    console.log(`- PREVIOUS_TAG: ${env.PREVIOUS_TAG || "release"}`);
+    console.log(`- PREVIOUS_TAG: ${previousTag || "not set"}`);
     console.log(`- GITHUB_TOKEN present: ${!!githubToken}`);
     
-    // Get the most recent commits directly instead of comparing tags
-    const apiPath = `/repos/${owner}/${repo}/commits?per_page=10`;
+    let apiPath;
+    
+    if (previousTag) {
+      // Compare between previous tag and current tag
+      apiPath = `/repos/${owner}/${repo}/compare/${previousTag}...${version}`;
+      console.log(`Comparing tags: ${previousTag} to ${version}`);
+    } else {
+      // If no previous tag, get commits for this tag/release
+      apiPath = `/repos/${owner}/${repo}/commits?sha=${version}&per_page=50`;
+      console.log(`Getting commits for tag: ${version}`);
+    }
+    
     console.log(`Using API path: ${apiPath}`);
     
     const options = {
@@ -56,7 +67,6 @@ async function fetchLatestCommits() {
       let data = '';
       
       res.on('data', (chunk) => {
-  
         data += chunk;
       });
        
@@ -67,13 +77,22 @@ async function fetchLatestCommits() {
           if (res.statusCode === 200) {
             try {
               const response = JSON.parse(data);
-              console.log(`API data received. Found ${response.length || 0} commits`);
+              
+              // Handle different response formats based on API endpoint
+              let commits = [];
+              if (previousTag) {
+                // Response from compare API
+                console.log(`API data received. Found ${response.commits?.length || 0} commits between tags`);
+                commits = response.commits || [];
+              } else {
+                // Response from commits API
+                console.log(`API data received. Found ${response.length || 0} commits for tag`);
+                commits = response || [];
+              }
 
               let description = defaultDescription
-                ? defaultDescription + "\n\n**Latest Changes:**\n"
-                : "**Latest Changes:**\n";
-
-              const commits = response || [];
+                ? defaultDescription + "\n\n**Changes in this release:**\n"
+                : "**Changes in this release:**\n";
 
               if (commits.length > 0) {
                 // Filter out chore and merge commits
@@ -83,15 +102,19 @@ async function fetchLatestCommits() {
                 });
 
                 if (filteredCommits.length > 0) {
-                  filteredCommits.slice(0, 10).forEach(commit => {
+                  filteredCommits.slice(0, 30).forEach(commit => {
                     let message = commit.commit.message.split('\n')[0];
                     if (message.length > 100) {
                       message = message.substring(0, 97) + '...';
                     }
                     description += `• ${message} ([${commit.sha.substring(0, 7)}](${commit.html_url}))\n`;
                   });
+                  
+                  if (filteredCommits.length > 30) {
+                    description += `\n*...and ${filteredCommits.length - 30} more commits*\n`;
+                  }
                 } else {
-                  description += "No relevant commits found.\n";
+                  description += "No relevant commits found in this release.\n";
                 }
 
                 resolve(description);
@@ -141,8 +164,8 @@ const downloadLinks = isPrivate
 async function sendWebhook() {
   try {
     console.log("Starting webhook process...");
-    // Get the description with latest commits
-    const description = await fetchLatestCommits();
+    // Get the description with release commits
+    const description = await fetchReleaseCommits();
     console.log("Commit description generated:", description.substring(0, 100) + "...");
     
     // Construct payload
