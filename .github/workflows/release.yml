@@ -50,17 +50,6 @@ jobs:
           author_name: Manifest Bumper
           author_email: 41898282+github-actions[bot]@users.noreply.github.com
           message: 'chore: bump manifest version to ${{ env.NEW_VERSION }}'
-
-      - name: Create version tag
-        run: |
-          git tag "v${{ env.NEW_VERSION }}"
-          git push origin "v${{ env.NEW_VERSION }}"
-
-      - name: Update latest_production tag
-        run: |
-          git tag -f latest_production
-          git push origin -f latest_production
-
       - name: Bundle files
         run: |
           mkdir -p ./temp/dirk_lib/web/
@@ -69,15 +58,16 @@ jobs:
           cp -r ./web/build ./temp/dirk_lib/web/
           cd ./temp && zip -r ../dirk_lib.zip ./dirk_lib
 
-      - name: Create GitHub Release 
-        uses: softprops/action-gh-release@v2
+      - name: Create Release
+        uses: marvinpinto/action-automatic-releases@v1.2.1
+        id: auto_release
         with:
-          tag_name: "v${{ env.NEW_VERSION }}"
-          name: "Release ${{ env.NEW_VERSION }}"
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          title: "v${{ env.NEW_VERSION }}"
+          prerelease: false
           files: dirk_lib.zip
-          make_latest: true
-          draft: false
         env:
+          CI: false
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Checkout
         uses: actions/checkout@v3 
