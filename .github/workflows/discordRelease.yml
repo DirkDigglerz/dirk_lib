@@ -6,7 +6,7 @@ on:
 
 jobs:
   notify-discord:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest 
     steps:
       - name: Github Releases To Discord
         uses: SethCohen/github-releases-to-discord@v1.16.2

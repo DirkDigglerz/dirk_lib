@@ -69,7 +69,7 @@ jobs:
           cp -r ./web/build ./temp/dirk_lib/web/
           cd ./temp && zip -r ../dirk_lib.zip ./dirk_lib
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release 
         uses: softprops/action-gh-release@v2
         with:
           tag_name: "v${{ env.NEW_VERSION }}"
