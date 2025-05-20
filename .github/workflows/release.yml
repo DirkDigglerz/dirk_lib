@@ -75,7 +75,8 @@ jobs:
           tag_name: "v${{ env.NEW_VERSION }}"
           name: "Release ${{ env.NEW_VERSION }}"
           files: dirk_lib.zip
-          draft: false 
+          make_latest: true
+          draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Checkout
