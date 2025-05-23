@@ -23,7 +23,7 @@ local parsePlayerCache = function(playerData)
   if not playerData then return end
   if not playerData.job?.name then return end
   cache:set('citizenId', playerData.identifier)
-  cache:set('charName', playerData.charinfo.firstname..' '..playerData.charinfo.lastname)
+  cache:set('charName', playerData.firstName..' '..playerData.lastName)
   parseJob(playerData.job)
   parsePlayerData(playerData)
   cache:set('playerLoaded', true)
