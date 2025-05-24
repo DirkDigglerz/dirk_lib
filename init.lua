@@ -180,3 +180,19 @@ if context == 'server' then
     return fn and fn() --[[@as number[] ]]
   end
 end 
+
+
+
+---## REDM SHIT
+
+if cache.game == 'redm' then 
+  NetworkOverrideClockTime = function(hour, minute, second)
+    Citizen.InvokeNative(0x669E223E64B1903C, hour, minute, second, 0, true)
+  end
+
+  SetWeatherTypeOvertimePersist = function(weatherType, transitionTime)
+    Citizen.InvokeNative(0x59174F1AFE095B5A, joaat(weatherType), true, false, true, transitionTime, false)
+  end
+end 
+
+

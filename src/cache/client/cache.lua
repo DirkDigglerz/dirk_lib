@@ -39,7 +39,8 @@ local GetVehiclePedIsIn = GetVehiclePedIsIn
 local GetPedInVehicleSeat = GetPedInVehicleSeat
 local GetVehicleMaxNumberOfPassengers = GetVehicleMaxNumberOfPassengers
 local GetCurrentPedWeapon = GetCurrentPedWeapon
-
+local GetMount = GetMount
+local IsPedOnMount = IsPedOnMount
 
 CreateThread(function()
   local wait_time = 100
@@ -68,6 +69,12 @@ CreateThread(function()
     local armed, weapon = GetCurrentPedWeapon(ped)
     cache:set('weapon', armed and weapon or false)
 
+		if cache.game == 'redm' then
+			local mount = GetMount(ped)
+			local onMount = IsPedOnMount(ped)
+			cache:set('mount', onMount and mount or false)
+		end
+    
     Wait(wait_time)
   end
 end)

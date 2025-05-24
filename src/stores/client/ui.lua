@@ -40,7 +40,9 @@ end)
 
 AddEventHandler('onResourceStop', function(resource)
   if resource == GetCurrentResourceName() then 
-    TriggerScreenblurFadeOut(500)
+    if cache.game == 'fivem' then 
+      TriggerScreenblurFadeOut(500)
+    end 
   end
 end)
 

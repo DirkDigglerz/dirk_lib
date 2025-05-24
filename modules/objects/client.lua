@@ -108,10 +108,13 @@ function object:spawn()
   else 
     model_loaded = lib.request.weaponAsset(model_hash, 15000)
   end
+
   assert(model_loaded, 'Failed to load model : ' .. self.model)
-  
+  self.model = joaat(self.model)
   if self.type == 'ped' then 
+    print('onSpawn?')
     self.entity = CreatePed(1, self.model, self.pos, false, false)
+    print(self.entity)
   elseif self.type == 'vehicle' then
     self.entity = CreateVehicle(self.model, self.pos, false, false)
   elseif self.type == 'object' then 
