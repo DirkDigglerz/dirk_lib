@@ -6,44 +6,42 @@ on:
       - main
 
 jobs:
-  draft_release_notes:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Draft Release Notes
-        uses: release-drafter/release-drafter@v5
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   create-release:
-    needs: draft_release_notes
+    name: Build and Create Tagged Release
     runs-on: ubuntu-latest
     steps:
-      - name: Install zip
+      - name: Install archive tools
         run: sudo apt install zip
 
       - name: Checkout source code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2
         with:
           fetch-depth: 0
+          ref: ${{ github.event.repository.default_branch }}
 
       - uses: pnpm/action-setup@v2.0.1
         with:
           version: 8.6.1
 
-      - name: Setup Node.js
+      - name: Setup node
         uses: actions/setup-node@v3
         with:
           node-version: 22.x
           cache: 'pnpm'
           cache-dependency-path: 'web/pnpm-lock.yaml'
 
+      - name: Set env
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+
       - name: Install dependencies
         run: pnpm install
         working-directory: web
 
-      - name: Build
+      - name: Install package dependencies
+        run: pnpm install
+        working-directory: web
+
+      - name: Run build
         run: pnpm build
         working-directory: web
         env:
@@ -51,8 +49,9 @@ jobs:
 
       - name: Bump manifest version
         run: node .github/actions/bump-manifest-version.js
+        # The script now writes NEW_VERSION to GITHUB_ENV
 
-      - name: Commit bumped manifest
+      - name: Push manifest change
         uses: EndBug/add-and-commit@v8
         with:
           add: fxmanifest.lua
@@ -61,39 +60,31 @@ jobs:
           author_email: 41898282+github-actions[bot]@users.noreply.github.com
           message: 'chore: bump manifest version to ${{ env.NEW_VERSION }}'
 
-      # Create and push tag for new version
-      - name: Create git tag
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git tag -a "v${{ env.NEW_VERSION }}" -m "Release v${{ env.NEW_VERSION }}"
-          git push origin "v${{ env.NEW_VERSION }}"
+      - name: Update branch
+        working-directory: ./
+        run: git push origin HEAD:main
 
       - name: Bundle files
         run: |
+          mkdir -p ./temp/dirk_lib
           mkdir -p ./temp/dirk_lib/web/
           cp ./fxmanifest.lua ./init.lua ./README.md ./LICENSE ./temp/dirk_lib/
-          cp -r ./src ./bridge ./locales ./modules ./temp/dirk_lib/
+          cp -r ./src ./temp/dirk_lib
+          cp -r ./bridge ./temp/dirk_lib
+          cp -r ./locales ./temp/dirk_lib
+          cp -r ./modules ./temp/dirk_lib
           cp -r ./web/build ./temp/dirk_lib/web/
           cd ./temp && zip -r ../dirk_lib.zip ./dirk_lib
 
-      - id: create_release
-        name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+      - name: Create Release
+        uses: marvinpinto/action-automatic-releases@v1.2.1
+        id: auto_release
         with:
-          tag_name: "v${{ env.NEW_VERSION }}"
-          name: "Release v${{ env.NEW_VERSION }}"
-          draft: false
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          title: "Release ${{ env.NEW_VERSION }}"
           prerelease: false
+          files: dirk_lib.zip
+          automatic_release_tag: 'latest_production'
         env:
+          CI: false
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dirk_lib.zip
-          asset_name: dirk_lib.zip
-          asset_content_type: application/zip
