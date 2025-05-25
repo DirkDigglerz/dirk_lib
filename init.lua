@@ -195,6 +195,10 @@ if cache.game == 'redm' then
       Citizen.InvokeNative(0x59174F1AFE095B5A, joaat(weatherType), true, false, true, transitionTime, false)
     end
 
+    GetNameOfZone = function(x, y, z, zoneTypeId)
+      return Citizen.InvokeNative(0x43AD8FC02B429D33 ,x,y,z, zoneTypeId or 10)
+    end 
+
   end
 
 end 

@@ -189,7 +189,7 @@ end
 function lib.loadBridge(_type, resource, _context )
   local loaded = lib.load(('@dirk_lib.bridge.%s.%s.%s'):format(_type, resource, _context), nil, true) 
   if not loaded then 
-    lib.print.error(('Bridge %s for resource %s not found. Context is %s'):format(_type, resource, _context))
+    lib.print.warn(('Bridge %s for resource %s not found. Context is %s'):format(_type, resource, _context))
     return {}
   end 
   return loaded

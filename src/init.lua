@@ -6,9 +6,6 @@ noop = function()
 
 end 
 
-
-
-
 lib = setmetatable({
   name = 'dirk_lib',
   context = IsDuplicityVersion() and 'server' or 'client',
@@ -157,3 +154,5 @@ CreateThread(function()
     print(bottomBorder)
   end)
 end)
+
+assert(LoadResourceFile(lib.name, 'web/build/index.html'), '^1The UI is not built, please download the release version from the link below, or build it yourself.\n	^3https://github.com/DirkDigglerz/dirk_lib/releases/tag/latest_production^0')
