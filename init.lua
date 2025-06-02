@@ -184,32 +184,14 @@ end
 
 
 ---## REDM SHIT
-
+local redmNatives = require 'src.redmNatives'
 if cache.game == 'redm' then 
   if context == 'client' then 
-    NetworkOverrideClockTime = function(hour, minute, second)
-      Citizen.InvokeNative(0x669E223E64B1903C, hour, minute, second, 0, true)
+    for k, v in pairs(redmNatives) do
+      print(('Adding redm native %s'):format(k))
+      _G[k] = v 
     end
-
-    SetWeatherTypeOvertimePersist = function(weatherType, transitionTime)
-      Citizen.InvokeNative(0x59174F1AFE095B5A, joaat(weatherType), true, false, true, transitionTime, false)
-    end
-
-    GetNameOfZone = function(x, y, z, zoneTypeId)
-      return Citizen.InvokeNative(0x43AD8FC02B429D33 ,x,y,z, zoneTypeId or 10)
-    end 
-
-    IsControlJustPressed = function(inputGroup, control)
-      return Citizen.InvokeNative(0x580417101DDB492F, inputGroup, control)
-    end
-
-    UiPromptDisablePromptsThisFrame = function()
-      Citizen.InvokeNative(0xF1622CE88A1946FB)
-    end
-
-
   end
-
 end 
 
 

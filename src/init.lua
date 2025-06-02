@@ -157,3 +157,15 @@ end)
 
 
 assert(LoadResourceFile(lib.name, 'web/build/index.html'), '^1The UI is not built, please download the release version from the link below, or build it yourself.\n	^3https://github.com/DirkDigglerz/dirk_lib/releases/tag/latest_production^0')
+
+---## REDM SHIT
+local redmNatives = require 'src.redmNatives'
+if cache.game == 'redm' then 
+  if context == 'client' then 
+    for k, v in pairs(redmNatives) do
+      print(('Adding redm native %s'):format(k))
+      _G[k] = v 
+    end
+  end
+end 
+

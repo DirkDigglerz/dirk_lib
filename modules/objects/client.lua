@@ -112,9 +112,10 @@ function object:spawn()
   assert(model_loaded, 'Failed to load model : ' .. self.model)
   self.model = joaat(self.model)
   if self.type == 'ped' then 
-    print('onSpawn?')
     self.entity = CreatePed(1, self.model, self.pos, false, false)
-    print(self.entity)
+    if self.entity and cache.game == 'redm' then 
+      SetPedDefaultOutfit(self.entity, true)
+    end
   elseif self.type == 'vehicle' then
     self.entity = CreateVehicle(self.model, self.pos, false, false)
   elseif self.type == 'object' then 

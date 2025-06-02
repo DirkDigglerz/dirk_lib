@@ -75,20 +75,33 @@ function blip:render()
     SetBlipScale(blip, self.scale or 1.0)
   end 
 
-  SetBlipDisplay(blip, self.display or 4)
-  SetBlipColour(blip, self.color or 1)
-  SetBlipAsShortRange(blip, self.shortRange or false)
-  SetBlipCategory(blip, self.category or 1)
-  SetBlipAlpha(blip, self.alpha or 255)
+  if cache.game == 'fivem' then 
+    SetBlipDisplay(blip, self.display or 4)
+    SetBlipColour(blip, self.color or 1)
+    SetBlipAsShortRange(blip, self.shortRange or false)
+    SetBlipCategory(blip, self.category or 1)
+    SetBlipAlpha(blip, self.alpha or 255)
+  end 
+  
   if self.rotation then SetBlipRotation(blip, self.rotation or 0) end
 
   if self.route then
     SetBlipRoute(blip, self.route or true)
   end
   
-  AddTextEntry(self.id, self.name or 'Blip')
-  BeginTextCommandSetBlipName(self.id)
-  EndTextCommandSetBlipName(blip)
+  if cache.game == 'redm' then 
+    Citizen.InvokeNative(0x9CB1A1623062F402 , blip, self.name or 'Blip')
+  elseif cache.game == 'fivem' then
+    AddTextEntry(self.id, self.name or 'Blip')
+    BeginTextCommandSetBlipName(self.id)
+    EndTextCommandSetBlipName(blip)
+  end
+
+  AddEventHandler('onResourceStop', function(resource)
+    if resource == GetCurrentResourceName() or resource == 'dirk_lib' then 
+      self:hide()
+    end
+  end)
 
   self.blip = blip
 end

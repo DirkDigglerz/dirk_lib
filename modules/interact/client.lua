@@ -29,7 +29,7 @@ lib.interact = {
         exports.sleepless_interact:addLocalEntity(interact_data)
       end
         
-    elseif settings.interact == 'marker' then 
+    elseif settings.interact == 'redm-uiprompt' then 
 
     end 
   end,

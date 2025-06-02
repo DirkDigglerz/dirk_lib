@@ -26,6 +26,7 @@ files {
   'bridge/**/shared.lua',
   'src/devtools/modelNames.lua',
   'src/settings.lua',
+  'src/redmNatives.lua',
   'src/autodetect.lua',
   'src/oxCompat.lua',
   --\\ NUI WHEN ADDED \\--

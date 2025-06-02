@@ -57,7 +57,9 @@ return {
 
   ---@param item: string
   ---@return string
-  getItemLabel      = inventory_bridge.getItemLabel or framework_bridge.getItemLabel,
+  getItemLabel      = inventory_bridge.getItemLabel or framework_bridge.getItemLabel or function(item)
+    return item
+  end,
 
   ---@param invId: string
   ---@param data: {type: string, maxWeight: number, maxSlots: number}
