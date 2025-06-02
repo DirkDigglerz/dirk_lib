@@ -199,6 +199,15 @@ if cache.game == 'redm' then
       return Citizen.InvokeNative(0x43AD8FC02B429D33 ,x,y,z, zoneTypeId or 10)
     end 
 
+    IsControlJustPressed = function(inputGroup, control)
+      return Citizen.InvokeNative(0x580417101DDB492F, inputGroup, control)
+    end
+
+    UiPromptDisablePromptsThisFrame = function()
+      Citizen.InvokeNative(0xF1622CE88A1946FB)
+    end
+
+
   end
 
 end 

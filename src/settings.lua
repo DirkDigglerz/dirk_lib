@@ -1,7 +1,7 @@
 local autodetected = require 'src.autodetect'
 
 local settings = {
-  primaryColor    = GetConvar('dirk_lib:primaryColor', 'dirk'),
+  primaryColor    = GetConvar('dirk_lib:primaryColor', GetGameName() == 'fivem' and 'dirk' or 'red'),
   primaryShade    = GetConvarInt('dirk_lib:primaryShade', 9),
   customTheme     = json.decode(GetConvar('dirk_lib:customTheme', json.encode({
     "#f8edff",
