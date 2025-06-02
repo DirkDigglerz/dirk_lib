@@ -21,6 +21,7 @@ local settings = {
   primaryIdentifier = GetConvar('dirk_lib:primaryIdentifier', 'license'),
   serverName      = GetConvar('dirk_lib:serverName', 'DirkRP'),
   logo              = GetConvar('dirk_lib:logo', 'https://via.placeholder.com/150'),
+  itemImgPath      = GetConvar('dirk_lib:itemImgPath', 'nui://dirk_inventory/web/images/'),
 
   --## Menus/Progress etc  
   notify          = GetConvar('dirk_lib:notify', 'dirk_lib'),

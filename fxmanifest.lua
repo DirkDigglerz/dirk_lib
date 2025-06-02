@@ -24,7 +24,6 @@ files {
   'bridge/**/client.lua',
   'bridge/**/server.lua',
   'bridge/**/shared.lua',
-  'src/stores/paymentMethods.lua',
   'src/devtools/modelNames.lua',
   'src/settings.lua',
   'src/autodetect.lua',
