@@ -28,26 +28,26 @@ function zone:__init()
   if self.type == 'circle' then 
     assert(self.pos, 'circle zone must have a position')
     assert(self.radius, 'circle zone must have a radius')
-    self.center_pos = self.pos
+    self.pos = self.pos
   end
 
   if self.type == 'circle2D' then 
     assert(self.pos, 'circle2D zone must have a position with atleast an x and y value')
     assert(self.radius, 'circle2D zone must have a radius')
-    self.center_pos = self.pos
+    self.pos = self.pos
   end
 
   if self.type == 'poly' then 
     assert(self.points, 'poly zone must have points')
     self.polygon = glm.polygon.new(self.points)
     self.height = self.height or 5.0
-    self.center_pos = lib.zones.getCenter(self.points)
+    self.pos = lib.zones.getCenter(self.points)
   end
 
   if self.type == 'box' then 
     assert(self.pos, 'box zone must have a position')
     assert(self.size, 'box zone must have a size')
-    self.center_pos = self.pos + self.size / 2
+    self.pos = self.pos + self.size / 2
   end
 
   if self.type == 'game_zone' then 
@@ -58,7 +58,8 @@ function zone:__init()
     assert(self.onChange, 'all_game_zone must have some sort of onChange function or its useless you squirt')
   end
 
-  if self.center_pos then 
+  if self.pos then 
+    print('game is ', cache.game)
     self.chunk_zone = cache.game == 'fivem' and GetNameOfZone(self.pos.x, self.pos.y, self.pos.z) or GetMapZoneAtCoords(self.pos.x,self.pos.y,self.pos.z)
   end
   -- lib.print.debug(('zone %s has been created n chunkZone %s'):format(self.id, self.chunk_zone))
@@ -76,7 +77,7 @@ end
 
 
 function zone:is_inside(data)
-  local dist = #(data.pos - (self.center_pos?.xyz or self.pos?.xyz or vector3(0, 0, 0)))
+  local dist = #(data.pos - (self.pos?.xyz or self.pos?.xyz or vector3(0, 0, 0)))
   local current_pos = data.pos 
 
   if self.type == 'circle2D' then 
@@ -137,7 +138,7 @@ end
 
 function zone:draw(data)
   if not self.drawZone then return false; end
-  local distance_to_center = #(data.pos - self.center_pos.xyz)
+  local distance_to_center = #(data.pos - self.pos.xyz)
   if distance_to_center > 50.0 then return false; end
   if self.type == 'circle' or self.type == 'circle2D' then 
     local circle = self.type == 'circle' 

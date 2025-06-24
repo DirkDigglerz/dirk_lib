@@ -15,7 +15,6 @@ import Notifications from './Notify/main';
 import Progress from './Progress/main';
 import Quiz from './Quiz/main';
 import StatusInfo from './StatusInfo/main';
-import StoreUI from './Stores/main';
 import TestBed from './TestBed/main';
 import TextUI from './TextUI/main';
 import { useSettings } from '../stores/settings';
@@ -87,7 +86,6 @@ const App: React.FC = () => {
             <Input />
             <KeyInputs />
             <StatusInfo />
-            <StoreUI />
           </Wrapper>
       </MantineEmotionProvider>
     </MantineProvider>
