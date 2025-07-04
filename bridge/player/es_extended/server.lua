@@ -81,7 +81,10 @@ return {
 
     for k,v in pairs(result) do
       v.position = json.decode(v.position) or {}
-      v.sex = tonumber(v.sex)
+      -- v.sex is sometimes 0 or 1 or 'm' or 'f', normalize it to 1 or 0
+      
+      local sex = tostring(v.sex):lower()
+      v.sex = (sex == "1" or sex == "m") and 1 or 0
       local slot = v.identifier:match('char(%d+)')
 
       table.insert(toRet, {
