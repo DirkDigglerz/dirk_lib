@@ -5,6 +5,10 @@ local parseMetadata = function(newMetadata)
   cache:set('cuffed', newMetadata.ishandcuffed)
 end
 
+RegisterNetEvent('qbx_medical:client:playerRevived', function()
+  cache:set('dead', false)
+end)
+
 local parseJob = function(job)
   if not job then return end
   local ret = {
@@ -69,7 +73,9 @@ end)
 
 
 AddEventHandler('onResourceStart', function(resourceName)
-  if resourceName == GetCurrentResourceName() then 
+  if lib.settings.framework ~= 'qbx_core' then return end
+  if lib.settings.framework ~= 'qb-core' then return end
+  if resourceName == GetCurrentResourceName() then
     if not LocalPlayer.state.isLoggedIn then return end
     parsePlayerCache()
   end

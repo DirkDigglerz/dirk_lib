@@ -42,6 +42,42 @@ return {
     return exports.qbx_core:Logout(src)
   end,
 
+  getCharacters = function(src)
+    local license = getIdentifierType(src, lib.settings.primaryIdentifier)
+    local toRet = {}
+    local result = MySQL.query.await('SELECT * FROM players WHERE license = ?', {license})
+    for k,v in pairs(result) do
+      local charInfo = json.decode(v.charinfo)
+      local playerSkin = getSkin(v.citizenid)
+      local lastPos = json.decode(v.position)
+      local format_pos = vector3(lastPos.x, lastPos.y, lastPos.z)
+      local metadata = {}
+      for k,v in ipairs(characterMetadata) do 
+        table.insert(metadata, {
+          icon = v.icon,
+          value = v.get(src),
+        })
+      end 
+      
+      table.insert(toRet, {
+        firstName  = charInfo.firstname,
+        lastName   = charInfo.lastname,
+        dob        = charInfo.birthdate,
+        state      = 'occupied',
+        lastpos    = format_pos, 
+        citizenId  = v.citizenid, 
+        gender     = charInfo.gender == 0 and 'male' or 'female',
+        networth   = getNetWorthQB(v.money),
+
+        model      = playerSkin?.model or "mp_m_freemode_01",
+        skin       = playerSkin?.skin or {},
+        metadata   = metadata,
+        slot      = v.cid,
+      })
+    end
+    return toRet
+  end,
+  
   getJob = function(src)
     local ply = lib.player.get(src)
     if not ply then return end
@@ -117,6 +153,7 @@ return {
     -- Check has money unless force 
     if not force then
       local has = ply.Functions.GetMoney(acc)
+      if not has then return false, 'no_account' end
       if has < amount then return false, 'not_enough' end
     end
     return ply.Functions.RemoveMoney(acc, amount, reason)

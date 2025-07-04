@@ -35,7 +35,6 @@ return {
   end,
 
   CreatePed = function(pedType, modelHash, x, y, z, heading, isNetwork, thisScriptCheck, p7, p8)
-    print('CreatePed called with modelHash: ' .. tostring(modelHash))
     return Citizen.InvokeNative(0xD49F9B0955C367DE, modelHash, x, y, z, heading, isNetwork, thisScriptCheck, p7, p8)
   end,
   

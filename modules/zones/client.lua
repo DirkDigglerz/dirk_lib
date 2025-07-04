@@ -59,7 +59,6 @@ function zone:__init()
   end
 
   if self.pos then 
-    print('game is ', cache.game)
     self.chunk_zone = cache.game == 'fivem' and GetNameOfZone(self.pos.x, self.pos.y, self.pos.z) or GetMapZoneAtCoords(self.pos.x,self.pos.y,self.pos.z)
   end
   -- lib.print.debug(('zone %s has been created n chunkZone %s'):format(self.id, self.chunk_zone))

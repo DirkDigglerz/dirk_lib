@@ -45,7 +45,6 @@ function lib.raycast.fromCoords(coords, destination, flags, ignore)
   local _, hit, endCoords, surfaceNormal, entityHit = GetShapeTestResult(rayHandle)
   if entityHit <= 0 then
     Wait(0)
-    print('wait?')
     return lib.raycast.fromCoords(coords, destination, flags, ignore, true)
   end
   return hit, endCoords, entityHit, surfaceNormal

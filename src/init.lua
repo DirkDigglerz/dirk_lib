@@ -163,9 +163,11 @@ local redmNatives = require 'src.redmNatives'
 if cache.game == 'redm' then 
   if context == 'client' then 
     for k, v in pairs(redmNatives) do
-      print(('Adding redm native %s'):format(k))
+      lib.print.info(('Added native %s for RedM'):format(k))
       _G[k] = v 
     end
   end
 end 
+
+
 

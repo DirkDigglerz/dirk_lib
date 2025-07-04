@@ -55,6 +55,20 @@ return  {
   ---@return boolean
   logoutCharacter = bridge.logoutCharacter,
 
+
+  ---@function lib.player.createCharacter
+  ---@description # Creates a character
+  ---@param src number
+  ---@param data table
+  ---@return boolean
+  createCharacter = bridge.createCharacter,
+
+  ---@function lib.player.getCharacters
+  ---@description # Gets the characters of a player
+  ---@param src number
+  ---@return table[]
+  getCharacters   = bridge.getCharacters,
+
   ---@function lib.player.jail
   ---@description # Jails a player
   ---@param src number
@@ -159,6 +173,16 @@ return  {
         if identifier == lib.player.identifier(tonumber(ply)) then
           return ply
         end
+      end
+    end
+    return false
+  end,
+
+  getIdentifierType = function(src, _type)
+    local identifiers = GetPlayerIdentifiers(src)
+    for k,v in pairs(identifiers) do 
+      if string.find(v, _type..":") then 
+        return v
       end
     end
     return false

@@ -58,7 +58,6 @@ local call = function(self, index, ...)
       local function method(...)
         return export[index](nil, ...)
       end
-
       if not ... then
         self[index] = method
       end
@@ -188,7 +187,7 @@ local redmNatives = require 'src.redmNatives'
 if cache.game == 'redm' then 
   if context == 'client' then 
     for k, v in pairs(redmNatives) do
-      print(('Adding redm native %s'):format(k))
+      lib.print.info(('Added native %s for RedM'):format(k))
       _G[k] = v 
     end
   end

@@ -57,7 +57,7 @@ return {
   end,
 
   registerStash = function(id, data)
-    return exports.ox_inventory:registerStash(id, data)
+    return exports.ox_inventory:RegisterStash(id, data.label, data.maxSlots, data.maxWeight, data.owner, data.groups, data.coords)
   end,
 
 

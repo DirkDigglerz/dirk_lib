@@ -11,6 +11,7 @@ description  'A library for FiveM developers to use in their projects, accepting
 dependencies {
   '/server:7290',
   '/onesync',
+  'oxmysql',
 }
 
 ui_page 'web/build/index.html'

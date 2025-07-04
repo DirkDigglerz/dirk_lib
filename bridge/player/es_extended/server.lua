@@ -1,5 +1,3 @@
-
-
 return {
   get = function(src)
     return lib.FW.GetPlayerFromId(src)
@@ -33,15 +31,75 @@ return {
   end, 
 
   deleteCharacter = function(src, citizenId)
-    return exports.qbx_core:DeleteCharacter(citizenId)
+		local data = MySQL.query.await('SELECT * FROM users WHERE identifier LIKE ?', {'%'..citizenId..'%'})
+		for k,v in pairs(data) do
+
+			if v.identifier == citizenId then
+				MySQL.query.await('DELETE FROM `users` WHERE `identifier` = ?', {v.identifier})
+				break
+			end
+		end
+
+    return true 
   end,
 
-  loginCharacter = function(src, citizenId, newData)
-    return exports.qbx_core:Login(src, citizenId, newData)
+  loginCharacter = function(src, citizenId, slot)
+    local rawId = lib.FW.GetIdentifier(src)
+    lib.FW.Players[rawId] = true
+    TriggerEvent("esx:onPlayerJoined", src, ('char%s'):format(slot))
+    return true
   end,
 
-  logoutCharacter = function(src, citizenId)
-    return exports.qbx_core:Logout(src)
+  logoutCharacter = function(src)
+    TriggerEvent("esx:playerLogout", src)
+  end,
+
+  createCharacter = function(src, data)
+    TriggerEvent('esx:onPlayerJoined', src, ("%s%s"):format('char', data.slot), {
+      firstname   = data.firstName,
+      lastname    = data.lastName,
+      dateofbirth = data.dob,
+      sex         = data.gender == 'male' and 1 or 0, 
+      height      = 180,
+    })
+  end, 
+
+  getCharacters = function(src)
+    local toRet = {}
+    local PREFIX = 'char'
+    local license = lib.player.getIdentifierType(src, lib.settings.primaryIdentifier)
+
+    if not license then
+      return {}
+    end
+
+    local result = MySQL.query.await([[
+      SELECT *
+      FROM users 
+      WHERE identifier LIKE ?
+    ]], { ("%s%%%s"):format(PREFIX, license:gsub(lib.settings.primaryIdentifier .. ':', '')) })
+
+    for k,v in pairs(result) do
+      v.position = json.decode(v.position) or {}
+      v.sex = tonumber(v.sex)
+      local slot = v.identifier:match('char(%d+)')
+
+      table.insert(toRet, {
+        slot      = tonumber(slot),
+        firstName  = v.firstname,
+        lastName   = v.lastname,
+        dob        = v.dateofbirth,
+        disabled   = v.disabled,
+        lastpos    = vector4(v.position.x or 0.0, v.position.y or 0.0, v.position.z or 0.0, v.position.heading or 0.0), 
+        citizenId  = v.identifier, 
+        gender     = v.sex == 1 and 'male' or 'female',
+        accounts   = json.decode(v.accounts) or {},
+        model      = playerSkin?.model or "mp_m_freemode_01",
+        skin       = playerSkin?.skin or {},
+        metadata   = json.decode(v.metadata) or {},
+      })
+    end
+    return toRet
   end,
 
   getJob = function(src)
