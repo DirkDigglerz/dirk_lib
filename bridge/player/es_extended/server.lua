@@ -55,13 +55,16 @@ return {
   end,
 
   createCharacter = function(src, data)
-    TriggerEvent('esx:onPlayerJoined', src, ("%s%s"):format('char', data.slot), {
+    local charId = ("%s%s"):format('char', data.slot)
+    TriggerEvent('esx:onPlayerJoined', src, charId, {
       firstname   = data.firstName,
       lastname    = data.lastName,
       dateofbirth = data.dob,
       sex         = data.gender == 'male' and 1 or 0, 
       height      = 180,
     })
+    local rawId = lib.FW.GetIdentifier(src)
+    return ('%s:%s'):format(charId, rawId)
   end, 
 
   getCharacters = function(src)
