@@ -16,6 +16,17 @@ local supportedResources = {
   housing           = {'qs-housing', 'bcs_housing'},
 }
 
+local imagePaths = {
+  ['dirk_inventory'] = 'nui//dirk_inventory/web/images/',
+  ['ox_inventory']   = 'nui://ox_inventory/web/images/',
+  ['qb-inventory'] = 'nui://qb-inventory/html/images/',
+  ['qs-inventory'] = 'nui://qs-inventory/html/images/',
+  ['codem-inventory'] = 'nui://codem-inventory/html/images/',
+  ['tgiann_inventory'] = 'nui://tgiann_inventory/html/images/',
+  ['mf-inventory'] = 'nui://mf-inventory/html/images/',
+  ['core_inventory'] = 'nui://core_inventory/html/images/',
+}
+
 local autodetected = {}
 
 for system, resources in pairs(supportedResources) do 
@@ -23,6 +34,10 @@ for system, resources in pairs(supportedResources) do
     local resourceState = GetResourceState(resource) 
     if resourceState == 'starting' or resourceState == 'started' or resourceState ~= 'missing' then
       autodetected[system] = resource 
+
+      if system == 'inventory' then 
+        autodetected.itemImgPath = imagePaths[resource] or 'nui//dirk_inventory/images/items/'
+      end 
       goto continue
     end
   end 

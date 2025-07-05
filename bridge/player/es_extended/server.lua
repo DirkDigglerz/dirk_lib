@@ -186,9 +186,10 @@ return {
   removeMoney = function(src, acc, count, reason, force)
     local ply = lib.player.get(src)
     assert(ply, 'Player does not exist')
-    local account_exists = ply.getAccount(acc)
-    if not account_exists then return false, 'no_account' end
-    if not force or (account_exists.money < count) then return false, 'insufficient_funds' end
+    local accountExists = ply.getAccount(acc)
+    if not accountExists then return false, 'NoAccount' end
+    print('accountExists', accountExists, acc, count)
+    if not force and (accountExists.money < count) then return false, 'NotEnoughMoney' end
     ply.removeAccountMoney(acc,count)
     return true 
   end,
