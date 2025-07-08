@@ -101,6 +101,23 @@ return {
     return ret
   end,
 
+  getGang = function(src)
+    local ply = lib.player.get(src)
+    if not ply then return end
+    local rawGang = ply.PlayerData.gang
+    local ret = {
+      name       = rawGang.name,
+      type       = rawGang.type,
+      label      = rawGang.label,
+      grade      = rawGang.grade.level,
+      isBoss     = rawGang.isboss,
+      bankAuth   = rawGang.bankAuth,
+      gradeLabel = rawGang.grade.name,
+      duty = rawGang.onduty
+    }
+    return ret
+  end,
+
   setJob = function(src, name, rank)
     local ply = lib.player.get(src)
     if not ply then return end
@@ -170,17 +187,29 @@ return {
     if not ply then return end
     return ply.Functions.SetMoney(acc, amount)
   end,
-  
-  hasLicense = function(src, license)
 
+  hasLicense = function(src, license)
+    if not license then return true; end 
+    local licenses = lib.player.getMetadata(src, 'licenses')
+    if not licenses then return false; end 
+    if type(license) == 'string' then 
+      return licenses[license]
+    elseif type(license) == 'table' then 
+      for k,v in pairs(license) do 
+        if license[v] then 
+          return true 
+        end  
+      end 
+    end
+    return false 
   end,
 
   getLicenses = function(src)
-
+    return lib.player.getMetadata(src, 'licenses')
   end, 
 
   hasGroup = function(src, group)
-
+    return lib.hasGroup(lib.player.getJob(src), lib.player.getGang(src), group)
   end,
 
 }

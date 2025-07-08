@@ -52,6 +52,22 @@ return {
     return ret
   end,
 
+  getGang = function()
+    local playerData = lib.FW.Functions.GetPlayerData()
+    local rawGang = playerData.gang
+    local ret = {
+      name       = rawGang.name,
+      type       = rawGang.type,
+      label      = rawGang.label,
+      grade      = rawGang.grade.level,
+      isBoss     = rawGang.isboss,
+      bankAuth   = rawGang.bankAuth,
+      gradeLabel = rawGang.grade.name,
+      duty       = rawGang.onduty
+    }
+    return ret
+  end,
+
   editStatus = function(status, value)
     local events = {
       hunger = 'consumables:server:addHunger',
@@ -80,15 +96,27 @@ return {
   end,
 
   hasLicense = function(license)
-
+    if not license then return true; end 
+    local licenses = lib.player.getMetadata('licenses')
+    if not licenses then return false; end 
+    if type(license) == 'string' then 
+      return licenses[license]
+    elseif type(license) == 'table' then 
+      for k,v in pairs(license) do 
+        if license[v] then 
+          return true 
+        end  
+      end 
+    end
+    return false 
   end,
 
   getLicenses = function()
-
+    return lib.player.getMetadata('licenses')
   end, 
 
   hasGroup = function(group)
-
+    return lib.hasGroup(lib.player.getJob(), lib.player.getGang(), group)
   end,
 
 }
