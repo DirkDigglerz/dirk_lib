@@ -20,7 +20,7 @@ return {
     return _key and metadata[_key] or metadata
   end,
 
-  getInventory = function()
+  getItems = function()
     return lib.FW.Functions.GetPlayerData().items
   end,
 

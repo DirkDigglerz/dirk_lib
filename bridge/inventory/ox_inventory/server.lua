@@ -50,6 +50,18 @@ return {
     end 
     return false
   end,
+
+  getItems = function(invId)
+    return exports.ox_inventory:GetInventoryItems(invId)
+  end,
+
+  setMetadata = function(invId, slot, metadata)
+    return exports.ox_inventory:SetMetadata(invId, slot, metadata)
+  end,
+
+  getItemBySlot = function(invId, slot)
+    return exports.ox_inventory:GetSlot(invId, slot)
+  end,
   
   getItemLabel = function(item)
     local item_exists =  exports.ox_inventory:Items(item)

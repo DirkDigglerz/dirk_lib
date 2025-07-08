@@ -1,6 +1,6 @@
 local settings = lib.settings
-local inventory_bridge = lib.loadBridge('inventory', settings.inventory, 'server')
-local framework_bridge = lib.loadBridge('framework', settings.framework, 'server')
+local inventoryBridge = lib.loadBridge('inventory', settings.inventory, 'server')
+local frameworkBridge = lib.loadBridge('framework', settings.framework, 'server')
 
 return {
   ---@function lib.inventory.useableItem
@@ -9,14 +9,14 @@ return {
   ---@param callback: function
   ---@param item: table
   ---@return void
-  useableItem       = inventory_bridge.useableItem or framework_bridge.useableItem,
+  useableItem       = inventoryBridge.useableItem or frameworkBridge.useableItem,
 
 
   ---@function lib.inventory.canUseItem
   ---@description # Check if player can use item return its function
   ---@param itemName: string
   ---@return func | nil
-  canUseItem        = inventory_bridge.canUseItem or framework_bridge.canUseItem,
+  canUseItem        = inventoryBridge.canUseItem or frameworkBridge.canUseItem,
 
 
   ---@function lib.inventory.addItem
@@ -26,7 +26,7 @@ return {
   ---@param count?: number
   ---@param metadata?: table
   ---@param slot?: number
-  addItem           = inventory_bridge.addItem or framework_bridge.addItem,
+  addItem           = inventoryBridge.addItem or frameworkBridge.addItem,
 
 
   ---@function lib.inventory.removeItem
@@ -36,7 +36,7 @@ return {
   ---@param count?: number
   ---@param metadata?: table
   ---@param slot?: number
-  removeItem        = inventory_bridge.removeItem or framework_bridge.removeItem,
+  removeItem        = inventoryBridge.removeItem or frameworkBridge.removeItem,
 
   ---@function lib.inventory.hasItem
   ---@description # Check if player has item in inventory
@@ -46,60 +46,58 @@ return {
   ---@param metadata?: table
   ---@param slot?: number
   ---@return nil | number | boolean  Returns nil if player does not have item, returns number of items if they have it
-  hasItem           = inventory_bridge.hasItem or framework_bridge.hasItem,
+  hasItem           = inventoryBridge.hasItem or frameworkBridge.hasItem,
 
   ---@function lib.inventory.getItemBySlot
   ---@description # Get item by slot
   ---@param invId: string
   ---@param slot: number
   ---@return table
-  getItemBySlot     = inventory_bridge.getItemBySlot or framework_bridge.getItemBySlot,
+  getItemBySlot     = inventoryBridge.getItemBySlot or frameworkBridge.getItemBySlot,
 
   ---@param item: string
   ---@return string
-  getItemLabel      = inventory_bridge.getItemLabel or framework_bridge.getItemLabel or function(item)
+  getItemLabel      = inventoryBridge.getItemLabel or frameworkBridge.getItemLabel or function(item)
     return item
   end,
 
   ---@param invId: string
   ---@param data: {type: string, maxWeight: number, maxSlots: number}
-  registerStash     = inventory_bridge.registerStash or framework_bridge.registerStash,
+  registerStash     = inventoryBridge.registerStash or frameworkBridge.registerStash,
 
   ---@param invId: string
-  get            = inventory_bridge.get or framework_bridge.get,
+  get            = inventoryBridge.get or frameworkBridge.get,
 
   ---@function lib.inventory.clearInventory
   ---@description # Clear inventory
   ---@param invId: string
-  clearInventory    = inventory_bridge.clearInventory or framework_bridge.clearInventory,
+  clearInventory    = inventoryBridge.clearInventory or frameworkBridge.clearInventory,
 
   ---@function lib.inventory.editMetadata
   ---@description # Edit metadata of an item at a specific slot
   ---@param itemName: string
   ---@param metadata: table
   ---@param combine?: boolean
-  editMetadata      = inventory_bridge.editMetadata or framework_bridge.editMetadata,
-
-
+  editMetadata      = inventoryBridge.editMetadata or frameworkBridge.editMetadata,
 
   ---@param invId: string
-  getItems          = inventory_bridge.getItems or framework_bridge.getItems,
+  getItems          = inventoryBridge.getItems or frameworkBridge.getItems,
 
   ---@param invId: string
   ---@param slot: number
-  getItemBySlot     = inventory_bridge.getItemBySlot or framework_bridge.getItemBySlot,
+  getItemBySlot     = inventoryBridge.getItemBySlot or frameworkBridge.getItemBySlot,
 
   ---@param invId: string
   ---@param itemName: string
-  getItemByName     = inventory_bridge.getItemByName or framework_bridge.getItemByName,
+  getItemByName     = inventoryBridge.getItemByName or frameworkBridge.getItemByName,
 
   ---@param invId: string
   ---@param metadata: table
-  getItemByMetadata = inventory_bridge.getItemByMetadata or framework_bridge.getItemByMetadata,
+  getItemByMetadata = inventoryBridge.getItemByMetadata or frameworkBridge.getItemByMetadata,
 
   ---@param item: string
   ---@return table
-  item              = inventory_bridge.item or framework_bridge.item,
+  item              = inventoryBridge.item or frameworkBridge.item,
 
   ---@function lib.inventory.canCarryItem
   ---@description # Check if player can carry item
@@ -108,8 +106,22 @@ return {
   ---@param count: number
   ---@param metadata: table
   ---@return boolean
-  canCarryItem      = inventory_bridge.canCarryItem or framework_bridge.canCarryItem,
+  canCarryItem      = inventoryBridge.canCarryItem or frameworkBridge.canCarryItem,
 
   
+  -- NEW 
+  ---@function lib.inventory.setMetadata
+  ---@description # Set metadata of an item at a specific slot
+  ---@param invId: string
+  ---@param slot: number
+  ---@param metadata: table
+  ---@return boolean
+  setMetadata = inventoryBridge.setMetadata or frameworkBridge.setMetadata,
 
+  ---@function lib.inventory.getItemBySlot
+  ---@description # Get item by slot
+  ---@param invId: string
+  ---@param slot: number
+  ---@return table
+  getItemBySlot = inventoryBridge.getItemBySlot or frameworkBridge.getItemBySlot,
 }

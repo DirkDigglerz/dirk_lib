@@ -28,5 +28,9 @@ return {
 
     local has = exports.ox_inventory:Search('count', itemName, metadata)
     return has >= count and has or 0 
-  end
+  end,
+
+  getItems = function()
+    return exports.ox_inventory:GetPlayerItems()
+  end,
 }

@@ -1,5 +1,3 @@
-local qbx_medical = GetResourceState('qbx_medical') ~= 'missing' and exports['qbx_medical'] or nil
-
 return {
   identifier = function()
     return lib.FW.Functions.GetPlayerData().citizenid
@@ -21,7 +19,7 @@ return {
     return _key and metadata[_key] or metadata 
   end,
 
-  getInventory = function()
+  getItems = function()
     return lib.FW.Functions.GetPlayerData().items
   end,
 

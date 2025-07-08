@@ -13,8 +13,8 @@ return {
     return lib.FW.PlayerData
   end,
 
-  getInventory = function()
-    return lib.FW.inventory
+  getItems = function()
+    return lib.FW.PlayerData.inventory or {}
   end,
 
   getMetadata = function(_key)

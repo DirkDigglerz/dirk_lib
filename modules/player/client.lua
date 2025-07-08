@@ -12,11 +12,6 @@ lib.player = {
   ---@return string
   name          = bridge.name,
 
-  ---@function lib.player.getInventory
-  ---@description # Get the inventory of a player
-  ---@return table
-  getInventory  = bridge.getInventory,
-
   ---@function lib.player.getPlayerData
   ---@description # Get the data of a player
   ---@param key? string
@@ -44,6 +39,11 @@ lib.player = {
   ---@description # Add to the status of a player, you can use negative values to remove status
   ---@param status string
   editStatus    = bridge.editStatus,
+
+  ---@function lib.player.getItems
+  ---@description # Get the items of a player
+  ---@return table
+  getItems      = bridge.getItems,
 }
 
 return lib.player

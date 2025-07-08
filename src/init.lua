@@ -61,12 +61,12 @@ local settings = require 'src.settings'
 lib.settings = settings
 
 --## FRAMEWORK/SETTINGS
-local framework_bridge = lib.loadBridge('framework', settings.framework, 'shared')
+local frameworkBridge = lib.loadBridge('framework', settings.framework, 'shared')
 
 lib.FW = setmetatable({}, {
 	__index = function(self, index)
-		local fw_obj = framework_bridge.getObject()
-		return fw_obj[index]
+		local fwObj = frameworkBridge.getObject()
+		return fwObj[index]
 	end
 })
 
