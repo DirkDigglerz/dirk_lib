@@ -192,6 +192,7 @@ lib.table = {
     end
     return false
   end,
+  
 
   convert = function(_type, data)
     assert(_type, "Type is required for table conversion")
@@ -246,7 +247,16 @@ lib.table = {
       end
     end
     return true
-  end
+  end,
+
+  isArray = function(tbl)
+    if type(tbl) ~= 'table' then return false; end
+    for k,v in pairs(tbl) do 
+      if type(k) ~= 'number' then return false; end
+      if v == nil then return false; end
+    end
+    return true
+  end,
 }
 
 

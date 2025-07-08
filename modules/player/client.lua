@@ -1,5 +1,5 @@
 local settings      = lib.settings
-local bridge        = lib.loadBridge('player', settings.framework, 'client')
+local bridge        = lib.loadBridge('framework', settings.framework, 'client')
 
 lib.player = {
   ---@function lib.player.identifier
@@ -44,6 +44,25 @@ lib.player = {
   ---@description # Get the items of a player
   ---@return table
   getItems      = bridge.getItems,
+
+  ---@function lib.player.hasLicense
+  ---@description # Checks if a player has a specific license
+  ---@param license string | table
+  getLicenses = bridge.getLicenses,
+
+  ---@function lib.player.hasLicense
+  ---@description # Checks if a player has a specific license
+  ---@param param string | table
+  ---@return boolean
+  hasLicense = bridge.hasLicense,
+
+  ---@function lib.player.hasGroup
+  ---@description # Check if a player has a specific group
+  ---@param group string | Record<string, number> | Array<string>
+  ---@return boolean
+  hasGroup = bridge.hasGroup,
+
+
 }
 
 return lib.player

@@ -13,3 +13,10 @@
     - getDiscordName(playerId) -- Returns the name
 
 ]]
+
+
+local playerDiscordRoles = {}
+
+CreateThread(function()
+  
+end)

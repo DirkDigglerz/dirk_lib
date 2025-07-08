@@ -35,14 +35,17 @@ files {
   'web/build/**/*',
 }
 
-shared_script 'src/init.lua'
+shared_script {
+  'src/init.lua',
+  'src/**/shared.lua',
+}
+
 client_scripts {
   'src/**/client.lua',
   'src/**/client/*.lua'
 }
 
 server_scripts {
-  '@oxmysql/lib/MySQL.lua',
   'modules/callback/server.lua',
   'src/**/server.lua',
   'src/**/server/*.lua',

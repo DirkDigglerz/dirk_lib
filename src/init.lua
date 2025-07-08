@@ -88,6 +88,18 @@ end
 
 
 if context == 'client' then
+  ---## REDM SHIT
+ 
+  if cache.game == 'redm' then 
+    local redmNatives = require 'src.redmNatives'
+    for k, v in pairs(redmNatives) do
+      lib.print.info(('Added native %s for RedM'):format(k))
+      _G[k] = v 
+    end
+  end 
+
+  assert(LoadResourceFile(lib.name, 'web/build/index.html'), '^1The UI is not built, please download the release version from the link below, or build it yourself.\n	^3https://github.com/DirkDigglerz/dirk_lib/releases/tag/latest_production^0')
+
   RegisterNuiCallback('GET_SETTINGS', function(data, cb)
     cb(lib.settings)
   end)
@@ -95,10 +107,15 @@ if context == 'client' then
   RegisterNuiCallback('GET_LOCALES', function(data, cb)
     cb(lib.getLocales())
   end)
+
+  return
 end 
 
 
-if context == 'client' then return false; end 
+--## SERVER
+
+
+
 CreateThread(function()
   --- PRINT INFO FOR AUTODETCTION
   SetTimeout(1000, function()
@@ -154,20 +171,5 @@ CreateThread(function()
     print(bottomBorder)
   end)
 end)
-
-
-assert(LoadResourceFile(lib.name, 'web/build/index.html'), '^1The UI is not built, please download the release version from the link below, or build it yourself.\n	^3https://github.com/DirkDigglerz/dirk_lib/releases/tag/latest_production^0')
-
----## REDM SHIT
-local redmNatives = require 'src.redmNatives'
-if cache.game == 'redm' then 
-  if context == 'client' then 
-    for k, v in pairs(redmNatives) do
-      lib.print.info(('Added native %s for RedM'):format(k))
-      _G[k] = v 
-    end
-  end
-end 
-
 
 

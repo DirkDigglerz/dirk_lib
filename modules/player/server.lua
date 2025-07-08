@@ -1,5 +1,5 @@
 local settings      = lib.settings
-local bridge        = lib.loadBridge('player', settings.framework, 'server')
+local bridge        = lib.loadBridge('framework', settings.framework, 'server')
 local prison        = lib.loadBridge('prison', settings.prison, 'server')
 
 return  {
@@ -90,6 +90,12 @@ return  {
   ---@return {name: string, type: string, label: string, grade: number, isBoss: boolean, bankAuth: boolean, gradeLabel: string, duty: boolean}
   getJob   = bridge.getJob,
 
+  ---@function lib.player.getGang
+  ---@description # Gets the gang of a player
+  ---@param src number
+  ---@return {name: string, grade: number}
+  getGang = bridge.getGang,
+
   ---@function lib.player.setDuty 
   ---@description # Sets the duty of a player
   ---@param src number
@@ -157,6 +163,27 @@ return  {
   ---@return table
   getMetadata = bridge.getMetadata,
 
+  ---@function lib.player.hasLicense
+  ---@description # Checks if a player has a specific license
+  ---@param src number
+  ---@param license string | table
+  ---@return boolean
+  hasLicense = bridge.hasLicense,
+
+  ---@function lib.player.getLicenses
+  ---@description # Gets the licenses of a player
+  ---@param src number
+  ---@return table
+  getLicenses = bridge.getLicenses,
+
+  ---@function lib.player.hasGroup
+  ---@description # Check if a player has a specific group
+  ---@param src number
+  ---@param group string | Record<string, number> | Array<string>
+  ---@return boolean
+  hasGroup = bridge.hasGroup,
+
+
   ---@function lib.player.checkOnline 
   ---@description # Checks if a player is online either by their character ID or server ID
   ---@param identifier string|number
@@ -187,6 +214,7 @@ return  {
     end
     return false
   end,
+
 
 
 }
