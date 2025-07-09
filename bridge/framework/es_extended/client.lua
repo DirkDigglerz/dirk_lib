@@ -53,6 +53,13 @@ return {
     return ret
   end,
 
+  getGang = function()
+    return {
+      name = 'none', 
+      gade = 0,
+    }
+  end,
+
   editStatus = function(status, value)
     TriggerEvent(value > 0 and 'esx_status:add' or 'esx_status:remove', status, math.abs(value))
   end,

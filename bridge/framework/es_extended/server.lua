@@ -107,14 +107,12 @@ return {
         firstName  = v.firstname,
         lastName   = v.lastname,
         dob        = v.dateofbirth,
-        disabled   = v.disabled,
         lastpos    = vector4(v.position.x or 0.0, v.position.y or 0.0, v.position.z or 0.0, v.position.heading or 0.0), 
         citizenId  = v.identifier, 
         gender     = v.sex == 1 and 'male' or 'female',
         accounts   = json.decode(v.accounts) or {},
-        model      = playerSkin?.model or "mp_m_freemode_01",
-        skin       = playerSkin?.skin or {},
         metadata   = json.decode(v.metadata) or {},
+        disabled   = v.disabled,
       })
     end
     return toRet

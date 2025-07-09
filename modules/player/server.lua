@@ -1,6 +1,7 @@
 local settings      = lib.settings
 local bridge        = lib.loadBridge('framework', settings.framework, 'server')
 local prison        = lib.loadBridge('prison', settings.prison, 'server')
+local clothingBridge = lib.loadBridge('clothing', settings.clothing, 'server')
 
 return  {
   ---@function lib.player.get
@@ -68,6 +69,11 @@ return  {
   ---@param src number
   ---@return table[]
   getCharacters   = bridge.getCharacters,
+
+  ---@function lib.player.getSkin
+  ---@function # Gets the skin of the playersId passed
+  ---@return table
+  getSkin = clothingBridge.getSkin or bridge.getSkin,
 
   ---@function lib.player.jail
   ---@description # Jails a player

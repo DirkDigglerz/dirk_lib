@@ -35,6 +35,10 @@ lib.player = {
   ---@return {name: string, type: string, label: string, grade: number, isBoss: boolean, bankAuth: boolean, gradeLabel: string, duty: boolean}
   getJob        = bridge.getJob,
 
+  ---@function lib.player.getGang 
+  ---@description # Get the gang of a player 
+  ---@return {name: string, type: string, label: string, grade: number, isBoss: boolean, bankAuth: boolean, gradeLabel: string, duty: boolean}
+  getGang        = bridge.getGang,
   ---@function lib.player.editStatus
   ---@description # Add to the status of a player, you can use negative values to remove status
   ---@param status string

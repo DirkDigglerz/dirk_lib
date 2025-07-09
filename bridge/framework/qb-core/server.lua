@@ -48,8 +48,21 @@ return {
     return lib.FW.Player.DeleteCharacter(src, citizenId)
   end,
 
-  loginCharacter = function(src, citizenId, newData)
-    return lib.FW.Player.Login(src, citizenId, newData)
+  loginCharacter = function(src, citizenId, slot)
+    return lib.FW.Player.Login(src, citizenId)
+  end,
+
+  createCharacter = function(src, newData)
+    return lib.FW.Player.Login(src, nil, {
+      cid = newData.slot, 
+      charinfo = {
+        firstname = newData.firstName, 
+        lastname  = newData.lastName,
+        birthdate = newData.dob,
+        gender    = newData.gender == 'female' and 1 or 0, 
+        nationality = newData.nationallity,
+      }
+    })
   end,
 
   logoutCharacter = function(src, citizenId)
@@ -57,36 +70,23 @@ return {
   end,
 
   getCharacters = function(src)
-    local license = getIdentifierType(src, lib.settings.primaryIdentifier)
+    local license = lib.player.getIdentifierType(src, lib.settings.primaryIdentifier or 'license')
     local toRet = {}
     local result = exports.oxmysql:query_async('SELECT * FROM players WHERE license = ?', {license})
     for k,v in pairs(result) do
       local charInfo = json.decode(v.charinfo)
-      local playerSkin = getSkin(v.citizenid)
       local lastPos = json.decode(v.position)
-      local format_pos = vector3(lastPos.x, lastPos.y, lastPos.z)
-      local metadata = {}
-      for k,v in ipairs(characterMetadata) do 
-        table.insert(metadata, {
-          icon = v.icon,
-          value = v.get(src),
-        })
-      end 
-      
       table.insert(toRet, {
+        slot       = tonumber(v.cid),
         firstName  = charInfo.firstname,
         lastName   = charInfo.lastname,
         dob        = charInfo.birthdate,
-        state      = 'occupied',
-        lastpos    = format_pos, 
+        lastpos    = vector4(lastPos.x or 0.0, lastPos.y or 0.0, lastPos.z or 0.0, lastPos.w or 0.0), 
         citizenId  = v.citizenid, 
-        gender     = charInfo.gender == 0 and 'male' or 'female',
-        networth   = getNetWorthQB(v.money),
-
-        model      = playerSkin?.model or "mp_m_freemode_01",
-        skin       = playerSkin?.skin or {},
-        metadata   = metadata,
-        slot      = v.cid,
+        gender     = tonumber(charInfo.gender) == 1 and 'female' or 'male',
+        accounts   = json.decode(v.money) or {},
+        metadata   = json.decode(v.metadata) or {},
+        disabled   = v.disabled,
       })
     end
     return toRet
@@ -222,6 +222,14 @@ return {
     return lib.hasGroup(lib.player.getJob(src), lib.player.getGang(src), group)
   end,
 
+  getSkin = function(src)
+    src = type(src) == 'string' and src or lib.player.identifier(src)
+    local skin = MySQL.query.await('SELECT * FROM playerskins WHERE citizenid = ? AND active = ?', { src, 1 })
+    if not skin or not skin[1] then return {} end 
+    local ret = json.decode(skin[1].skin) or {}
+    ret.model = tonumber(skin[1].model)
+    return ret
+  end,
 }
 
 
