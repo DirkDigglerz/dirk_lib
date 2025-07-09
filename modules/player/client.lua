@@ -1,5 +1,6 @@
 local settings      = lib.settings
 local bridge        = lib.loadBridge('framework', settings.framework, 'client')
+local clothingBridge = lib.loadBridge('clothing', settings.clothing, 'client')
 
 lib.player = {
   ---@function lib.player.identifier
@@ -66,7 +67,8 @@ lib.player = {
   ---@return boolean
   hasGroup = bridge.hasGroup,
 
-
+  setSkin = clothingBridge.setSkin,
+  openCustomisation = clothingBridge.openCustomisation,
 }
 
 return lib.player

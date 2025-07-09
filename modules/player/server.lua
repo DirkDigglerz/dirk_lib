@@ -73,7 +73,7 @@ return  {
   ---@function lib.player.getSkin
   ---@function # Gets the skin of the playersId passed
   ---@return table
-  getSkin = clothingBridge.getSkin or bridge.getSkin,
+  getSkin = clothingBridge.getSkin,
 
   ---@function lib.player.jail
   ---@description # Jails a player
