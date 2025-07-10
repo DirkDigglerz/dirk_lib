@@ -35,9 +35,9 @@ return {
     assert(ply, 'Player does not exist')
     return ply.PlayerData.charinfo.gender or 'unknown'
   end, 
-
+ 
   deleteCharacter = function(src, citizenId)
-    return exports.qbx_core:DeleteCharacter(src, citizenId)
+    return exports.qbx_core:DeleteCharacter(citizenId)
   end,
 
   loginCharacter = function(src, citizenId, slot)
