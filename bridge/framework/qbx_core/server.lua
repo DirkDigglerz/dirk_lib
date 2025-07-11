@@ -62,7 +62,7 @@ return {
   end,
 
   getCharacters = function(src)
-    local license = lib.player.getIdentifierType(src, lib.settings.primaryIdentifier or 'license')
+    local license = lib.player.getIdentifierType(src, 'license2')
     local toRet = {}
     local result = exports.oxmysql:query_async('SELECT * FROM players WHERE license = ?', {license})
     for k,v in pairs(result) do
