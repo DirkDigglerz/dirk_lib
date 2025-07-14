@@ -49,7 +49,8 @@ RegisterNetEvent('QBCore:Client:OnPlayerLoaded', parsePlayerCache)
 RegisterNetEvent('QBCore:Client:OnPlayerUnload', playerUnload)
 
 RegisterNetEvent('QBCore:Client:SetDuty', function(duty) 
-  local originalCache = json.decode(json.encode(cache.job)) 
+  local originalCache = json.decode(json.encode(cache.job))
+  originalCache = originalCache or {}
   originalCache.onduty = duty
   cache:set('job', originalCache)
 end)
