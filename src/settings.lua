@@ -56,7 +56,6 @@ local settings = {
 -- local renamed = json.decode(GetConvar('dirk_lib:renamedResources', json.encode({})))
 
 for system,resource in pairs(autodetected) do 
-  -- Allows for convar overriding of used resource. 
   settings[system] = GetConvar(('dirk_lib:%s'):format(system), resource)
 end
 
