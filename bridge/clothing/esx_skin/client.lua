@@ -60,7 +60,6 @@ return {
   end,
 
   openCustomisation = function(categories)
-    print('open customisation')
     local result = promise.new()
     TriggerEvent("esx_skin:openSaveableMenu", 
       function()

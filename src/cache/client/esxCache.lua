@@ -31,10 +31,8 @@ end
 
 CreateThread(function()
   while not lib.FW do Wait(500); end 
-  print('ESX Cache: FW Loaded')
   while not lib.FW.GetPlayerData() do Wait(500); end
   while not lib.FW.GetPlayerData().job?.name do Wait(500); end
-  print('ESX Cache: Player Loaded')
   parsePlayerCache()
 end)
 
