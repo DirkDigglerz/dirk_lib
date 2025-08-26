@@ -1,9 +1,8 @@
-import { IconProp } from "@fortawesome/fontawesome-svg-core"
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
 import { Box, Flex, Image, Text, useMantineTheme } from "@mantine/core"
 import { useEffect, useMemo, useState } from "react"
 import colorWithAlpha from "../../utils/colorWithAlpha"
 import getImageType from "../../utils/getImagePath"
+import serverLogo from './serverLogo.png'
 
 export type NotificationProps = {
   title?: string
@@ -64,16 +63,17 @@ export default function Notification(props: NotificationProps){
       // mah='12vh'
       // align='center'
       h='fit-content'
-      p='xs'
+      p='1vh 2vh'
       style={{
         // overflow: 'hidden',
-        borderRadius: theme.radius.xxs,
+        borderRadius: theme.radius.xxl,
+        outline: `0.15vh solid ${colorWithAlpha(theme.colors[theme.primaryColor][9], 0.6)}`,
         
         transition: 'all 0.2s ease-in-out',
       }}
 
       align={'center'}
-      gap='xs'
+      gap='sm'
       
     >
       {/* Box for the number */}
@@ -86,7 +86,7 @@ export default function Notification(props: NotificationProps){
             backgroundColor: colorWithAlpha(theme.colors[theme.primaryColor][9], 0.2),
             outline: `0.2vh solid ${colorWithAlpha(theme.colors[theme.primaryColor][9], 0.6)}`,
             color: 'rgba(255,255,255,0.8)',
-            borderRadius: theme.radius.xxs,
+            borderRadius: theme.radius.xl,
             padding: '0 0.6vh',  
             fontWeight: 700,
             aspectRatio: '1/1',
@@ -112,10 +112,10 @@ export default function Notification(props: NotificationProps){
         >
           <Text
             size='xs'
-            c={props.titleColor || theme.colors[theme.primaryColor][9]}
+            c={props.titleColor || colorWithAlpha(theme.colors[theme.primaryColor][9], 0.8)}
             style={{
               fontFamily: 'Akrobat Bold',
-              textShadow: `0 0 0.2vh ${props.titleColor || colorWithAlpha(theme.colors[theme.primaryColor][9], 1)}`
+              textShadow: `0 0 0.2vh ${props.titleColor || colorWithAlpha(theme.colors[theme.primaryColor][9], 0.5)}`
             }}
           >
             {props.title?.toUpperCase()}
@@ -136,49 +136,57 @@ export default function Notification(props: NotificationProps){
 function NotificationImage (props: NotificationProps & {imageType: false | {type: string, path: string}}) {
   const theme = useMantineTheme();
   return (
-    <Box
-      // // direction={'column'}
-      // justify={'center'}
-      // align='center'
+    <Image
+      src={props.imageType && props.imageType.type === 'image' ? props.imageType.path : serverLogo}
+      alt='icon'
       h='4vh'
-      // ml='xs'
-      mah='4vh'
-      bg={props.iconBg || props.iconColor && 'rgba(44,44,44,0.3)' || colorWithAlpha(theme.colors[theme.primaryColor][9], 0.2)}
       style={{
-        borderRadius: '0.05vh',
         aspectRatio: '1/1',
-        outline: `0.2vh solid ${props.iconColor  || colorWithAlpha(theme.colors[theme.primaryColor][9], 0.6)}`,
       }}
-    >
-      <Flex
-        justify='center'
-        align='center'
-        h='100%'
-        w='100%'
-      >
-        {props.imageType && props.imageType.type == 'icon' && (
-          <FontAwesomeIcon  
-            icon={props.icon as IconProp || 'fas fa-info-circle' as IconProp}
-            color={props.iconColor || colorWithAlpha(theme.colors[theme.primaryColor][9], 0.8)}
-            style={{
-              fontSize: '2.4vh',
-            }}
-          /> 
-        )}
+      />
+    // <Box
+    //   // // direction={'column'}
+    //   // justify={'center'}
+    //   // align='center'
+    //   h='4vh'
+    //   // ml='xs'
+    //   mah='4vh'
+    //   bg={props.iconBg || props.iconColor && 'rgba(44,44,44,0.3)' || colorWithAlpha(theme.colors[theme.primaryColor][9], 0.2)}
+    //   style={{
+    //     borderRadius: theme.radius.xs,
+    //     aspectRatio: '1/1',
+    //     outline: `0.2vh solid ${props.iconColor  || colorWithAlpha(theme.colors[theme.primaryColor][9], 0.6)}`,
+    //   }}
+    // >
+    //   <Flex
+    //     justify='center'
+    //     align='center'
+    //     h='100%'
+    //     w='100%'
+    //   >
+    //     {props.imageType && props.imageType.type == 'icon' && (
+    //       <FontAwesomeIcon  
+    //         icon={props.icon as IconProp || 'fas fa-info-circle' as IconProp}
+    //         color={props.iconColor || colorWithAlpha(theme.colors[theme.primaryColor][9], 0.8)}
+    //         style={{
+    //           fontSize: '2.4vh',
+    //         }}
+    //       /> 
+    //     )}
 
-        {props.imageType && props.imageType.type == 'image' && (
-          <Image 
-            src={props.imageType.path}
-            alt='icon'
-            h='3vh'
-            style={{
-              aspectRatio: '1/1',
-            }}
-          />
-        )}
+    //     {props.imageType && props.imageType.type == 'image' && (
+    //       <Image 
+    //         src={props.imageType.path}
+    //         alt='icon'
+    //         h='3vh'
+    //         style={{
+    //           aspectRatio: '1/1',
+    //         }}
+    //       />
+    //     )}
 
-      </Flex>
-    </Box>
+    //   </Flex>
+    // </Box>
   )
 }
 

@@ -22,7 +22,7 @@ return {
   end,
 
   getMetadata = function(_key)
-    return lib.getPlayerMetadata(_key)
+    return lib.FW.PlayerData.metadata[_key] or nil
   end,
   
   getMoney = function(_account)

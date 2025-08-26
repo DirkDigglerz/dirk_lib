@@ -4,7 +4,9 @@ return {
   end,
 
   useableItem = function(item, cb)
-    return lib.FW.RegisterUsableItem(item, cb)
+    return lib.FW.RegisterUsableItem(item, function(src, name, item)
+      cb(src, item)
+    end)
   end,
 
   getItemLabel = function(item)

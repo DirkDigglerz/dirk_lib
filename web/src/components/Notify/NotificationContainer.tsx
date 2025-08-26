@@ -1,11 +1,11 @@
 import { Flex } from "@mantine/core";
 import { useEffect, useState } from "react";
 import { useNuiEvent } from "../../hooks/useNuiEvent";
+import { getPositionProps, getTranslate, PositionProps } from "../../utils/positioning";
 import Notification, { NotificationProps } from "./Notification";
-import { internalEvent } from "../../utils/internalEvent";
 
 export type NotificationContainerProps = {
-  position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  position: PositionProps;
 }
 
 function NotificationContainer(props: NotificationContainerProps) {
@@ -20,7 +20,6 @@ function NotificationContainer(props: NotificationContainerProps) {
       setNotifications([...notifications]);
       return;
     }
-    console.log('Adding notification', data);
     setNotifications([...notifications, data]);
   });
 
@@ -59,11 +58,12 @@ function NotificationContainer(props: NotificationContainerProps) {
       w="20%"
       h="fit-content"
       pos="absolute"
+      {...getPositionProps(props.position)}
       style={{
-        top: props.position?.includes('top') ? '1vh' : 'unset',
-        bottom: props.position?.includes('bottom') ? '1vh' : 'unset',
-        left: props.position?.includes('left') ? '1vh' : 'unset',
-        right: props.position?.includes('right') ? '1vh' : 'unset',
+        zIndex: 1000,
+        pointerEvents: 'none', // Allow clicks to pass through
+        translate: getTranslate(props.position),
+        transition: 'all 0.3s ease-in-out',
       }}
     >
       {notifications.map((notification, index) => (

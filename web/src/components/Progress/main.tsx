@@ -67,7 +67,21 @@ export default function Progress() {
       // Optionally clear all options here if needed
     }, 500)
   })
-  
+      //   bg='rgba(0,0,0,0.6)'
+      // // mah='12vh'
+      // // align='center'
+      // h='fit-content'
+      // p='1vh 2vh'
+      // style={{
+      //   // overflow: 'hidden',
+      //   borderRadius: theme.radius.xxl,
+      //   outline: `0.15vh solid ${colorWithAlpha(theme.colors[theme.primaryColor][9], 0.6)}`,
+        
+      //   transition: 'all 0.2s ease-in-out',
+      // }}
+
+      // align={'center'}
+      // gap='sm'
   return (
     <Transition
       mounted={display}
@@ -79,13 +93,14 @@ export default function Progress() {
       {(styles) => (
         <Flex
           m='xs'
-          p='xs'
-          pb='sm'
+          p='2vh 2vh'
           pos='absolute'
           {...getPositionProps(options.position)}
-          bg={`linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.302621947216386) 16%, rgba(0,0,0,0.3) 46%, rgba(0,0,0,0.6) 100%)`}
+          // bg={`linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.302621947216386) 16%, rgba(0,0,0,0.3) 46%, rgba(0,0,0,0.6) 100%)`}
+          bg={'rgba(0,0,0,0.6)'}
           style={{
-            borderRadius: theme.radius.xxs,
+            borderRadius: theme.radius.xl,
+            outline: `0.15vh solid ${colorWithAlpha(theme.colors[theme.primaryColor][9], 0.6)}`,
             transform: getTranslate(options.position),
             ...styles
           }}
@@ -103,12 +118,12 @@ export default function Progress() {
                   color='rgba(255,255,255,0.8)'
                   icon={options.icon as IconProp} 
                   style={{
-                    fontSize: theme.fontSizes.sm, 
+                    fontSize: theme.fontSizes.xs, 
                   }}
                 />  
               )}
               <Text
-                size='sm'
+                size='xs'
                 style={{
                   fontFamily: 'Akrobat Bold',
                   textShadow: `0 0 0.1vh ${colorWithAlpha(theme.colors[theme.primaryColor][theme.primaryShade as number], 0.9)}`
@@ -117,7 +132,7 @@ export default function Progress() {
             </Flex>
             {options.description && (
               <Text
-                size='xs'
+                size='xxs'
                 c='rgba(255,255,255,0.8)'
               >
                 {options.description}

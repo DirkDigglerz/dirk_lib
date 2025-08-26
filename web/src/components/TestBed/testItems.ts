@@ -120,7 +120,7 @@ export const defaultTestItems = [
           {
             title:'Find Ranked',
             icon:'search',
-            readOnly:true,
+            readOnly:true, 
           },
           {
             title:'Private Game',
@@ -204,7 +204,7 @@ export const defaultTestItems = [
         iconBg: 'rgba(255, 0, 0, 0.1)',
         title: 'Test Notification',
         description: 'Get yourself over to the Los Santos Customs and get your car fixed up. You can also get a new paint job while you are there.',
-        position: 'top-right',
+        position: 'top-center',
         icon: 'bell',
       },
     },
