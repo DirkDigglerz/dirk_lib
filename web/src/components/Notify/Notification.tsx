@@ -2,7 +2,7 @@ import { Box, Flex, Image, Text, useMantineTheme } from "@mantine/core"
 import { useEffect, useMemo, useState } from "react"
 import colorWithAlpha from "../../utils/colorWithAlpha"
 import getImageType from "../../utils/getImagePath"
-import serverLogo from './serverLogo.png'
+
 
 export type NotificationProps = {
   title?: string
@@ -134,16 +134,15 @@ export default function Notification(props: NotificationProps){
 }
 
 function NotificationImage (props: NotificationProps & {imageType: false | {type: string, path: string}}) {
-  const theme = useMantineTheme();
   return (
     <Image
-      src={props.imageType && props.imageType.type === 'image' ? props.imageType.path : serverLogo}
+      src={props.imageType && props.imageType.type === 'image' ? props.imageType.path : './serverLogo.png'}
       alt='icon'
       h='4vh'
       style={{
         aspectRatio: '1/1',
       }}
-      />
+    />
     // <Box
     //   // // direction={'column'}
     //   // justify={'center'}
