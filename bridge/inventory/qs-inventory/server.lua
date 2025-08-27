@@ -7,7 +7,13 @@ return {
   ---@param md table [Optional] Item Metadata
   ---@return boolean
   addItem  = function(invId, item, count, md, slot) 
-    return type(invId) ~= 'number' and exports['qs-inventory']:AddItem(invId, item, count, slot, md) or exports['qs-inventory']:AddItemIntoStash(invId, item, count, slot, md, nil, nil)
+    print(('Attempting to add %s to inventory %s'):format(item, invId))
+    if type(invId) == 'number' or tonumber(invId) then
+      return exports['qs-inventory']:AddItem(invId, item, count, slot, md)
+    else 
+      return exports['qs-inventory']:AddItemIntoStash(invId, item, count, slot, md, nil, nil)
+    end
+    return false 
   end,
 
   --- Remove Item from inventory either playerid or invId
@@ -18,7 +24,13 @@ return {
   ---@param md table [Optional] Item Metadata
   ---@return boolean
   removeItem = function(invId, item, count, md, slot)
-    return type(invId) ~= 'number' and exports['qs-inventory']:RemoveItem(invId, item, count, slot, md) or exports['qs-inventory']:RemoveItemIntoStash(invId, item, count, slot, md)
+    print(('Attempting to remove %s from inventory %s'):format(item, invId))
+    if type(invId) == 'number' or tonumber(invId) then
+      return exports['qs-inventory']:RemoveItem(invId, item, count, slot, md)
+    else
+      return exports['qs-inventory']:RemoveItemIntoStash(invId, item, count, slot, md)
+    end
+    return false
   end,
 
   --- Check if player has item in inventory
