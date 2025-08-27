@@ -43,7 +43,7 @@ lib.notify = function(data)
   local settings = lib.settings
   if not settings.notify or settings.notify == 'dirk_lib' then
     local sound = settings.notifyAudio and data.sound
-    data.title = data.title or data.type and types[data.type].title or 'Notification'
+    data.title = data.title or (data.type and types[data.type]?.title) or 'Notification'
     data.titleColor = data.titleColor or types[data.type] and types[data.type].titleColor
     data.position = data.position or settings.notifyPosition or 'top-right'
     data.icon = data.icon or data.type and types[data.type] and types[data.type].icon or types['inform'].icon

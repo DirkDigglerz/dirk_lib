@@ -27,7 +27,7 @@ return {
     end 
 
     local has = exports.ox_inventory:Search('count', itemName, metadata)
-    return has >= count and has or 0 
+    return has >= count and has or nil 
   end,
 
   getItems = function()
