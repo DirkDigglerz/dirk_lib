@@ -1,6 +1,7 @@
 return {
   setFuel = function(veh, val, _type)
-    return Entity(veh).state.fuel += val 
+    -- return Entity(veh).state.fuel += val 
+    return 
   end, 
 
   getFuel = function(veh)

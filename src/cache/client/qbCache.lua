@@ -74,8 +74,7 @@ end)
 
 
 AddEventHandler('onResourceStart', function(resourceName)
-  if lib.settings.framework ~= 'qbx_core' then return end
-  if lib.settings.framework ~= 'qb-core' then return end
+  if lib.settings.framework ~= 'qbx_core' and lib.settings.framework ~= 'qb-core' then return end
   if resourceName == GetCurrentResourceName() then
     if not LocalPlayer.state.isLoggedIn then return end
     parsePlayerCache()

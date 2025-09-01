@@ -74,15 +74,16 @@ export default function Menu(){
       <>
 
         <SideBar 
-          menuOpen={menuOpen} 
-          setMenuOpen={setMenuOpen}
+          menuOpen={!!menuOpen} 
+          setMenuOpen={(open: boolean) => setMenuOpen(open ? menuOpen || false : false)}
           escapeClose={menuOpen ? menuOpen.canClose : false}
           onClose={() => {
             fetchNui('CLOSE_CONTEXT')
           }}
           w='28vw' 
           h='100vh'
-          pt='12vh' 
+          p='xs'
+          pt='xl' 
           style={{
             // backdropFilter: 'blur(2px)',
             display:'flex',
