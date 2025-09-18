@@ -78,7 +78,7 @@ function blip:render()
   if cache.game == 'fivem' then 
     SetBlipDisplay(blip, self.display or 4)
     SetBlipColour(blip, self.color or 1)
-    SetBlipAsShortRange(blip, self.shortRange or false)
+    SetBlipAsShortRange(blip, self.shortRange ~= nil and self.shortRange or true)
     SetBlipCategory(blip, self.category or 1)
     SetBlipAlpha(blip, self.alpha or 255)
   end 

@@ -189,23 +189,34 @@ return {
   end,
 
   hasLicense = function(src, license)
-    if not license then return true; end 
-    local licenses = lib.player.getMetadata(src, 'licenses')
-    if not licenses then return false; end 
-    if type(license) == 'string' then 
-      return licenses[license]
-    elseif type(license) == 'table' then 
-      for k,v in pairs(license) do 
-        if license[v] then 
-          return true 
-        end  
-      end 
+    if not license then return true; end
+
+    -- QBX/QBCore commonly use 'licences' (British); fall back to 'licenses' if needed
+    local licenses = lib.player.getMetadata and (lib.player.getMetadata(src, 'licences') or lib.player.getMetadata(src, 'licenses'))
+    if not licenses then return false; end
+
+    local function truthy(v)
+      return v == true or v == 1 or v == '1'
     end
-    return false 
+
+    if type(license) == 'string' then
+      local v = licenses[license]
+      return truthy(v)
+    elseif type(license) == 'table' then
+      -- ANY-of: return true as soon as one of the requested licenses is present
+      for _, name in ipairs(license) do
+        local v = licenses[name]
+        if truthy(v) then
+          return true
+        end
+      end
+    end
+
+    return false
   end,
 
   getLicenses = function(src)
-    return lib.player.getMetadata(src, 'licenses')
+    return lib.player.getMetadata(src, 'licences') or lib.player.getMetadata(src, 'licenses') or {}
   end, 
 
   hasGroup = function(src, group)

@@ -23,6 +23,8 @@ return {
     return lib.FW.Functions.GetPlayerData().items
   end,
 
+  
+
   getMoney = function(_account)
     local playerData = lib.FW.Functions.GetPlayerData()
     return playerData.money[_account] or 0
@@ -65,23 +67,35 @@ return {
   end,
 
   hasLicense = function(license)
-    if not license then return true; end 
-    local licenses = lib.player.getMetadata('licenses')
-    if not licenses then return false; end 
-    if type(license) == 'string' then 
-      return licenses[license]
-    elseif type(license) == 'table' then 
-      for k,v in pairs(license) do 
-        if license[v] then 
-          return true 
-        end  
-      end 
+    if not license then return true end
+
+    -- QBX/QBCore commonly use 'licences' (British); fall back to 'licenses' if needed
+    local licenses = lib.player.getMetadata and (lib.player.getMetadata('licences') or lib.player.getMetadata('licenses'))
+    if not licenses then return false end
+
+    local function truthy(v)
+      return v == true or v == 1 or v == '1'
     end
-    return false 
+
+    if type(license) == 'string' then
+      local v = licenses[license]
+      return truthy(v)
+    elseif type(license) == 'table' then
+      -- ANY-of: return true as soon as one of the requested licenses is present
+      for _, name in ipairs(license) do
+        local v = licenses[name]
+        if truthy(v) then
+          return true
+        end
+      end
+      return false
+    end
+
+    return false
   end,
 
   getLicenses = function()
-    return lib.player.getMetadata('licenses')
+    return lib.player.getMetadata('licences') or lib.player.getMetadata('licenses') or {}
   end, 
 
   hasGroup = function(group)
