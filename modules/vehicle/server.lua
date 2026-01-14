@@ -1,5 +1,6 @@
 local keys = lib.loadBridge('keys', settings.keys, 'server')
 local fuel = lib.loadBridge('fuel', settings.fuel, 'server')
+local framework = lib.loadBridge('framework', settings.framework, 'server')
 
 lib.vehicle = {
   addKeys = function(src, veh,plate)
@@ -19,7 +20,21 @@ lib.vehicle = {
   getFuel = function(veh)
     if not fuel.getFuel then return lib.print.error(('No bridge found for getting fuel for %s'):format(settings.fuel)) end
     return fuel.getFuel(veh)
-  end
+  end,
+
+  getByPlate = function(plate)
+    if not framework.getByPlate then return lib.print.error(('No bridge found for getting vehicle by plate for %s'):format(settings.framework)) end
+    return framework.getByPlate(plate)
+  end,
+
+  generatePlate = function(format) 
+    local newPlate = lib.string.random(format or '........'):upper()
+    if lib.vehicle.getByPlate(newPlate) then 
+      Wait(0)
+      return lib.vehicle.generatePlate(format)
+    end
+    return newPlate
+  end, 
 }
 
 return lib.vehicle

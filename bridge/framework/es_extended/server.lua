@@ -264,5 +264,9 @@ return {
     local myGang = lib.player.getGang(src)
     return lib.hasGroup(myJob, myGang, group)
   end,
+  
+  getByPlate = function(plate)
+
+  end,
 }
 

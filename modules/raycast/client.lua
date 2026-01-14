@@ -35,19 +35,16 @@ local GetFinalRenderedCamRot = GetFinalRenderedCamRot
 ---@param flags ShapetestFlags? Defaults to 511.
 ---@param ignore ShapetestIgnore? Defaults to 4.
 ---@return boolean hit
----@return number entityHit
 ---@return vector3 endCoords
+---@return number entityHit
 ---@return vector3 surfaceNormal
 ---@return number materialHash
 function lib.raycast.fromCoords(coords, destination, flags, ignore)
-
-  local rayHandle = StartShapeTestRay(coords.x,coords.y,coords.z, destination.x,destination.y,destination.z, -1, ignore, flags or 0)
-  local _, hit, endCoords, surfaceNormal, entityHit = GetShapeTestResult(rayHandle)
-  if entityHit <= 0 then
-    Wait(0)
-    return lib.raycast.fromCoords(coords, destination, flags, ignore, true)
-  end
-  return hit, endCoords, entityHit, surfaceNormal
+  local rayHandle = StartShapeTestRay(coords.x, coords.y, coords.z, destination.x, destination.y, destination.z, flags or 511, ignore or 4, 0)
+  local _, hit, endCoords, surfaceNormal, materialHash, entityHit = GetShapeTestResultIncludingMaterial(rayHandle)
+  
+  -- Return results even if nothing was hit (entityHit will be 0)
+  return hit == 1, endCoords, entityHit or 0, surfaceNormal, materialHash
 end
 
 lib.raycast.world3dToScreen2d = function(pos)

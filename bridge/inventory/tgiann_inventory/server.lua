@@ -40,7 +40,7 @@ return {
     local hasItem, hasCount = false, 0
     for k,v in pairs(playerItems) do 
       if v.name == item then 
-        if not count or count <= v.count then 
+        if not count or count <= v.amount then 
           if not slot or slot == v.slot then
             if not count or ((v.count and count <= v.count) or (v.amount and count <= v.amount)) then 
               hasItem = true

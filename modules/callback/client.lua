@@ -14,11 +14,6 @@ RegisterNetEvent(callback_event:format(cache.resource), function(key, ...)
   return cb and cb(...)
 end)
 
-
-
-
-
-
 local triggerServerCallback = function(_,event, cb, ...)
   local key 
   repeat 

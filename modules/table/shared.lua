@@ -172,9 +172,9 @@ lib.table = {
         local type2 = type(v)
 
 		if type1 == 'table' and type2 == 'table' then
-            table_merge(t1[k], v, addDuplicateNumbers)
+          t1[k] = lib.table.merge(t1[k], v, addDuplicateNumbers)
         elseif addDuplicateNumbers and (type1 == 'number' and type2 == 'number') then
-            t1[k] += v
+          t1[k] += v
 		else
 			t1[k] = v
         end

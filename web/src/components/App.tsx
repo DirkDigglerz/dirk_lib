@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useNuiEvent } from '../hooks/useNuiEvent';
 
 import theme from '../theme';
-import { isEnvBrowser } from '../utils/misc';
+import { imageUrlToBase64, isEnvBrowser } from '../utils/misc';
 
 import { MantineEmotionProvider } from '@mantine/emotion';
 import Menu from './Context/main';
@@ -19,6 +19,7 @@ import TestBed from './TestBed/main';
 import TextUI from './TextUI/main';
 import { useSettings } from '../stores/settings';
 import { localeStore } from '../stores/locales';
+import { fetchNui } from '../utils/fetchNui';
 
 
 const App: React.FC = () => {
@@ -71,6 +72,16 @@ const App: React.FC = () => {
     window.invokeNative("openUrl", data);
   });
 
+  useNuiEvent<string>('IMAGE_TO_BASE64', (url) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.src = url;
+    img.onload = async () => {
+      const base64 = await imageUrlToBase64(img.src);
+      fetchNui('IMAGE_TO_BASE64_RESULT', { url, base64 });
+    };
+  });
+  
   return (
     <MantineProvider theme={curTheme} defaultColorScheme='dark'>
       <MantineEmotionProvider>

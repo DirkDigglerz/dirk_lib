@@ -1,8 +1,17 @@
 return {
-  setSkin = function(ped, skin)
+  setModel = function(ped, model)
+    local playerPed = ped or cache.ped
+    if not model then return end
+    exports[lib.settings.clothing]:setPlayerModel(playerPed, model)
+  end,
+
+  setSkin = function(ped, skin, model)
     local playerPed = ped or cache.ped
     if not skin then return end
     exports[lib.settings.clothing]:setPedAppearance(playerPed, skin)
+    if not model then return end
+    print("Setting model to ", model)
+    exports[lib.settings.clothing]:setPlayerModel(model)
   end,
 
   openCustomisation = function(categories)

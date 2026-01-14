@@ -68,7 +68,10 @@ lib.player = {
   hasGroup = bridge.hasGroup,
 
   setSkin = clothingBridge.setSkin,
-  openCustomisation = clothingBridge.openCustomisation,
+  openCustomisation = function()
+    print('Opening clothing customisation')
+    clothingBridge.openCustomisation()
+  end,
 }
 
 return lib.player
