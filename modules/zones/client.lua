@@ -4,6 +4,21 @@ local zones = {}
 local zone = {}
 zone.__index = zone
 
+local sanitizePolyPoints = function(points)
+  local fixedPoints = {}
+
+  for i, pt in ipairs(points) do
+    -- if it's vector2, force z = 0
+    if pt.z == nil then
+      fixedPoints[i] = vector3(pt.x, pt.y, 0.0)
+    else
+      fixedPoints[i] = pt
+    end
+  end
+
+  return fixedPoints
+end
+
 -- grid config
 local CELL_SIZE = 500.0
 local Grids = {}
@@ -113,12 +128,20 @@ function zone:__init()
   if self.type == 'circle2D' then
     assert(self.pos and self.radius, 'circle2D zone must have pos and radius')
   end
+  
   if self.type == 'poly' then
     assert(self.points, 'poly zone must have points')
-    self.polygon = glm.polygon.new(self.points)
+
+    -- normalize points: allow vector2 or vector3
+    self.points = sanitizePolyPoints(self.points)
+
     self.height = self.height or 5.0
     self.pos = lib.zones.getCenter(self.points)
+
+    -- now safe
+    self.polygon = glm.polygon.new(self.points)
   end
+
   if self.type == 'box' then
     assert(self.pos and self.size, 'box zone must have pos and size')
     self.size.z = self.size.z or 99999.999
@@ -247,8 +270,10 @@ lib.zones = {
     return vector3(x/#poly,y/#poly,z/#poly)
   end,
 
-  isPointInside = function(poly,pos)
-    return glm.polygon.new(poly):contains(pos,5.0)
+  isPointInside = function(poly,pos, height)
+    poly = sanitizePolyPoints(poly)
+    pos = vector3(pos.x, pos.y, pos.z or 0)
+    return glm.polygon.new(poly):contains(pos, height or 5.0)
   end
 }
 

@@ -151,6 +151,10 @@ end
 ---@param data ProgressProps
 ---@return boolean?
 function lib.progressBar(data)
+  if lib.settings.progress == 'ox_lib' then 
+    return exports.ox_lib:progressBar(data)
+  end 
+
   while progress ~= nil do Wait(0) end
 
   if not interruptProgress(data) then
@@ -172,6 +176,10 @@ end
 ---@param data ProgressProps
 ---@return boolean?
 function lib.progressCircle(data)
+  if lib.settings.progress == 'ox_lib' then 
+    return exports.ox_lib:progressCircle(data)
+  end 
+
   while progress ~= nil do Wait(0) end
 
   if not interruptProgress(data) then
@@ -198,6 +206,10 @@ end
 
 ---@return boolean
 function lib.progressActive()
+  if lib.settings.progress == 'ox_lib' then 
+    return exports.ox_lib:progressActive()
+  end 
+  
   return progress and true
 end
 
