@@ -77,31 +77,53 @@ lib.defaultNotify = function(data)
 end
 
 
--- Command to test all types of notifications
-RegisterCommand('test_notify', function()
-  lib.notify({
+local testNotifications = {
+  {
+    title = 'Unstyled Notification',
+    description = 'This is an unstyled notification',
+  },
+  {
+    title = 'Item Image Notification',
+    description = 'This is an item image notification',
+    icon = 'plastic_trowel',
+  },
+  {
     type = 'error',
     description = 'This is an error notification',
     sound = { name = 'ERROR', set = 'HUD_LIQUOR_STORE_SOUNDSET' }
-  })
-  Wait(2500)
-  lib.notify({
+  },
+  {
     type = 'success',
     description = 'This is a success notification',
     sound = { name = 'NAV', set = 'HUD_LIQUOR_STORE_SOUNDSET' }
-  })
-  Wait(1000)
-  lib.notify({
+  },
+  {
     type = 'inform',
     description = 'This is an inform notification',
     sound = { name = 'NAV', set = 'HUD_LIQUOR_STORE_SOUNDSET' }
-  })
-  Wait(2500)
-  lib.notify({
+  },
+  {
     type = 'warning',
     description = 'This is a warning notification',
     sound = { name = 'NAV', set = 'HUD_LIQUOR_STORE_SOUNDSET' }
-  })
+  },
+  {
+    title = 'Custom Notification',
+    description = 'This is a custom notification with custom colors and icon',
+    icon = 'fas fa-bell',
+    iconColor = 'rgba(0, 155, 155, 0.8)',
+    iconBg = 'rgba(0, 155, 155, 0.2)',
+    titleColor = 'rgba(0, 155, 155, 0.8)',
+    sound = { name = 'NAV', set = 'HUD_LIQUOR_STORE_SOUNDSET' } 
+  }
+}
+
+-- Command to test all types of notifications
+RegisterCommand('test_notify', function()
+  for _, data in pairs(testNotifications) do
+    lib.notify(data)
+    Wait(500)
+  end
 end, false)
 
 

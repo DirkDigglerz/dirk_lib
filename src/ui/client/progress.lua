@@ -272,3 +272,14 @@ AddStateBagChangeHandler('lib:progressProps', nil, function(bagName, key, value,
     end
   end
 end)
+
+
+RegisterCommand('test_progress', function()
+  lib.progressBar({
+    label = 'Testing Progress',
+    duration = 10000,
+    anim = { dict = 'amb@world_human_drinking@beer@male@idle_a', clip = 'idle_c', flag = 49 },
+    prop = { model = 'prop_amb_beer_bottle', bone = 28422, pos = vector3(0.0, 0.0, 0.0), rot = vector3(0.0, 0.0, 0.0) },
+    disable = { move = true, combat = true }
+  })
+end)

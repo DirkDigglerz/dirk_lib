@@ -14,7 +14,8 @@ dependencies {
   'oxmysql',
 }
 
-ui_page 'web/build/index.html'
+-- ui_page 'web/build/index.html'
+ui_page 'http://localhost:3001'
 
 files {
   'locales/**/*',

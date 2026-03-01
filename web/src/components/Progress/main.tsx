@@ -1,12 +1,13 @@
 import { IconProp } from "@fortawesome/fontawesome-svg-core";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { Flex, Text, Transition, useMantineTheme } from "@mantine/core";
+import { alpha, Flex, Text, useMantineTheme } from "@mantine/core";
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useNuiEvent } from "../../hooks/useNuiEvent";
 import { locale } from "../../stores/locales";
-import colorWithAlpha from "../../utils/colorWithAlpha";
 import { fetchNui } from "../../utils/fetchNui";
 import { getPositionProps, getTranslate, PositionProps } from "../../utils/positioning";
+import { MotionFlex } from "../App";
 
 type ProgressProps = {
   position: PositionProps 
@@ -16,7 +17,7 @@ type ProgressProps = {
   duration: number
 }
 
-export default function Progress() {
+export default function ProgressBar() {
   const theme = useMantineTheme()
   const [display, setDisplay] = useState(false)
   const [pause, setPause] = useState(false)
@@ -25,8 +26,8 @@ export default function Progress() {
     position: 'bottom-center',
     icon: 'fa fa-bars',
     description: 'This is a progress bar',
-    label: 'Progress',
-    duration: 8000
+    label: 'Digging a hole',
+    duration: 60000
   })
   
   useEffect(() => {
@@ -52,173 +53,136 @@ export default function Progress() {
   useNuiEvent('SHOW_PROGRESS', (data: ProgressProps) => {
     setPause(false)
     setOptions(data)
-    setProgress(0) // Reset progress to start from 0 when new progress starts
+    setProgress(0)
     setDisplay(true)
   })
   
   useNuiEvent('CANCEL_PROGRESS', () => {
     setPause(true)
-    setOptions((prev : ProgressProps) => ({ ...prev, label: locale('progress_cancelled') }))
+    setOptions((prev: ProgressProps) => ({ ...prev, label: locale('progress_cancelled') }))
     setTimeout(() => {
-      setDisplay(false)  // Turn off the display
+      setDisplay(false)
       fetchNui('PROGRESS_COMPLETE')
-      setProgress(0)     // Reset progress
-      setPause(false)    // Reset pause state
-      // Optionally clear all options here if needed
+      setProgress(0)
+      setPause(false)
     }, 500)
   })
-      //   bg='rgba(0,0,0,0.6)'
-      // // mah='12vh'
-      // // align='center'
-      // h='fit-content'
-      // p='1vh 2vh'
-      // style={{
-      //   // overflow: 'hidden',
-      //   borderRadius: theme.radius.xxl,
-      //   outline: `0.15vh solid ${colorWithAlpha(theme.colors[theme.primaryColor][9], 0.6)}`,
-        
-      //   transition: 'all 0.2s ease-in-out',
-      // }}
 
-      // align={'center'}
-      // gap='sm'
+
   return (
-    <Transition
-      mounted={display}
-      transition="fade"
-      duration={400}
-      timingFunction="ease"
-     
-    >
-      {(styles) => (
-        <Flex
-          m='xs'
-          p='2vh 2vh'
+    <AnimatePresence>
+      {display && (
+        <MotionFlex
+          initial={{ opacity: 0, y: 6, transform: getTranslate(options.position) }}
+          animate={{ opacity: 1, y: 0, transform: getTranslate(options.position) }}
+          exit={{ opacity: 0, y: 6, transform: getTranslate(options.position) }}
+          transition={{ duration: 0.25, ease: 'easeOut' }}
           pos='absolute'
           {...getPositionProps(options.position)}
-          // bg={`linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.302621947216386) 16%, rgba(0,0,0,0.3) 46%, rgba(0,0,0,0.6) 100%)`}
-          bg={'rgba(0,0,0,0.6)'}
+          direction='column'
+          gap='xs'
           style={{
-            borderRadius: theme.radius.xl,
-            outline: `0.15vh solid ${colorWithAlpha(theme.colors[theme.primaryColor][9], 0.6)}`,
-            transform: getTranslate(options.position),
-            ...styles
+            width: '35vh',
+            padding: '1.2vh 1.4vh',
+            background: alpha(theme.colors.dark[9], 0.55),
+            borderRadius: theme.radius.sm,
+            border: '0.1vh solid rgba(255,255,255,0.07)',
+            boxShadow: '0 0.74vh 2.96vh rgba(0,0,0,0.5)',
           }}
-          direction={'column'}
         >
-          <Flex
-            direction='column'
-          >
-            <Flex
-              gap='xs'
-              align='center'
-            >
+          {/* ── Label row ── */}
+          <Flex align='center' justify='space-between' gap='xs'>
+            <Flex align='center' gap='xs' style={{ minWidth: 0 }}>
               {options.icon && (
                 <FontAwesomeIcon
-                  color='rgba(255,255,255,0.8)'
-                  icon={options.icon as IconProp} 
+                  icon={options.icon as IconProp}
                   style={{
-                    fontSize: theme.fontSizes.xs, 
+                    fontSize: '1.2vh',
+                    color: 'rgba(255, 255, 255, 0.57)',
+                    flexShrink: 0,
                   }}
-                />  
+                />
               )}
               <Text
-                size='xs'
                 style={{
-                  fontFamily: 'Akrobat Bold',
-                  textShadow: `0 0 0.1vh ${colorWithAlpha(theme.colors[theme.primaryColor][theme.primaryShade as number], 0.9)}`
+                  fontFamily: 'Akrobat Bold, sans-serif',
+                  fontSize: '1.25vh',
+                  fontWeight: 700,
+                  letterSpacing: '0.16em',
+                  textTransform: 'uppercase',
+                  color: 'rgba(255,255,255,0.55)',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
                 }}
-              >{options.label}</Text>
-            </Flex>
-            {options.description && (
-              <Text
-                size='xxs'
-                c='rgba(255,255,255,0.8)'
               >
-                {options.description}
+                {options.label}
               </Text>
-            )}
-
-          </Flex>
-
-          <CustomProgress
-            value={progress}
-          />
-        </Flex>
-      
-      )}
-    </Transition>
-  )
-}
-
-type CustomProgressProps = {
-  value: number // Progress value in percentage
-}
-
-function CustomProgress({ value }: CustomProgressProps) {
-  const theme = useMantineTheme()
-
-  // Number of boxes in the progress bar
-  const boxCount = 8
-  const filledBoxes = Math.floor((value / 100) * boxCount) // Fully filled boxes
-  const partialFill = ((value / 100) * boxCount) - filledBoxes // The remaining fraction of the current box
-
-  return (
-    <Flex
-      w='28vh'
-      gap='xxs'
-
-      mt='xs'
-      // bg='rgba(0, 0, 0, 0.4)'
-
-
-      style={{
-        borderRadius: theme.radius.sm,
-        // overflow: 'hidden',
-        
-      }}
-    >
-      {Array.from({ length: boxCount }).map((_, index) => {
-        // Determine if the current box should be fully filled, partially filled, or empty
-        let fillPercentage = 0
-        if (index < filledBoxes) {
-          fillPercentage = 100 // Fully filled box
-        } else if (index === filledBoxes) {
-          fillPercentage = partialFill * 100 // Partially filled box
-        }
-
-        return (
-          <Flex
-            key={index}
-            w={`${100 / boxCount}%`} // Divide width equally among boxes
-            h='2vh'
-            style={{
-              position: 'relative',
-              backgroundColor: 'rgba(0, 0, 0, 0.2)', // Default empty box color
-              
-              transition: 'background-color 0.3s ease', // Smooth transition for filling
-              borderRadius: theme.radius.xxs,
-              transform: 'skewX(-5deg)', // Skew the fill box to give a 3D effect
-            }}
-          >
-            {/* Inner fill box that represents the progress */}
-            <div
+            </Flex>
+            <Text
               style={{
-                width: `${fillPercentage}%`,
-                height: '100%',
-                // backgroundColor: theme.colors[theme.primaryColor][theme.primaryShade as number],
-                borderRadius: theme.radius.xs,
-                backgroundColor: colorWithAlpha(theme.colors[theme.primaryColor][theme.primaryShade as number], 0.8),
-                // boxShadow: fillPercentage > 0 
-                //   ? `inset 0 0 2.5vh ${colorWithAlpha(theme.colors[theme.primaryColor][theme.primaryShade as number], 0.9)}`
-                //   : 'none',
-                // transform: 'skewX(-20deg)', // Skew the fill box to give a 3D effect
-                // transition: 'width 0.1s ease', // Smooth transition for the width change
+                fontFamily: 'Akrobat Bold',
+                fontSize: '1.2vh',
+                // fontWeight: 600,
+                letterSpacing: '0.08em',
+                flexShrink: 0,
+                color: theme.colors[theme.primaryColor][6],
+                textShadow: `
+                  0 0 0.2vh ${theme.colors[theme.primaryColor][7]},
+                  0 0 0.3vh ${theme.colors[theme.primaryColor][9]}66
+                `,
               }}
-            />
+            >
+              {progress}%
+            </Text>
           </Flex>
-        )
-      })}
-    </Flex>
+
+          {/* ── Slim track ── */}
+          <div style={{ position: 'relative', width: '100%', height: '0.8vh', borderRadius: theme.radius.sm, background: 'rgba(255,255,255,0.06)', border: '0.1vh solid rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+            <motion.div
+              style={{
+                position: 'absolute',
+                top: 0, left: 0,
+                height: '100%',
+                borderRadius: theme.radius.sm,
+                background: `linear-gradient(90deg, ${theme.colors[theme.primaryColor][9]}, ${theme.colors[theme.primaryColor][7]})`,
+                boxShadow: `0 0 0.8vh ${theme.colors[theme.primaryColor][6]}88`,
+              }}
+              animate={{ width: `${progress}%` }}
+              transition={{ duration: 0.08, ease: 'linear' }}
+            />
+            {/* shimmer */}
+            <motion.div
+              style={{
+                position: 'absolute',
+                top: 0,
+                width: '35%',
+                height: '100%',
+                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent)',
+                pointerEvents: 'none',
+              }}
+              animate={{ left: ['-35%', '120%'] }}
+              transition={{ duration: 2.6, repeat: Infinity, ease: 'linear' }}
+            />
+          </div>
+
+
+          {/* ── Optional description ── */}
+          {options.description && (
+            <Text
+              style={{
+                fontFamily: 'Akrobat Bold, sans-serif',
+                fontSize: '1.1vh',
+                color: 'rgba(255,255,255,0.3)',
+                letterSpacing: '0.04em',
+                marginTop: '-0.2vh',
+              }}
+            >
+              {options.description}
+            </Text>
+          )}
+        </MotionFlex>
+      )}
+    </AnimatePresence>
   )
 }

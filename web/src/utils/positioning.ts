@@ -8,6 +8,8 @@ export type PositionProps = 'top-right' | 'right-center' | 'bottom-right' | 'top
   transform?: string
 }
 
+const OFFSET_VALUE = '3vh'
+
 const getPositionProps = (position : PositionProps) => {
 
   if (typeof position !== 'string') {
@@ -22,43 +24,43 @@ const getPositionProps = (position : PositionProps) => {
   switch (position) {
     case 'top-right':
       return {
-        top: 0,
-        right: 0
+        top: OFFSET_VALUE,
+        right: OFFSET_VALUE
       }
     case 'right-center':
       return {
         top: '50%',
-        right: 0, 
+        right: OFFSET_VALUE, 
       
       }
     case 'bottom-right':
       return {
-        bottom: 0,
-        right: 0
+        bottom: OFFSET_VALUE,
+        right: OFFSET_VALUE
       }
     case 'top-left':
       return {
-        top: 0,
-        left: 0
+        top: OFFSET_VALUE,
+        left: OFFSET_VALUE
       }
     case 'left-center':
       return {
         top: '50%',
-        left: 0
+        left: OFFSET_VALUE
       }
     case 'bottom-left':
       return {
-        bottom: 0,
-        left: 0
+        bottom: OFFSET_VALUE,
+        left: OFFSET_VALUE
       }
     case 'bottom-center':
       return {
-        bottom: 0,
+        bottom: OFFSET_VALUE,
         left: '50%'
       }
     case 'top-center':
       return {
-        top: 0,
+        top: OFFSET_VALUE,
         left: '50%'
       }
   }
@@ -88,6 +90,8 @@ const getTranslate = (position: PositionProps) => {
       return 'translate(-50%, 0)'
   }
 }
+
+
 
 const getTransition = (position: PositionProps) => {
   if (typeof position !== 'string') {

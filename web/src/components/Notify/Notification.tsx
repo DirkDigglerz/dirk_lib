@@ -1,8 +1,9 @@
-import { Box, Flex, Image, Text, useMantineTheme } from "@mantine/core"
-import { useEffect, useMemo, useState } from "react"
-import colorWithAlpha from "../../utils/colorWithAlpha"
+import { IconProp } from "@fortawesome/fontawesome-svg-core"
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome"
+import { alpha, Box, Flex, Image, Text, useMantineTheme } from "@mantine/core"
+import { motion } from "framer-motion"
+import { useEffect, useMemo, useRef, useState } from "react"
 import getImageType from "../../utils/getImagePath"
-
 
 export type NotificationProps = {
   title?: string
@@ -15,24 +16,22 @@ export type NotificationProps = {
   iconColor?: string
   iconBg?: string
   iconAnimation?: string
-  
-  
+
   // FOR UI 
   hide?: boolean
   count?: number
 }
 
-
-
-export default function Notification(props: NotificationProps){
-  const theme = useMantineTheme();
+export default function Notification(props: NotificationProps) {
+  const theme = useMantineTheme()
   const [display, setDisplay] = useState(false)
-  const [amountEffect, setAmountEffect] = useState(false) // For the amount effect
-
+  const [amountEffect, setAmountEffect] = useState(false)
+  const [timeLeft, setTimeLeft] = useState(100)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const imageType = useMemo(() => {
-    return getImageType(props.icon);
-  } , [props.icon]);
+    return getImageType(props.icon)
+  }, [props.icon])
 
   useEffect(() => {
     if (props.count && !amountEffect) {
@@ -44,7 +43,7 @@ export default function Notification(props: NotificationProps){
   }, [props.count])
 
   useEffect(() => {
-    if (!props.hide) { 
+    if (!props.hide) {
       setTimeout(() => {
         setDisplay(true)
       }, 100)
@@ -52,140 +51,202 @@ export default function Notification(props: NotificationProps){
       setDisplay(false)
     }
   }, [props.hide])
+
+  // Duration countdown bar — only start when display flips to true
+  useEffect(() => {
+    if (!display) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+      return
+    }
+
+    setTimeLeft(100)
+    const tick = (props.duration ?? 5000) / 100
+
+    intervalRef.current = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(intervalRef.current!)
+          intervalRef.current = null
+          setDisplay(false)
+          return 0
+        }
+        return prev - 1
+      })
+    }, tick)
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+    }
+  }, [display, props.duration])
+
   return (
     <Flex
-      pos='relative' 
-      right = {props.position.includes('right') ? !display ? '-150%' : '0': 'auto'}
-      left = {props.position.includes('left') ? !display ? '-150%' : '0': 'auto'}
-      top = {props.position.includes('top') ? !display ? '-150%' : '0': 'auto'}
-      bottom = {props.position.includes('bottom') ? !display ? '-150%' : '0': 'auto'}
-      bg='rgba(0,0,0,0.6)'
-      // mah='12vh'
-      // align='center'
+      pos='relative'
+      right={props.position.includes('right') ? !display ? '-150%' : '0' : 'auto'}
+      left={props.position.includes('left') ? !display ? '-150%' : '0' : 'auto'}
+      top={props.position.includes('top') ? !display ? '-150%' : '0' : 'auto'}
+      bottom={props.position.includes('bottom') ? !display ? '-150%' : '0' : 'auto'}
       h='fit-content'
-      p='1vh 2vh'
+      direction='column'
       style={{
-        // overflow: 'hidden',
-        borderRadius: theme.radius.xxl,
-        outline: `0.15vh solid ${colorWithAlpha(theme.colors[theme.primaryColor][9], 0.6)}`,
-        
+        background: alpha(theme.colors.dark[9], 0.55),
+        borderRadius: theme.radius.sm,
+        border: '0.1vh solid rgba(255,255,255,0.07)',
+        boxShadow: '0 0.74vh 2.96vh rgba(0,0,0,0.5)',
         transition: 'all 0.2s ease-in-out',
+        minWidth: '20vh',
+        maxWidth: '35vh',
+        overflow: 'hidden',
       }}
-
-      align={'center'}
-      gap='sm'
-      
     >
-      {/* Box for the number */}
-      {props.count && (
-        <Box
-          style={{
-            position: 'absolute',
-            top: '0.7vh',
-            right: '0.7vh',
-            backgroundColor: colorWithAlpha(theme.colors[theme.primaryColor][9], 0.2),
-            outline: `0.2vh solid ${colorWithAlpha(theme.colors[theme.primaryColor][9], 0.6)}`,
-            color: 'rgba(255,255,255,0.8)',
-            borderRadius: theme.radius.xl,
-            padding: '0 0.6vh',  
-            fontWeight: 700,
-            aspectRatio: '1/1',
-            textAlign: 'center',
-            transform: amountEffect ? 'scale(1.2)' : 'scale(1)',
-            transition: 'all 0.2s ease-in-out',
-            zIndex: 1000, // Ensure it is above other content
-          }}
-        >
-          <Text size='xxs'>{props.count}</Text>
-        </Box> 
-      )}
+      {/* ── Main content ── */}
+      <Flex p='1.2vh 1.4vh' gap='1vh' align='center'>
 
-        <NotificationImage 
-          imageType={imageType}
-          {...props}
-        />
-
-        <Flex
-          direction='column'
-          // bg='red'
-          flex={1}
-        >
-          <Text
-            size='xs'
-            c={props.titleColor || colorWithAlpha(theme.colors[theme.primaryColor][9], 0.8)}
+        {/* Count badge */}
+        {props.count && (
+          <Box
             style={{
-              fontFamily: 'Akrobat Bold',
-              textShadow: `0 0 0.2vh ${props.titleColor || colorWithAlpha(theme.colors[theme.primaryColor][9], 0.5)}`
+              position: 'absolute',
+              top: '0.6vh',
+              right: '0.6vh',
+              backgroundColor: alpha(theme.colors[theme.primaryColor][9], 0.2),
+              border: '0.1vh solid rgba(255,255,255,0.07)',
+              borderRadius: theme.radius.sm,
+              padding: '0 0.5vh',
+              textAlign: 'center',
+              transform: amountEffect ? 'scale(1.2)' : 'scale(1)',
+              transition: 'all 0.2s ease-in-out',
+              zIndex: 1000,
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: 'Akrobat Bold, sans-serif',
+                fontSize: '0.85vh',
+                color: theme.colors[theme.primaryColor][6],
+                textShadow: `0 0 0.2vh ${theme.colors[theme.primaryColor][7]}, 0 0 0.3vh ${theme.colors[theme.primaryColor][9]}66`,
+              }}
+            >
+              {props.count}
+            </Text>
+          </Box>
+        )}
+
+        <NotificationImage imageType={imageType} {...props} />
+
+        <Flex direction='column' flex={1} gap={2}>
+          <Text
+            style={{
+              fontSize: '1.3vh',
+              fontWeight: 700,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: props.titleColor || 'white',
+              textShadow: props.titleColor
+                ? undefined
+                : `0 0 0.2vh ${theme.colors[theme.primaryColor][7]}, 0 0 0.3vh ${theme.colors[theme.primaryColor][9]}66`,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             }}
           >
             {props.title?.toUpperCase()}
           </Text>
 
-          <Text
-            c='rgba(255,255,255,0.6)'
-            size='xxs'
-          >
-            {props.description}
-          </Text>
+          {props.description && (
+            <Text
+              style={{
+                fontSize: '1.2vh',
+                color: 'rgba(255,255,255,0.4)',
+                letterSpacing: '0.04em',
+              }}
+            >
+              {props.description}
+            </Text>
+          )}
         </Flex>
+      </Flex>
 
+      {/* ── Duration bar — flush to bottom ── */}
+      <div style={{
+          position: 'relative',
+          width: '100%',
+          height: '0.8vh',
+          background: 'rgba(255,255,255,0.06)',
+          borderTop: '0.1vh solid rgba(255,255,255,0.06)',
+          overflow: 'hidden',
+          flexShrink: 0,
+        }}>
+          <motion.div
+            style={{
+              position: 'absolute',
+              top: 0, left: 0,
+              height: '100%',
+              background: `linear-gradient(90deg, ${theme.colors[theme.primaryColor][9]}, ${theme.colors[theme.primaryColor][7]})`,
+              boxShadow: `0 0 0.8vh ${theme.colors[theme.primaryColor][6]}88`,
+            }}
+            animate={{ width: `${timeLeft}%` }}
+            transition={{ duration: 0.08, ease: 'linear' }}
+          />
+          {/* shimmer */}
+          <motion.div
+            style={{
+              position: 'absolute',
+              top: 0,
+              width: '35%',
+              height: '100%',
+              background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent)',
+              pointerEvents: 'none',
+            }}
+            animate={{ left: ['-35%', '120%'] }}
+            transition={{ duration: 2.6, repeat: Infinity, ease: 'linear' }}
+          />
+        </div>
     </Flex>
   )
 }
 
-function NotificationImage (props: NotificationProps & {imageType: false | {type: string, path: string}}) {
+function NotificationImage(props: NotificationProps & { imageType: false | { type: string, path: string } }) {
+  const theme = useMantineTheme()
   return (
-    <Image
-      src={props.imageType && props.imageType.type === 'image' ? props.imageType.path : './serverLogo.png'}
-      alt='icon'
+    <Box
       h='4vh'
+      mah='4vh'
+      bg={props.iconBg || alpha(theme.colors[theme.primaryColor][9], 0.25)}
       style={{
+        borderRadius: theme.radius.xs,
         aspectRatio: '1/1',
+        border: '0.1vh solid rgba(255,255,255,0.07)',
+        flexShrink: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
       }}
-    />
-    // <Box
-    //   // // direction={'column'}
-    //   // justify={'center'}
-    //   // align='center'
-    //   h='4vh'
-    //   // ml='xs'
-    //   mah='4vh'
-    //   bg={props.iconBg || props.iconColor && 'rgba(44,44,44,0.3)' || colorWithAlpha(theme.colors[theme.primaryColor][9], 0.2)}
-    //   style={{
-    //     borderRadius: theme.radius.xs,
-    //     aspectRatio: '1/1',
-    //     outline: `0.2vh solid ${props.iconColor  || colorWithAlpha(theme.colors[theme.primaryColor][9], 0.6)}`,
-    //   }}
-    // >
-    //   <Flex
-    //     justify='center'
-    //     align='center'
-    //     h='100%'
-    //     w='100%'
-    //   >
-    //     {props.imageType && props.imageType.type == 'icon' && (
-    //       <FontAwesomeIcon  
-    //         icon={props.icon as IconProp || 'fas fa-info-circle' as IconProp}
-    //         color={props.iconColor || colorWithAlpha(theme.colors[theme.primaryColor][9], 0.8)}
-    //         style={{
-    //           fontSize: '2.4vh',
-    //         }}
-    //       /> 
-    //     )}
-
-    //     {props.imageType && props.imageType.type == 'image' && (
-    //       <Image 
-    //         src={props.imageType.path}
-    //         alt='icon'
-    //         h='3vh'
-    //         style={{
-    //           aspectRatio: '1/1',
-    //         }}
-    //       />
-    //     )}
-
-    //   </Flex>
-    // </Box>
+    >
+      <Flex justify='center' align='center' h='100%' w='100%'>
+        {props.imageType && props.imageType.type === 'icon' && (
+          <FontAwesomeIcon
+            icon={props.icon as IconProp || 'fas fa-info-circle' as IconProp}
+            color={props.iconColor || theme.colors[theme.primaryColor][9]}
+            style={{ fontSize: '2vh' }}
+          />
+        )}
+        {props.imageType && props.imageType.type === 'image' && (
+          <Image
+            src={props.imageType.path}
+            alt='icon'
+            h='3vh'
+            style={{ aspectRatio: '1/1' }}
+          />
+        )}
+      </Flex>
+    </Box>
   )
 }
-

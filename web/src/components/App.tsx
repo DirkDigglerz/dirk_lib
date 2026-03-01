@@ -1,4 +1,4 @@
-import { BackgroundImage, MantineProvider } from '@mantine/core';
+import { BackgroundImage, Flex, MantineProvider } from '@mantine/core';
 import '@mantine/dates/styles.css';
 import React, { useEffect, useState } from "react";
 import { useNuiEvent } from '../hooks/useNuiEvent';
@@ -7,20 +7,24 @@ import theme from '../theme';
 import { imageUrlToBase64, isEnvBrowser } from '../utils/misc';
 
 import { MantineEmotionProvider } from '@mantine/emotion';
+import { motion } from 'framer-motion';
+import { localeStore } from '../stores/locales';
+import { useSettings } from '../stores/settings';
+import { fetchNui } from '../utils/fetchNui';
 import Menu from './Context/main';
 import Dialog from './Dialog/main';
 import Input from './Input/main';
 import KeyInputs from './KeyInputs/main';
 import Notifications from './Notify/main';
-import Progress from './Progress/main';
+import ProgressBar from './Progress/main';
 import Quiz from './Quiz/main';
 import StatusInfo from './StatusInfo/main';
 import TestBed from './TestBed/main';
 import TextUI from './TextUI/main';
-import { useSettings } from '../stores/settings';
-import { localeStore } from '../stores/locales';
-import { fetchNui } from '../utils/fetchNui';
 
+
+// @ts-expect-error - This is a web component, it doesn't exist in the types
+export const MotionFlex = motion.create(Flex);
 
 const App: React.FC = () => {
   const [curTheme, setCurTheme] = useState(theme);
@@ -88,7 +92,7 @@ const App: React.FC = () => {
           <Wrapper>
             {/* <Radial /> */}
             <TestBed />
-            <Progress />
+            <ProgressBar />
             <TextUI />
             <Notifications />
             <Menu />

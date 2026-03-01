@@ -70,26 +70,12 @@ end
 
 local convert_to_ox = function(table)
   local ret = {}
-  for item,data in pairs(table) do
-    ret[item] = {} 
-    assert(data.label, "Label is required for item "..item)
-    assert(data.name, "Name is required for item "..item)
-    assert(data.name == item, "Name and key must be the same for item "..item)
-    assert(type(data.label) == "string", "Label must be a string for item "..item)
+  for _,data in pairs(table) do
+    assert(data.name, "Name is required for ox item")
+    assert(data.label, "Label is required for ox item "..data.name)
+    assert(type(data.label) == "string", "Label must be a string for ox item "..data.name)
+    ret[data.name] = {}
     
-    for k,v in pairs(data) do 
-      if k == "label" or k == "weight" or k == "stackable" then 
-        if k ~= "stackable" then 
-          ret[item][k] = v
-        else
-          ret[item]["stack"] = v
-        end
-      elseif k == 'image' then 
-        ret[item].client = {
-          image = v
-        }
-      end
-    end
   end
   return ret
 end
@@ -152,7 +138,7 @@ local convert_to_sql = function(table)
   for k,v in pairs(t) do
     assert(v.label, "Label is required for item "..k)
     assert(v.name, "Name is required for item "..k)
-    assert(v.name == k, "Name and key must be the same for item "..k)
+    k = v.name
     assert(type(v.label) == "string", "Label must be a string for item "..k)
     currentNumber = currentNumber + 1
     output = output..string.format("\n ('%s', '%s')%s", k, v.label, currentNumber == tableCount and "" or ",")
