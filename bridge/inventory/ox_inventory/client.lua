@@ -33,4 +33,22 @@ return {
   getItems = function()
     return exports.ox_inventory:GetPlayerItems()
   end,
+
+
+  items = function()
+    local allItems = exports.ox_inventory:Items()
+    local itemImgPath = lib.settings.itemImgPath
+    local formatted = {}
+    for k,v in pairs(allItems) do 
+      local img = v.client?.image or v.name
+      local imgUrl = ('%s/%s.png'):format(itemImgPath, img)
+      formatted[k] = {
+        name = v.name,
+        label = v.label,
+        weight = v.weight,
+        image = imgUrl,
+      }
+    end
+    return formatted
+  end,
 }

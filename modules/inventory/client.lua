@@ -2,6 +2,12 @@ local settings = lib.settings
 local inventoryBridge = lib.loadBridge('inventory', settings.inventory, 'client')
 local frameworkBridge = lib.loadBridge('framework', settings.framework, 'client')
 
+---@type Item
+---@field name string
+---@field label string
+---@field weight number
+---@field image string
+
 return {
   ---@function lib.player.getItems
   ---@description # Get the inventory of a player
@@ -38,4 +44,11 @@ return {
   ---@param item string # Item name
   ---@return string
   getItemLabel      = inventoryBridge.getItemLabel or frameworkBridge.getItemLabel,
+
+  ---@function lib.inventory.items 
+  ---@description # Get all items in the game
+  ---@return Item[]
+  items              = inventoryBridge.items or frameworkBridge.items,
 }
+
+--
