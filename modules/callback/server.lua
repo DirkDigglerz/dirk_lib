@@ -67,11 +67,10 @@ end
 local callbackResponse = function(success,result, ...)
   if not success then 
     if result then 
-      return print(('^1SCRIPT ERROR: %s^0\n%s'):format(result,
+      print(('^1SCRIPT ERROR: %s^0\n%s'):format(result,
       Citizen.InvokeNative(`FORMAT_STACK_TRACE` & 0xFFFFFFFF, nil, 0, Citizen.ResultAsString()) or ''))
     end 
-
-    return false 
+    return false  -- always return false on error, never nil
   end
 
   return result, ...
