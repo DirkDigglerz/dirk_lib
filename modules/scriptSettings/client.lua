@@ -6,9 +6,154 @@ local settingsUiOpen = false
 local openEventName = ('%s:openScriptSettings'):format(scriptName)
 local nuiReady = false
 local settingsLoaded = false
+local scriptSettingsWatchers = {}
+local nextScriptSettingsWatcherId = 0
+local resourceVersion = GetResourceMetadata(scriptName, 'version', 0) or 'dev'
 
 local function debugLog(msg)
   print(('[scriptSettings:%s] %s'):format(scriptName, msg))
+end
+
+local function cloneValue(value)
+  if type(value) ~= 'table' then return value end
+  return lib.table.deepClone(value)
+end
+
+local function isEqualValue(a, b)
+  if type(a) ~= type(b) then return false end
+  if type(a) ~= 'table' then return a == b end
+  return json.encode(a) == json.encode(b)
+end
+
+local function getValueAtPath(data, path)
+  if path == '*' or path == '' or path == nil then
+    return data
+  end
+
+  local current = data
+  for segment in path:gmatch('[^.]+') do
+    if type(current) ~= 'table' then return nil end
+    current = current[segment]
+  end
+
+  return current
+end
+
+local function pathsOverlap(watchPath, changedPath)
+  if watchPath == '*' then return true end
+  if watchPath == changedPath then return true end
+  if not changedPath or changedPath == '' then return false end
+
+  return watchPath:sub(1, #changedPath + 1) == changedPath .. '.'
+    or changedPath:sub(1, #watchPath + 1) == watchPath .. '.'
+end
+
+local function collectChangedLeaves(partial, previous, path, out)
+  if type(partial) ~= 'table' then return out end
+  out = out or {}
+
+  for key, value in pairs(partial) do
+    local nextPath = path and (path .. '.' .. key) or key
+    local oldValue = type(previous) == 'table' and previous[key] or nil
+
+    if type(value) == 'table' then
+      collectChangedLeaves(value, oldValue, nextPath, out)
+    else
+      if not isEqualValue(oldValue, value) then
+        out[#out + 1] = {
+          path = nextPath,
+          old = oldValue,
+          new = value,
+        }
+      end
+    end
+  end
+
+  return out
+end
+
+local function notifyWatcher(watcher, current, previous, changedPaths, source, forceInitial)
+  if forceInitial then
+    if not watcher.immediate or watcher.initialDelivered then
+      return false
+    end
+  elseif #changedPaths == 0 then
+    return false
+  end
+
+  local newValue = cloneValue(getValueAtPath(current, watcher.path))
+  local oldValue = cloneValue(getValueAtPath(previous, watcher.path))
+
+  if not forceInitial and watcher.path ~= '*' and isEqualValue(oldValue, newValue) then
+    return false
+  end
+
+  local ok, err = pcall(watcher.cb, newValue, oldValue, {
+    path = watcher.path,
+    changedPaths = changedPaths,
+    source = source,
+    current = current,
+    previous = previous,
+  })
+
+  if not ok then
+    lib.print.error(('[scriptSettings:%s] watcher for "%s" failed: %s'):format(scriptName, watcher.path, tostring(err)))
+  end
+
+  watcher.initialDelivered = true
+  return watcher.once == true
+end
+
+local function dispatchScriptSettingsWatchers(current, previous, changedLeaves, source, forceInitial)
+  if not next(scriptSettingsWatchers) then return end
+
+  for watcherId, watcher in pairs(scriptSettingsWatchers) do
+    local changedPaths = {}
+
+    if not forceInitial then
+      for i = 1, #(changedLeaves or {}) do
+        local changedPath = changedLeaves[i].path
+        if pathsOverlap(watcher.path, changedPath) then
+          changedPaths[#changedPaths + 1] = changedPath
+        end
+      end
+    end
+
+    if notifyWatcher(watcher, current, previous, changedPaths, source, forceInitial) then
+      scriptSettingsWatchers[watcherId] = nil
+    end
+  end
+end
+
+local function onScriptSettings(path, cb, options)
+  assert(type(path) == 'string' and path ~= '', 'scriptSettings.on requires a non-empty path string')
+  assert(type(cb) == 'function', 'scriptSettings.on requires a callback function')
+
+  options = options or {}
+  nextScriptSettingsWatcherId = nextScriptSettingsWatcherId + 1
+
+  local watcher = {
+    id = nextScriptSettingsWatcherId,
+    path = path,
+    cb = cb,
+    once = options.once == true,
+    immediate = options.immediate ~= false,
+    initialDelivered = false,
+  }
+
+  scriptSettingsWatchers[watcher.id] = watcher
+
+  if settingsLoaded and watcher.immediate then
+    if notifyWatcher(watcher, scriptSettings, nil, { path }, 'initial', true) then
+      scriptSettingsWatchers[watcher.id] = nil
+    end
+  elseif settingsLoaded then
+    watcher.initialDelivered = true
+  end
+
+  return function()
+    scriptSettingsWatchers[watcher.id] = nil
+  end
 end
 
 local fetchFromKVP = function()
@@ -25,16 +170,22 @@ local updateKVP = function(ver, data)
 end
 
 local sendSettingsToNui = function()
+  print('sendSettingsToNui called with settings:', scriptSettings, 'and clientVersion:', clientVersion)
   if not hasUI or not scriptSettings then return end
   debugLog(('sendSettingsToNui called (nuiReady=%s)'):format(tostring(nuiReady)))
   SendNuiMessage(json.encode({
     action = 'UPDATE_SCRIPT_SETTINGS',
-    data = scriptSettings,
-    clientVersion = clientVersion,
+    data = {
+      settings = scriptSettings,
+      clientVersion = clientVersion,
+    },
+    
   }))
 end
 
 local function ensureSettingsLoaded(forceRefresh)
+  local previousSettings = settingsLoaded and cloneValue(scriptSettings) or nil
+
   if settingsLoaded and not forceRefresh then
     return scriptSettings
   end
@@ -61,6 +212,7 @@ local function ensureSettingsLoaded(forceRefresh)
   end
 
   settingsLoaded = true
+  dispatchScriptSettingsWatchers(scriptSettings, previousSettings, nil, forceRefresh and 'refresh' or 'load', true)
   debugLog(('ensureSettingsLoaded complete (version=%s)'):format(tostring(clientVersion)))
   return scriptSettings
 end
@@ -100,7 +252,6 @@ local openSettingsUi = function()
     return
   end
 
-  ensureSettingsLoaded()
 
   settingsUiOpen = true
 
@@ -120,9 +271,6 @@ local openSettingsUi = function()
       myPos = { x = coords.x, y = coords.y, z = coords.z, w = heading },
     },
   }))
-
-  sendSettingsToNui()
-  debugLog('openSettingsUi -> messages sent')
 end
 
 closeSettingsUi = function()
@@ -148,6 +296,10 @@ if hasUI then
     cb({})
   end)
 
+  RegisterNuiCallback('GET_RESOURCE_VERSION', function(_, cb)
+    cb({ version = resourceVersion })
+  end)
+
   RegisterNuiCallback('CLOSE_ADMIN_SECTION', function(_, cb)
     closeSettingsUi()
     cb({})
@@ -155,6 +307,11 @@ if hasUI then
 
   RegisterNuiCallback('FETCH_ALL_ITEMS', function(_, cb)
     cb(lib.inventory.items())
+  end)
+
+  RegisterNuiCallback('GIVE_SCRIPT_SETTINGS_ITEM', function(data, cb)
+    local success, err = lib.callback.await(('%s:giveScriptSettingsItem'):format(scriptName), data or {})
+    cb({ success = success, _error = err })
   end)
 end
 
@@ -178,9 +335,11 @@ local updateScriptSettings = function(data, expectedVersion)
 end
 
 RegisterNetEvent(('%s:updateScriptSettings'):format(scriptName), function(data, new_version)
+  local previousSettings = cloneValue(scriptSettings)
   scriptSettings = lib.table.merge(scriptSettings, data, true)
   clientVersion = new_version or clientVersion
   settingsLoaded = true
+  local changedLeaves = collectChangedLeaves(data, previousSettings, nil, {})
   SetResourceKvp(('%s_scriptSettings'):format(scriptName), json.encode({
     client_version = clientVersion,
     data = scriptSettings,
@@ -188,10 +347,13 @@ RegisterNetEvent(('%s:updateScriptSettings'):format(scriptName), function(data, 
   if hasUI then
     SendNuiMessage(json.encode({
       action = 'UPDATE_SCRIPT_SETTINGS',
-      data = data,
-      clientVersion = clientVersion,
+      data = {
+        settings = scriptSettings,
+        clientVersion = clientVersion,
+      },
     }))
   end
+  dispatchScriptSettingsWatchers(scriptSettings, previousSettings, changedLeaves, 'update', false)
 end)
 
 if hasUI then
@@ -202,6 +364,12 @@ if hasUI then
       payload = data.data
       expectedVersion = data.expectedVersion or clientVersion
     end
+
+    -- Defensive fallback for stale UI builds that still send expectedVersion=0.
+    if type(expectedVersion) == 'number' and expectedVersion <= 0 and type(clientVersion) == 'number' and clientVersion > 0 then
+      expectedVersion = clientVersion
+    end
+
     local success, _error, meta = updateScriptSettings(payload, expectedVersion)
     if type(meta) == 'table' and meta.client_version then
       clientVersion = meta.client_version
@@ -241,6 +409,7 @@ local toRet = {
   end,
 
   set = updateScriptSettings,
+  on = onScriptSettings,
 }
 setmetatable(toRet, {
   __call = function()

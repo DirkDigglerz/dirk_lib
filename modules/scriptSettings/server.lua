@@ -141,6 +141,26 @@ local function getNestedValue(tbl, dotPath)
   return current
 end
 
+local function getSchemaNode(schema, dotPath)
+  local current = schema
+
+  for segment in dotPath:gmatch('[^.]+') do
+    if type(current) ~= 'table' or type(current.properties) ~= 'table' then
+      return nil
+    end
+
+    current = current.properties[segment]
+  end
+
+  return current
+end
+
+local function getDefaultForPath(schema, dotPath)
+  local node = getSchemaNode(schema, dotPath)
+  if type(node) ~= 'table' then return nil end
+  return extractDefaults(node)
+end
+
 local function setNestedValue(tbl, dotPath, value)
   local segments = {}
   for s in dotPath:gmatch('[^.]+') do segments[#segments + 1] = s end
@@ -236,7 +256,10 @@ local function collectChangedLeaves(partial, previous, path, out)
     if type(value) == 'table' then
       collectChangedLeaves(value, oldValue, nextPath, out)
     else
-      if not isEqualValue(oldValue, value) then
+      local defaultValue = settingsSchema and getDefaultForPath(settingsSchema, nextPath) or nil
+      local isImplicitDefault = oldValue == nil and defaultValue ~= nil and isEqualValue(defaultValue, value)
+
+      if not isImplicitDefault and not isEqualValue(oldValue, value) then
         out[#out + 1] = {
           path = nextPath,
           old = oldValue,
@@ -278,10 +301,79 @@ local function buildEditorMeta(src)
 end
 
 -- --------------------------------------------------
+-- CONTENT HASH
+-- --------------------------------------------------
+
+-- Canonical JSON string with sorted keys so the hash is stable across restarts.
+-- Lua's pairs() iteration order is non-deterministic, so json.encode(tbl) can
+-- produce different strings for the same data on different runs.  This function
+-- always walks object keys in sorted order, giving a deterministic output.
+local function canonicalJson(val)
+  if val == nil then return 'null' end
+  local t = type(val)
+  if t == 'boolean' then return val and 'true' or 'false' end
+  if t == 'number'  then return tostring(val) end
+  if t == 'string'  then return json.encode(val) end -- handles escaping
+  if t ~= 'table'   then return 'null' end
+
+  -- Detect array vs object (same heuristic as json.encode: sequential integer keys from 1)
+  local isArray = true
+  local n = #val
+  if n == 0 then
+    -- Could be empty array or empty object — check for any key
+    if next(val) ~= nil then isArray = false end
+  else
+    for k in pairs(val) do
+      if type(k) ~= 'number' or k < 1 or k > n or math.floor(k) ~= k then
+        isArray = false
+        break
+      end
+    end
+  end
+
+  if isArray then
+    local parts = {}
+    for i = 1, n do
+      parts[i] = canonicalJson(val[i])
+    end
+    return '[' .. table.concat(parts, ',') .. ']'
+  else
+    local keys = {}
+    local keyMap = {} -- sorted string -> original key (preserves type for table lookup)
+    for k in pairs(val) do
+      local sk = tostring(k)
+      keys[#keys + 1] = sk
+      keyMap[sk] = k
+    end
+    table.sort(keys)
+    local parts = {}
+    for i = 1, #keys do
+      local sk = keys[i]
+      parts[i] = json.encode(sk) .. ':' .. canonicalJson(val[keyMap[sk]])
+    end
+    return '{' .. table.concat(parts, ',') .. '}'
+  end
+end
+
+-- Produces a stable, content-derived 31-bit positive integer from a table.
+-- Using a hash instead of an incrementing counter means server resets and
+-- stale KVP data can never cause spurious VersionConflict errors — the
+-- same settings always produce the same version value.
+local function hashSettings(data)
+  local s = canonicalJson(data)
+  local h = 5381
+  for i = 1, #s do
+    h = (h * 33 + string.byte(s, i)) % 2147483647
+  end
+  return h == 0 and 1 or h  -- keep non-zero; 0 is used as the "unset" sentinel
+end
+
+-- --------------------------------------------------
 -- STATE
 -- --------------------------------------------------
 
 local defaults = {}
+local settingsSchema = nil
 scriptSettings = nil
 local client_version = 0
 local currentVer     = '0.0.0'
@@ -289,6 +381,120 @@ local canEditScript  = function() return true end
 local changeLog = {}
 local lastEditorMeta = nil
 local uiCommandRegistered = false
+local scriptSettingsWatchers = {}
+local nextScriptSettingsWatcherId = 0
+
+local function cloneValue(value)
+  if type(value) ~= 'table' then return value end
+  return lib.table.deepClone(value)
+end
+
+local function getValueAtPath(data, path)
+  if path == '*' or path == '' or path == nil then
+    return data
+  end
+
+  local current = data
+  for segment in path:gmatch('[^.]+') do
+    if type(current) ~= 'table' then return nil end
+    current = current[segment]
+  end
+
+  return current
+end
+
+local function pathsOverlap(watchPath, changedPath)
+  if watchPath == '*' then return true end
+  if watchPath == changedPath then return true end
+  if not changedPath or changedPath == '' then return false end
+
+  return watchPath:sub(1, #changedPath + 1) == changedPath .. '.'
+    or changedPath:sub(1, #watchPath + 1) == watchPath .. '.'
+end
+
+local function notifyWatcher(watcher, current, previous, changedPaths, source, forceInitial)
+  if forceInitial then
+    if not watcher.immediate or watcher.initialDelivered then
+      return false
+    end
+  elseif #changedPaths == 0 then
+    return false
+  end
+
+  local newValue = cloneValue(getValueAtPath(current, watcher.path))
+  local oldValue = cloneValue(getValueAtPath(previous, watcher.path))
+
+  if not forceInitial and watcher.path ~= '*' and isEqualValue(oldValue, newValue) then
+    return false
+  end
+
+  local ok, err = pcall(watcher.cb, newValue, oldValue, {
+    path = watcher.path,
+    changedPaths = changedPaths,
+    source = source,
+    current = current,
+    previous = previous,
+  })
+
+  if not ok then
+    lib.print.error(('[scriptSettings:%s] watcher for "%s" failed: %s'):format(scriptName, watcher.path, tostring(err)))
+  end
+
+  watcher.initialDelivered = true
+  return watcher.once == true
+end
+
+local function dispatchScriptSettingsWatchers(current, previous, changedLeaves, source, forceInitial)
+  if not next(scriptSettingsWatchers) then return end
+
+  for watcherId, watcher in pairs(scriptSettingsWatchers) do
+    local changedPaths = {}
+
+    if not forceInitial then
+      for i = 1, #(changedLeaves or {}) do
+        local changedPath = changedLeaves[i].path
+        if pathsOverlap(watcher.path, changedPath) then
+          changedPaths[#changedPaths + 1] = changedPath
+        end
+      end
+    end
+
+    if notifyWatcher(watcher, current, previous, changedPaths, source, forceInitial) then
+      scriptSettingsWatchers[watcherId] = nil
+    end
+  end
+end
+
+local function onScriptSettings(path, cb, options)
+  assert(type(path) == 'string' and path ~= '', 'scriptSettings.on requires a non-empty path string')
+  assert(type(cb) == 'function', 'scriptSettings.on requires a callback function')
+
+  options = options or {}
+  nextScriptSettingsWatcherId = nextScriptSettingsWatcherId + 1
+
+  local watcher = {
+    id = nextScriptSettingsWatcherId,
+    path = path,
+    cb = cb,
+    once = options.once == true,
+    immediate = options.immediate ~= false,
+    initialDelivered = false,
+  }
+
+  scriptSettingsWatchers[watcher.id] = watcher
+
+  if scriptSettings and watcher.immediate then
+    if notifyWatcher(watcher, scriptSettings, nil, { path }, 'initial', true) then
+      scriptSettingsWatchers[watcher.id] = nil
+    end
+  elseif scriptSettings then
+    watcher.initialDelivered = true
+  end
+
+  return function()
+    scriptSettingsWatchers[watcher.id] = nil
+  end
+end
 
 -- --------------------------------------------------
 -- UI COMMAND HELPERS
@@ -373,6 +579,7 @@ end
 local function registerScriptSettings(schema, canEditFn, rules)
   debugLog('registerScriptSettings start')
   local defaultData    = extractDefaults(schema) or {}
+  settingsSchema       = schema
   defaults             = defaultData
   canEditScript        = canEditFn or function() return true end
   serverOnlyPaths      = extractServerOnly(schema, nil)
@@ -482,10 +689,16 @@ local function registerScriptSettings(schema, canEditFn, rules)
   -- 3. Smart merge: schema-driven, new keys filled from defaults, stale keys pruned, arrays by key
   scriptSettings = smartMerge(defaultData, rawData, schema)
 
+  -- Recompute version as a content hash — discards the stored integer counter
+  -- so a manual DB reset or resource restart never causes drift.
+  local fullClientView = filterByVisibility(scriptSettings, nil, false)
+  client_version = hashSettings(fullClientView)
+
   MySQL.prepare.await(
     'UPDATE dirk_scriptSettings SET data = ?, client_version = ?, resource_version = ?, change_log = ?, last_editor = ? WHERE script = ?',
     { json.encode(scriptSettings), client_version, currentVer, json.encode(changeLog), json.encode(lastEditorMeta), scriptName }
   )
+  dispatchScriptSettingsWatchers(scriptSettings, nil, nil, 'load', true)
   debugLog(('initial persist complete (client_version=%s, changeLog=%s)'):format(tostring(client_version), tostring(#changeLog)))
 
   lib.print.info(('Script settings loaded for %s (stored v%s → current v%s)'):format(scriptName, storedVer, currentVer))
@@ -505,7 +718,10 @@ local function setScriptSettings(data, forceVers, ctx)
 
   local clientData = filterByVisibility(data, nil, false)
   if next(clientData) then
-    client_version = tonumber(forceVers) or client_version + 1
+    -- Hash the full client-visible state so the version is purely content-derived.
+    -- This is immune to counter drift from manual DB/server resets.
+    local fullClientView = filterByVisibility(scriptSettings, nil, false)
+    client_version = hashSettings(fullClientView)
   end
   debugLog(('setScriptSettings changedLeaves=%s nextClientVersion=%s hasClientData=%s'):format(tostring(#changedLeaves), tostring(client_version), tostring(next(clientData) ~= nil)))
 
@@ -540,6 +756,8 @@ local function setScriptSettings(data, forceVers, ctx)
     debugLog('broadcasting updateScriptSettings to clients')
     TriggerClientEvent(('%s:updateScriptSettings'):format(scriptName), -1, clientData, client_version)
   end
+
+  dispatchScriptSettingsWatchers(scriptSettings, previous, changedLeaves, 'update', false)
 
   return {
     client_version = client_version,
@@ -656,6 +874,7 @@ local function getScriptSettingsHistory(payload)
   }
 end
 
+
 -- --------------------------------------------------
 -- CALLBACKS
 -- --------------------------------------------------
@@ -667,7 +886,8 @@ lib.callback.register(('%s:getScriptSettings'):format(scriptName), function(src,
     return nil, 'NotReady'
   end
   client_ver = tonumber(client_ver) or -1
-  if client_ver >= client_version then
+  -- Use equality: hash ordering is meaningless, client is up-to-date iff hashes match.
+  if client_ver == client_version then
     debugLog(('callback getScriptSettings -> no update (client=%s server=%s)'):format(tostring(client_ver), tostring(client_version)))
     return nil
   end
@@ -698,6 +918,28 @@ lib.callback.register(('%s:getScriptSettingsHistory'):format(scriptName), functi
 
   return getScriptSettingsHistory(payload)
 end)
+
+lib.callback.register(('%s:giveScriptSettingsItem'):format(scriptName), function(src, payload)
+  debugLog(('callback giveScriptSettingsItem src=%s payloadType=%s'):format(tostring(src), type(payload)))
+  if not src or src <= 0 then return false, 'InvalidSource' end
+  if not canEditScript(src) then return false, 'NoPermission' end
+
+  local args = type(payload) == 'table' and payload or {}
+  local itemName = type(args.itemName) == 'string' and args.itemName or nil
+  local itemAmount = math.max(1, math.floor(tonumber(args.itemAmount) or 1))
+
+  if not itemName or itemName == '' then
+    return false, 'InvalidItem'
+  end
+
+  local added = lib.inventory.addItem(src, itemName, itemAmount)
+  if not added then
+    return false, 'AddItemFailed'
+  end
+
+  return true
+end)
+
 
 lib.callback.register(('%s:updateScriptSettings'):format(scriptName), function(src, payload)
   debugLog(('callback updateScriptSettings src=%s payloadType=%s'):format(tostring(src), type(payload)))
@@ -752,6 +994,16 @@ end)
 local toRet = {
   set = setScriptSettings,
 
+  get = function(path)
+    if not path or path == '' then
+      return scriptSettings
+    end
+
+    return cloneValue(getValueAtPath(scriptSettings, path))
+  end,
+
+  on = onScriptSettings,
+
   reset = function()
     scriptSettings = defaults
     setScriptSettings(defaults, 0)
@@ -763,24 +1015,5 @@ setmetatable(toRet, {
     registerScriptSettings(schema, canEditFn, rules)
   end,
 })
-
-RegisterCommand(('%s:resetScriptSettings'):format(scriptName), function(src, args, raw)
-  if src ~= 0 then
-    if not canEditScript(src) then
-      lib.notify(src, {
-        title = 'Script Settings',
-        description = 'You do not have permission to reset the script settings.',
-        type = 'error',
-      })
-      return
-    end
-    lib.notify(src, {
-      title = 'Script Settings',
-      description = 'Script settings have been reset to defaults.',
-      type = 'success',
-    })
-  end
-  toRet.reset()
-end, false) 
 
 return toRet

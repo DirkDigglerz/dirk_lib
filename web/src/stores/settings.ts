@@ -8,6 +8,7 @@ export type SettingsProps = {
   primaryShade: MantineColorShade;
   customTheme: MantineColorsTuple;
   itemImgPath: string;
+  resourceVersion?: string;
   fetchSettings: () => void;
   // Add more settings here
 };
@@ -35,6 +36,7 @@ export const useSettings = create<SettingsProps>((set) => ({
         primaryColor: string;
         primaryShade: MantineColorShade;
         customTheme: MantineColorsTuple;
+        resourceVersion?: string;
       }>('GET_SETTINGS')
         .then((data) => {
           // Ensure data is of type SettingsProps
@@ -42,7 +44,8 @@ export const useSettings = create<SettingsProps>((set) => ({
             set({
               primaryColor: data.primaryColor,
               primaryShade: data.primaryShade,
-              customTheme: data.customTheme
+              customTheme: data.customTheme,
+              resourceVersion: data.resourceVersion,
             });
           } else {
             console.error('SettingsProvider: Invalid settings data received from NUI:', data);
