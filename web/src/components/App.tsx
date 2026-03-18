@@ -21,6 +21,8 @@ import Quiz from './Quiz/main';
 import StatusInfo from './StatusInfo/main';
 import TestBed from './TestBed/main';
 import TextUI from './TextUI/main';
+import GizmoOverlay from './Gizmo/main';
+import AlertDialog from './AlertDialog/main';
 
 
 // @ts-expect-error - This is a web component, it doesn't exist in the types
@@ -101,6 +103,8 @@ const App: React.FC = () => {
             <Input />
             <KeyInputs />
             <StatusInfo />
+            <GizmoOverlay />
+            <AlertDialog />
           </Wrapper>
       </MantineEmotionProvider>
     </MantineProvider>
