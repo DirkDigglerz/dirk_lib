@@ -242,7 +242,7 @@ end
 local function isEqualValue(a, b)
   if type(a) ~= type(b) then return false end
   if type(a) ~= 'table' then return a == b end
-  return json.encode(a) == json.encode(b)
+  return lib.table.compare(a, b) and lib.table.compare(b, a)
 end
 
 local function collectChangedLeaves(partial, previous, path, out)

@@ -11,7 +11,7 @@ local nextScriptSettingsWatcherId = 0
 local resourceVersion = GetResourceMetadata(scriptName, 'version', 0) or 'dev'
 
 local function debugLog(msg)
-  print(('[scriptSettings:%s] %s'):format(scriptName, msg))
+  -- print(('[scriptSettings:%s] %s'):format(scriptName, msg))
 end
 
 local function cloneValue(value)
@@ -22,7 +22,7 @@ end
 local function isEqualValue(a, b)
   if type(a) ~= type(b) then return false end
   if type(a) ~= 'table' then return a == b end
-  return json.encode(a) == json.encode(b)
+  return lib.table.compare(a, b) and lib.table.compare(b, a)
 end
 
 local function getValueAtPath(data, path)
@@ -170,7 +170,6 @@ local updateKVP = function(ver, data)
 end
 
 local sendSettingsToNui = function()
-  print('sendSettingsToNui called with settings:', scriptSettings, 'and clientVersion:', clientVersion)
   if not hasUI or not scriptSettings then return end
   debugLog(('sendSettingsToNui called (nuiReady=%s)'):format(tostring(nuiReady)))
   SendNuiMessage(json.encode({

@@ -98,7 +98,17 @@ if context == 'client' then
     end
   end 
 
-  assert(LoadResourceFile(lib.name, 'web/build/index.html'), '^1The UI is not built, please download the release version from the link below, or build it yourself.\n	^3https://github.com/DirkDigglerz/dirk_lib/releases/tag/latest_production^0')
+  if not LoadResourceFile(lib.name, 'web/build/index.html') then
+    CreateThread(function()
+      while true do
+        print('^1[dirk_lib] ERROR: The UI has not been built! The web/build folder is missing.^0')
+        print('^3[dirk_lib] Download the latest release or build the UI yourself.^0')
+        print('^3[dirk_lib] https://www.dirkscripts.com/scripts/library^0')
+        Wait(5000)
+      end
+    end)
+    return
+  end
 
   RegisterNuiCallback('GET_SETTINGS', function(data, cb)
     cb(lib.settings)
@@ -113,6 +123,18 @@ end
 
 
 --## SERVER
+
+if not LoadResourceFile(lib.name, 'web/build/index.html') then
+  CreateThread(function()
+    while true do
+      print('^1[dirk_lib] ERROR: The UI has not been built! The web/build folder is missing.^0')
+      print('^3[dirk_lib] Download the latest release or build the UI yourself.^0')
+      print('^3[dirk_lib] https://www.dirkscripts.com/scripts/library^0')
+      Wait(5000)
+    end
+  end)
+  return
+end
 
 
 
