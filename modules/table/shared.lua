@@ -93,7 +93,7 @@ local convert_to_string = function(table)
             elseif type(m) == "number" then
               output = output.."    ".."['"..i.."']".." = "..m..",\n"
             else
-              output = output.."    ".."['"..i.."']".." = '"..m.."',\n"
+              output = output.."    ".."['"..i.."']"..' = "'..m..'",\n'
             end
           end
         output = output.."  },"
@@ -102,7 +102,7 @@ local convert_to_string = function(table)
       elseif type(d) == "number" then
         output = output.."  ".."['"..n.."']".." = "..d..","
       else
-        output = output.."  ".."['"..n.."']".." = '"..d.."',"
+        output = output.."  ".."['"..n.."']"..' = "'..d..'",'
       end
       output = output.."\n"
     end
