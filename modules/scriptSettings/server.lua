@@ -195,15 +195,27 @@ end
 -- • Keys removed in defaults → pruned from result
 -- • Type mismatch            → defaults wins, warning logged
 -- • Arrays with 'x-arrayKey' → merged by identity key; missing entries added, removed entries pruned
-local function smartMerge(defaultData, dbData, schemaNode)
+local function smartMerge(defaultData, dbData, schemaNode, _path)
+  _path = _path or ''
   if type(defaultData) ~= 'table' or type(dbData) ~= 'table' then
     return dbData
   end
   local result = {}
+
+  -- Detect DB keys that will be PRUNED (not in defaults)
+  for k in pairs(dbData) do
+    if defaultData[k] == nil then
+      local fullPath = _path ~= '' and (_path .. '.' .. k) or k
+      debugLog(('PRUNE key "%s" — exists in DB but not in schema defaults, dropping'):format(fullPath))
+    end
+  end
+
   for k, defaultVal in pairs(defaultData) do
     local dbVal = dbData[k]
     local childSchema = schemaNode and schemaNode.properties and schemaNode.properties[k]
+    local fullPath = _path ~= '' and (_path .. '.' .. k) or k
     if dbVal == nil then
+      debugLog(('FILL key "%s" — not in DB, using schema default'):format(fullPath))
       result[k] = defaultVal
     elseif type(defaultVal) == 'table' and type(dbVal) == 'table' then
       local mergeKey = childSchema and childSchema['x-arrayKey']
@@ -220,17 +232,29 @@ local function smartMerge(defaultData, dbData, schemaNode)
             if dbItem then
               result[k][#result[k] + 1] = lib.table.merge(lib.table.deepClone(defaultItem), dbItem, false)
             else
+              debugLog(('FILL array item "%s" [%s=%s] — not in DB array, using default'):format(fullPath, mergeKey, tostring(key)))
               result[k][#result[k] + 1] = defaultItem
             end
           end
         end
+        -- Detect pruned array items
+        for dbKey in pairs(dbIndex) do
+          local found = false
+          for _, defaultItem in ipairs(defaultVal) do
+            if defaultItem[mergeKey] == dbKey then found = true; break end
+          end
+          if not found then
+            debugLog(('PRUNE array item "%s" [%s=%s] — in DB but not in schema defaults'):format(fullPath, mergeKey, tostring(dbKey)))
+          end
+        end
       else
-        result[k] = smartMerge(defaultVal, dbVal, childSchema)
+        result[k] = smartMerge(defaultVal, dbVal, childSchema, fullPath)
       end
     else
       if type(defaultVal) == type(dbVal) then
         result[k] = dbVal
       else
+        debugLog(('RESET key "%s" — type mismatch (default: %s, stored: %s), forcing default'):format(fullPath, type(defaultVal), type(dbVal)))
         lib.print.warn(('scriptSettings [%s]: type mismatch for key "%s" (default: %s, stored: %s) — resetting to default.'):format(scriptName, k, type(defaultVal), type(dbVal)))
         result[k] = defaultVal
       end
@@ -680,6 +704,13 @@ local function registerScriptSettings(schema, canEditFn, rules)
   changeLog = json.decode(loadedData?.change_log or '[]') or {}
   lastEditorMeta = json.decode(loadedData?.last_editor or 'null')
 
+  debugLog('=== INIT: raw DB data top-level keys: ' .. (function()
+    local keys = {} for k in pairs(rawData) do keys[#keys+1] = k end table.sort(keys) return table.concat(keys, ', ')
+  end)())
+  debugLog('=== INIT: schema default top-level keys: ' .. (function()
+    local keys = {} for k in pairs(defaultData) do keys[#keys+1] = k end table.sort(keys) return table.concat(keys, ', ')
+  end)())
+
   -- 1. Apply declarative renames from schema x-renamedFrom
   rawData = applyRenames(rawData, renames)
 
@@ -687,7 +718,32 @@ local function registerScriptSettings(schema, canEditFn, rules)
   rawData = runMigrations(rawData, storedVer, currentVer, migrations)
 
   -- 3. Smart merge: schema-driven, new keys filled from defaults, stale keys pruned, arrays by key
+  debugLog('=== INIT: running smartMerge (schema is source of truth) ===')
   scriptSettings = smartMerge(defaultData, rawData, schema)
+  debugLog('=== INIT: smartMerge complete ===')
+
+  -- Log a summary of values that changed from what was in DB
+  local resetCount = 0
+  local function diffLog(def, db, merged, path)
+    if type(def) ~= 'table' then return end
+    for k, defVal in pairs(def) do
+      local fp = path ~= '' and (path .. '.' .. k) or k
+      local dbVal = type(db) == 'table' and db[k] or nil
+      local mergedVal = type(merged) == 'table' and merged[k] or nil
+      if type(defVal) == 'table' and type(mergedVal) == 'table' then
+        diffLog(defVal, dbVal, mergedVal, fp)
+      elseif dbVal ~= nil and not isEqualValue(dbVal, mergedVal) then
+        resetCount = resetCount + 1
+        debugLog(('CHANGED on merge "%s": DB had %s → now %s'):format(fp, tostring(dbVal), tostring(mergedVal)))
+      end
+    end
+  end
+  diffLog(defaultData, rawData, scriptSettings, '')
+  if resetCount > 0 then
+    debugLog(('=== INIT: %d value(s) changed from DB during smartMerge ==='):format(resetCount))
+  else
+    debugLog('=== INIT: no values changed from DB during smartMerge ===')
+  end
 
   -- Recompute version as a content hash — discards the stored integer counter
   -- so a manual DB reset or resource restart never causes drift.
@@ -714,16 +770,28 @@ local function setScriptSettings(data, forceVers, ctx)
   local previous = lib.table.deepClone(scriptSettings)
   scriptSettings = lib.table.merge(scriptSettings, data, false)
 
-  local changedLeaves = collectChangedLeaves(data, previous, nil, {})
+  -- Compare actual state change (post-merge vs pre-merge) to avoid phantom
+  -- changelog entries from stale or redundant UI data.
+  local changedLeaves = collectChangedLeaves(scriptSettings, previous, nil, {})
 
-  local clientData = filterByVisibility(data, nil, false)
-  if next(clientData) then
-    -- Hash the full client-visible state so the version is purely content-derived.
-    -- This is immune to counter drift from manual DB/server resets.
+  -- Nothing actually changed and no forced version — skip persist/broadcast entirely.
+  if #changedLeaves == 0 and not forceVers then
+    debugLog('setScriptSettings: no actual state changes, skipping persist/broadcast')
+    return {
+      client_version = client_version,
+      changed_paths = {},
+      last_editor = lastEditorMeta,
+    }
+  end
+
+  -- Recompute client version from full client-visible state.
+  if forceVers then
+    client_version = forceVers
+  else
     local fullClientView = filterByVisibility(scriptSettings, nil, false)
     client_version = hashSettings(fullClientView)
   end
-  debugLog(('setScriptSettings changedLeaves=%s nextClientVersion=%s hasClientData=%s'):format(tostring(#changedLeaves), tostring(client_version), tostring(next(clientData) ~= nil)))
+  debugLog(('setScriptSettings changedLeaves=%s nextClientVersion=%s'):format(tostring(#changedLeaves), tostring(client_version)))
 
   local editor = buildEditorMeta(ctx and ctx.src)
   if #changedLeaves > 0 then
@@ -752,6 +820,7 @@ local function setScriptSettings(data, forceVers, ctx)
   debugLog('setScriptSettings persisted to DB')
 
   -- Only send shared paths to clients
+  local clientData = filterByVisibility(data, nil, false)
   if next(clientData) then
     debugLog('broadcasting updateScriptSettings to clients')
     TriggerClientEvent(('%s:updateScriptSettings'):format(scriptName), -1, clientData, client_version)
@@ -908,7 +977,7 @@ lib.callback.register(('%s:getFullScriptSettings'):format(scriptName), function(
     debugLog('callback getFullScriptSettings -> NoPermission')
     return nil, 'NoPermission'
   end
-  return scriptSettings
+  return true, nil, { settings = scriptSettings, clientVersion = client_version }
 end)
 
 lib.callback.register(('%s:getScriptSettingsHistory'):format(scriptName), function(src, payload)
@@ -978,7 +1047,8 @@ lib.callback.register(('%s:updateScriptSettings'):format(scriptName), function(s
 end)
 
 lib.callback.register(('%s:resetScriptSettings'):format(scriptName), function(src)
-  debugLog(('callback resetScriptSettings src=%s'):format(tostring(src)))
+  debugLog(('callback resetScriptSettings src=%s — FULL RESET TO DEFAULTS'):format(tostring(src)))
+  lib.print.warn(('[scriptSettings:%s] RESET TO DEFAULTS triggered by player %s (%s)'):format(scriptName, tostring(src), GetPlayerName(src) or 'unknown'))
   if not scriptSettings then return false, 'NotReady' end
   if not canEditScript(src) then return false, 'NoPermission' end
   scriptSettings = defaults
@@ -1005,6 +1075,8 @@ local toRet = {
   on = onScriptSettings,
 
   reset = function()
+    debugLog('PUBLIC API reset() — FULL RESET TO DEFAULTS')
+    lib.print.warn(('[scriptSettings:%s] reset() called — all settings reverted to defaults'):format(scriptName))
     scriptSettings = defaults
     setScriptSettings(defaults, 0)
   end,

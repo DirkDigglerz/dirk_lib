@@ -312,6 +312,11 @@ if hasUI then
     local success, err = lib.callback.await(('%s:giveScriptSettingsItem'):format(scriptName), data or {})
     cb({ success = success, _error = err })
   end)
+
+  RegisterNuiCallback('GET_FULL_SCRIPT_SETTINGS', function(_, cb)
+    local success, _error, data = lib.callback.await(('%s:getFullScriptSettings'):format(scriptName))
+    cb({ success = success, _error = _error, data = data })
+  end)
 end
 
 -- ──────────────────────────────────────
@@ -335,7 +340,7 @@ end
 
 RegisterNetEvent(('%s:updateScriptSettings'):format(scriptName), function(data, new_version)
   local previousSettings = cloneValue(scriptSettings)
-  scriptSettings = lib.table.merge(scriptSettings, data, true)
+  scriptSettings = lib.table.merge(scriptSettings, data, false)
   clientVersion = new_version or clientVersion
   settingsLoaded = true
   local changedLeaves = collectChangedLeaves(data, previousSettings, nil, {})
