@@ -768,7 +768,11 @@ end
 local function setScriptSettings(data, forceVers, ctx)
   debugLog(('setScriptSettings start (forceVers=%s, src=%s)'):format(tostring(forceVers), tostring(ctx and ctx.src)))
   local previous = lib.table.deepClone(scriptSettings)
-  scriptSettings = lib.table.merge(scriptSettings, data, false)
+  if ctx and ctx.fullReplace then
+    scriptSettings = lib.table.deepClone(data)
+  else
+    scriptSettings = lib.table.merge(scriptSettings, data, false)
+  end
 
   -- Compare actual state change (post-merge vs pre-merge) to avoid phantom
   -- changelog entries from stale or redundant UI data.
@@ -823,7 +827,7 @@ local function setScriptSettings(data, forceVers, ctx)
   local clientData = filterByVisibility(data, nil, false)
   if next(clientData) then
     debugLog('broadcasting updateScriptSettings to clients')
-    TriggerClientEvent(('%s:updateScriptSettings'):format(scriptName), -1, clientData, client_version)
+    TriggerClientEvent(('%s:updateScriptSettings'):format(scriptName), -1, clientData, client_version, ctx and ctx.fullReplace or false)
   end
 
   dispatchScriptSettingsWatchers(scriptSettings, previous, changedLeaves, 'update', false)
@@ -1040,6 +1044,7 @@ lib.callback.register(('%s:updateScriptSettings'):format(scriptName), function(s
   local meta = setScriptSettings(newSettings, nil, {
     src = src,
     expectedVersion = expectedVersion,
+    fullReplace = true,
   })
   debugLog(('callback updateScriptSettings -> success newVersion=%s'):format(tostring(meta and meta.client_version)))
 
@@ -1051,10 +1056,9 @@ lib.callback.register(('%s:resetScriptSettings'):format(scriptName), function(sr
   lib.print.warn(('[scriptSettings:%s] RESET TO DEFAULTS triggered by player %s (%s)'):format(scriptName, tostring(src), GetPlayerName(src) or 'unknown'))
   if not scriptSettings then return false, 'NotReady' end
   if not canEditScript(src) then return false, 'NoPermission' end
-  scriptSettings = defaults
-  setScriptSettings(defaults, 0)
+  local meta = setScriptSettings(defaults, nil, { src = src, fullReplace = true })
   debugLog('callback resetScriptSettings -> success')
-  return true
+  return true, nil, meta
 end)
 
 -- --------------------------------------------------
@@ -1077,8 +1081,7 @@ local toRet = {
   reset = function()
     debugLog('PUBLIC API reset() — FULL RESET TO DEFAULTS')
     lib.print.warn(('[scriptSettings:%s] reset() called — all settings reverted to defaults'):format(scriptName))
-    scriptSettings = defaults
-    setScriptSettings(defaults, 0)
+    setScriptSettings(defaults, nil, { fullReplace = true })
   end,
 }
 

@@ -338,9 +338,13 @@ local updateScriptSettings = function(data, expectedVersion)
   })
 end
 
-RegisterNetEvent(('%s:updateScriptSettings'):format(scriptName), function(data, new_version)
+RegisterNetEvent(('%s:updateScriptSettings'):format(scriptName), function(data, new_version, fullReplace)
   local previousSettings = cloneValue(scriptSettings)
-  scriptSettings = lib.table.merge(scriptSettings, data, false)
+  if fullReplace then
+    scriptSettings = data
+  else
+    scriptSettings = lib.table.merge(scriptSettings, data, false)
+  end
   clientVersion = new_version or clientVersion
   settingsLoaded = true
   local changedLeaves = collectChangedLeaves(data, previousSettings, nil, {})
@@ -387,7 +391,10 @@ if hasUI then
   end)
 
   RegisterNuiCallback('RESET_SCRIPT_SETTINGS', function(_, cb)
-    local success, _error = lib.callback.await(('%s:resetScriptSettings'):format(scriptName))
+    local success, _error, meta = lib.callback.await(('%s:resetScriptSettings'):format(scriptName))
+    if success and type(meta) == 'table' and meta.client_version then
+      clientVersion = meta.client_version
+    end
     cb({ success = success, _error = _error })
   end)
 end

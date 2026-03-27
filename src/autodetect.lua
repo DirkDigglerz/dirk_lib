@@ -17,7 +17,7 @@ local supportedResources = {
 }
 
 local imagePaths = {
-  ['dirk_inventory'] = 'nui//dirk_inventory/web/images/',
+  ['dirk_inventory'] = 'nui://dirk_inventory/web/images/',
   ['ox_inventory']   = 'nui://ox_inventory/web/images/',
   ['qb-inventory'] = 'nui://qb-inventory/html/images/',
   ['qs-inventory'] = 'nui://qs-inventory/html/images/',
@@ -35,8 +35,16 @@ for system, resources in pairs(supportedResources) do
     if resourceState == 'starting' or resourceState == 'started' or resourceState ~= 'missing' then
       autodetected[system] = resource 
 
-      if system == 'inventory' then 
-        autodetected.itemImgPath = imagePaths[resource] or 'nui//dirk_inventory/images/items/'
+      if system == 'inventory' then
+        -- Check ox_inventory's own convar first (users may set a CDN url via setr inventory:imagepath)
+        local oxConvar = GetConvar('inventory:imagepath', '')
+        if oxConvar ~= '' then
+          -- Ensure trailing slash
+          if oxConvar:sub(-1) ~= '/' then oxConvar = oxConvar .. '/' end
+          autodetected.itemImgPath = oxConvar
+        else
+          autodetected.itemImgPath = imagePaths[resource] or 'nui://dirk_inventory/web/images/'
+        end
       end 
       goto continue
     end
