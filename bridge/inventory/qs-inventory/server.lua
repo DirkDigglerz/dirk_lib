@@ -1,3 +1,5 @@
+local cachedItems
+
 return {
   --- Add Item to inventory either playerid or invId
   ---@param invId string | number Inventory ID or Player ID
@@ -76,6 +78,26 @@ return {
     exports['qs-inventory']:CreateUsableItem(itemName, function(src, item)
       callback(src, item)
     end)
-  end
+  end,
+
+  --- Get all items registered on the server. Cached per resource lifetime.
+  ---@return table<string, { name: string, label: string, weight: number, image: string }>
+  items = function()
+    if cachedItems then return cachedItems end
+    local allItems = exports['qs-inventory']:GetItemList()
+    if not allItems then return {} end
+    local itemImgPath = lib.settings.itemImgPath or ''
+    local formatted = {}
+    for k, v in pairs(allItems) do
+      formatted[k] = {
+        name   = v.name or k,
+        label  = v.label or v.name or k,
+        weight = v.weight or 0,
+        image  = ('%s/%s.png'):format(itemImgPath, v.image or v.name or k),
+      }
+    end
+    cachedItems = formatted
+    return formatted
+  end,
 }
 

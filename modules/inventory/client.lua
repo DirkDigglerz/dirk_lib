@@ -45,10 +45,10 @@ return {
   ---@return string
   getItemLabel      = inventoryBridge.getItemLabel or frameworkBridge.getItemLabel,
 
-  ---@function lib.inventory.items 
+  ---@function lib.inventory.items
   ---@description # Get all items in the game
   ---@return Item[]
-  items              = inventoryBridge.items or frameworkBridge.items,
+  items              = inventoryBridge.items or frameworkBridge.items or function() return {} end,
 }
 
 --

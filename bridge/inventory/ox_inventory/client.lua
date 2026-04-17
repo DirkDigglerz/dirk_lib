@@ -1,3 +1,5 @@
+local cachedItems
+
 return {
   ---@function lib.inventory.displayMetadata 
   ---@description # Display metadata of an item with the specific key
@@ -35,20 +37,25 @@ return {
   end,
 
 
+  ---@function lib.inventory.items
+  ---@description # Get all items registered on the server. Cached per resource lifetime.
+  ---@return table<string, { name: string, label: string, weight: number, image: string }>
   items = function()
+    if cachedItems then return cachedItems end
     local allItems = exports.ox_inventory:Items()
-    local itemImgPath = lib.settings.itemImgPath
+    if not allItems then return {} end
+    local itemImgPath = lib.settings.itemImgPath or ''
     local formatted = {}
-    for k,v in pairs(allItems) do 
-      local img = v.client?.image or v.name
-      local imgUrl = ('%s/%s.png'):format(itemImgPath, img)
+    for k, v in pairs(allItems) do
+      local img = (v.client and v.client.image) or v.name
       formatted[k] = {
-        name = v.name,
-        label = v.label,
-        weight = v.weight,
-        image = imgUrl,
+        name   = v.name or k,
+        label  = v.label or v.name or k,
+        weight = v.weight or 0,
+        image  = ('%s/%s.png'):format(itemImgPath, img),
       }
     end
+    cachedItems = formatted
     return formatted
   end,
 }

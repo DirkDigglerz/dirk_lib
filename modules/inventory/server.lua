@@ -108,6 +108,11 @@ return {
   ---@return boolean
   canCarryItem      = inventoryBridge.canCarryItem or frameworkBridge.canCarryItem,
 
+  ---@function lib.inventory.items
+  ---@description # Get all items registered on the server
+  ---@return table<string, { name: string, label: string, weight: number, image: string }>
+  items             = inventoryBridge.items or frameworkBridge.items or function() return {} end,
+
   
   -- NEW 
   ---@function lib.inventory.setMetadata

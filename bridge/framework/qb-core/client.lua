@@ -1,3 +1,5 @@
+local cachedItems
+
 return {
   getItemLabel = function(item)
     local items = lib.FW?.Shared?.Items
@@ -5,6 +7,27 @@ return {
     local item = items[item]
     if not item then return false, 'NoItem' end
     return item.label
+  end,
+
+  ---@function lib.inventory.items
+  ---@description # Get all items from QBCore.Shared.Items. Cached per resource lifetime.
+  ---@return table<string, { name: string, label: string, weight: number, image: string }>
+  items = function()
+    if cachedItems then return cachedItems end
+    local src = lib.FW and lib.FW.Shared and lib.FW.Shared.Items
+    if not src then return {} end
+    local itemImgPath = lib.settings.itemImgPath or ''
+    local formatted = {}
+    for k, v in pairs(src) do
+      formatted[k] = {
+        name   = v.name or k,
+        label  = v.label or v.name or k,
+        weight = v.weight or 0,
+        image  = ('%s/%s.png'):format(itemImgPath, v.image or v.name or k),
+      }
+    end
+    cachedItems = formatted
+    return formatted
   end,
   
   identifier = function()

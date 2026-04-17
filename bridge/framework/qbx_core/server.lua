@@ -1,4 +1,27 @@
+local cachedItems
+
 return {
+  ---@function lib.inventory.items
+  ---@description # Get all items from QBCore.Shared.Items. Cached per resource lifetime.
+  ---@return table<string, { name: string, label: string, weight: number, image: string }>
+  items = function()
+    if cachedItems then return cachedItems end
+    local src = lib.FW and lib.FW.Shared and lib.FW.Shared.Items
+    if not src then return {} end
+    local itemImgPath = lib.settings.itemImgPath or ''
+    local formatted = {}
+    for k, v in pairs(src) do
+      formatted[k] = {
+        name   = v.name or k,
+        label  = v.label or v.name or k,
+        weight = v.weight or 0,
+        image  = ('%s/%s.png'):format(itemImgPath, v.image or v.name or k),
+      }
+    end
+    cachedItems = formatted
+    return formatted
+  end,
+
   canUseItem = function(item)
     return exports.qbx_core:CanUseItem(item)
   end,

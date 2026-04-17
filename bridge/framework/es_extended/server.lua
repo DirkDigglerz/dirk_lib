@@ -1,4 +1,42 @@
+local cachedItems
+
+-- Build a normalized item table from whichever ESX item source is available.
+local function sourceItems()
+  if not lib.FW then return nil end
+  -- Newer ESX: ESX.GetItems() returns { [name] = { label, weight } }
+  if type(lib.FW.GetItems) == 'function' then
+    local ok, items = pcall(lib.FW.GetItems)
+    if ok and type(items) == 'table' then return items end
+  end
+  -- Legacy ESX: ESX.Items table
+  if type(lib.FW.Items) == 'table' then return lib.FW.Items end
+  return nil
+end
+
 return {
+  ---@function lib.inventory.items
+  ---@description # Get all items from ESX. Cached per resource lifetime.
+  ---@return table<string, { name: string, label: string, weight: number, image: string }>
+  items = function()
+    if cachedItems then return cachedItems end
+    local src = sourceItems()
+    if not src then return {} end
+    local itemImgPath = lib.settings.itemImgPath or ''
+    local formatted = {}
+    for k, v in pairs(src) do
+      -- ESX entries vary: sometimes { label, weight }, sometimes a string label only
+      local entry = type(v) == 'table' and v or { label = tostring(v) }
+      formatted[k] = {
+        name   = entry.name or k,
+        label  = entry.label or entry.name or k,
+        weight = entry.weight or 0,
+        image  = ('%s/%s.png'):format(itemImgPath, entry.image or entry.name or k),
+      }
+    end
+    cachedItems = formatted
+    return formatted
+  end,
+
   canUseItem = function(item)
     return lib.FW.UsableItemsCallbacks[item]
   end,

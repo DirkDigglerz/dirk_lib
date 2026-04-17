@@ -1,3 +1,5 @@
+local cachedItems
+
 return {
 
   --- Add Item to inventory either playerid or invId
@@ -78,6 +80,24 @@ return {
     return exports.ox_inventory:RegisterStash(id, data.label, data.maxSlots, data.maxWeight, data.owner, data.groups, data.coords)
   end,
 
-
-
-} 
+  --- Get all items registered on the server. Cached per resource lifetime.
+  ---@return table<string, { name: string, label: string, weight: number, image: string }>
+  items = function()
+    if cachedItems then return cachedItems end
+    local allItems = exports.ox_inventory:Items()
+    if not allItems then return {} end
+    local itemImgPath = lib.settings.itemImgPath or ''
+    local formatted = {}
+    for k, v in pairs(allItems) do
+      local img = (v.client and v.client.image) or v.name
+      formatted[k] = {
+        name   = v.name or k,
+        label  = v.label or v.name or k,
+        weight = v.weight or 0,
+        image  = ('%s/%s.png'):format(itemImgPath, img),
+      }
+    end
+    cachedItems = formatted
+    return formatted
+  end,
+}
