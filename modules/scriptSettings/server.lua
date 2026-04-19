@@ -219,7 +219,11 @@ local function smartMerge(defaultData, dbData, schemaNode, _path)
       result[k] = defaultVal
     elseif type(defaultVal) == 'table' and type(dbVal) == 'table' then
       local mergeKey = childSchema and childSchema['x-arrayKey']
-      if mergeKey then
+      local isArraySchema = childSchema and childSchema.type == 'array'
+      if isArraySchema and not mergeKey then
+        -- Plain array without x-arrayKey: DB is the source of truth (user-owned list).
+        result[k] = dbVal
+      elseif mergeKey then
         local dbIndex = {}
         for _, item in ipairs(dbVal) do
           if item[mergeKey] then dbIndex[item[mergeKey]] = item end

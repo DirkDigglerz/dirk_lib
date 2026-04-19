@@ -225,7 +225,8 @@ lib.table = {
   end,
 
   compare = function(t1, t2)
-    for k,v in pairs(t1) do 
+    if type(t1) ~= 'table' or type(t2) ~= 'table' then return t1 == t2 end
+    for k,v in pairs(t1) do
       if type(v) == 'table' then
         if not lib.table.compare(v, t2[k]) then return false; end
       else
