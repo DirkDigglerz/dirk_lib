@@ -3,7 +3,7 @@ local debugEnabled = GetConvarInt('dirk_scriptsettings_debug', 1) == 1
 
 local function debugLog(message)
   if not debugEnabled then return end
-  lib.print.info(('[scriptSettings:%s] %s'):format(scriptName, message))
+  lib.print.info(('[scriptConfig:%s] %s'):format(scriptName, message))
 end
 
 -- --------------------------------------------------
@@ -180,7 +180,7 @@ local function applyRenames(data, renames)
     if val ~= nil then
       setNestedValue(data, newPath, val)
       setNestedValue(data, oldPath, nil)
-      lib.print.info(('scriptSettings [%s]: migrated key "%s" → "%s"'):format(scriptName, oldPath, newPath))
+      lib.print.info(('scriptConfig [%s]: migrated key "%s" → "%s"'):format(scriptName, oldPath, newPath))
     end
   end
   return data
@@ -259,7 +259,7 @@ local function smartMerge(defaultData, dbData, schemaNode, _path)
         result[k] = dbVal
       else
         debugLog(('RESET key "%s" — type mismatch (default: %s, stored: %s), forcing default'):format(fullPath, type(defaultVal), type(dbVal)))
-        lib.print.warn(('scriptSettings [%s]: type mismatch for key "%s" (default: %s, stored: %s) — resetting to default.'):format(scriptName, k, type(defaultVal), type(dbVal)))
+        lib.print.warn(('scriptConfig [%s]: type mismatch for key "%s" (default: %s, stored: %s) — resetting to default.'):format(scriptName, k, type(defaultVal), type(dbVal)))
         result[k] = defaultVal
       end
     end
@@ -402,15 +402,26 @@ end
 
 local defaults = {}
 local settingsSchema = nil
-scriptSettings = nil
+scriptConfig = nil
 local client_version = 0
 local currentVer     = '0.0.0'
 local canEditScript  = function() return true end
 local changeLog = {}
 local lastEditorMeta = nil
-local uiCommandRegistered = false
-local scriptSettingsWatchers = {}
-local nextScriptSettingsWatcherId = 0
+local scriptConfigWatchers = {}
+local nextScriptConfigWatcherId = 0
+local CHANGE_LOG_MAX = 100
+local lastPersistedHash = 0
+
+local function persistPayloadHash()
+  return hashSettings({
+    data = scriptConfig,
+    client_version = client_version,
+    resource_version = currentVer,
+    change_log = changeLog,
+    last_editor = lastEditorMeta,
+  })
+end
 
 local function cloneValue(value)
   if type(value) ~= 'table' then return value end
@@ -465,17 +476,17 @@ local function notifyWatcher(watcher, current, previous, changedPaths, source, f
   })
 
   if not ok then
-    lib.print.error(('[scriptSettings:%s] watcher for "%s" failed: %s'):format(scriptName, watcher.path, tostring(err)))
+    lib.print.error(('[scriptConfig:%s] watcher for "%s" failed: %s'):format(scriptName, watcher.path, tostring(err)))
   end
 
   watcher.initialDelivered = true
   return watcher.once == true
 end
 
-local function dispatchScriptSettingsWatchers(current, previous, changedLeaves, source, forceInitial)
-  if not next(scriptSettingsWatchers) then return end
+local function dispatchScriptConfigWatchers(current, previous, changedLeaves, source, forceInitial)
+  if not next(scriptConfigWatchers) then return end
 
-  for watcherId, watcher in pairs(scriptSettingsWatchers) do
+  for watcherId, watcher in pairs(scriptConfigWatchers) do
     local changedPaths = {}
 
     if not forceInitial then
@@ -488,20 +499,20 @@ local function dispatchScriptSettingsWatchers(current, previous, changedLeaves, 
     end
 
     if notifyWatcher(watcher, current, previous, changedPaths, source, forceInitial) then
-      scriptSettingsWatchers[watcherId] = nil
+      scriptConfigWatchers[watcherId] = nil
     end
   end
 end
 
-local function onScriptSettings(path, cb, options)
-  assert(type(path) == 'string' and path ~= '', 'scriptSettings.on requires a non-empty path string')
-  assert(type(cb) == 'function', 'scriptSettings.on requires a callback function')
+local function onScriptConfig(path, cb, options)
+  assert(type(path) == 'string' and path ~= '', 'scriptConfig.on requires a non-empty path string')
+  assert(type(cb) == 'function', 'scriptConfig.on requires a callback function')
 
   options = options or {}
-  nextScriptSettingsWatcherId = nextScriptSettingsWatcherId + 1
+  nextScriptConfigWatcherId = nextScriptConfigWatcherId + 1
 
   local watcher = {
-    id = nextScriptSettingsWatcherId,
+    id = nextScriptConfigWatcherId,
     path = path,
     cb = cb,
     once = options.once == true,
@@ -509,103 +520,27 @@ local function onScriptSettings(path, cb, options)
     initialDelivered = false,
   }
 
-  scriptSettingsWatchers[watcher.id] = watcher
+  scriptConfigWatchers[watcher.id] = watcher
 
-  if scriptSettings and watcher.immediate then
-    if notifyWatcher(watcher, scriptSettings, nil, { path }, 'initial', true) then
-      scriptSettingsWatchers[watcher.id] = nil
+  if scriptConfig and watcher.immediate then
+    if notifyWatcher(watcher, scriptConfig, nil, { path }, 'initial', true) then
+      scriptConfigWatchers[watcher.id] = nil
     end
-  elseif scriptSettings then
+  elseif scriptConfig then
     watcher.initialDelivered = true
   end
 
   return function()
-    scriptSettingsWatchers[watcher.id] = nil
+    scriptConfigWatchers[watcher.id] = nil
   end
-end
-
--- --------------------------------------------------
--- UI COMMAND HELPERS
--- --------------------------------------------------
-
-local function getArgValue(args, keys)
-  if type(args) ~= 'table' then return nil end
-  if args[1] ~= nil then return args[1] end
-  for i = 1, #keys do
-    local val = args[keys[i]]
-    if val ~= nil then
-      return val
-    end
-  end
-  return nil
-end
-
-local function registerUiCommand(rules)
-  if uiCommandRegistered then return end
-
-  local uiRules = rules and rules.ui
-  if uiRules == false then return end
-
-  local commandName = (uiRules and uiRules.command) or ('%s:settings'):format(scriptName)
-  local helpText = (uiRules and uiRules.help) or 'Open script settings menu'
-  local restricted = (uiRules and uiRules.restricted)
-  if restricted == nil then
-    restricted = 'group.admin'
-  end
-
-  local openEventName = (uiRules and uiRules.openEvent) or ('%s:openScriptSettings'):format(scriptName)
-  local allowTargetArg = uiRules == nil or uiRules.allowTargetArg ~= false
-
-  lib.addCommand(commandName, {
-    help = helpText,
-    restricted = restricted,
-  }, function(source, args)
-    local target = source
-
-    if allowTargetArg then
-      local rawTarget = getArgValue(args, { 'target', 'serverId', 'playerId' })
-      local parsedTarget = tonumber(rawTarget)
-
-      if source == 0 then
-        if not parsedTarget then
-          lib.print.warn(('[scriptSettings:%s] console must provide a target server id for %s'):format(scriptName, commandName))
-          return
-        end
-        target = parsedTarget
-      elseif parsedTarget then
-        target = parsedTarget
-      end
-    elseif source == 0 then
-      lib.print.warn(('[scriptSettings:%s] %s cannot be run from console when target args are disabled'):format(scriptName, commandName))
-      return
-    end
-
-    if not target or target <= 0 or not GetPlayerName(target) then
-      if source ~= 0 then
-        lib.notify(source, {
-          title = 'Script Settings',
-          description = 'Target player is not online.',
-          type = 'error',
-        })
-      else
-        lib.print.warn(('[scriptSettings:%s] target %s is not online'):format(scriptName, tostring(target)))
-      end
-      return
-    end
-
-    TriggerClientEvent(openEventName, target)
-  end)
-
-  uiCommandRegistered = true
-  lib.print.info(('Registered script settings UI command "%s" for %s'):format(commandName, scriptName))
 end
 
 -- --------------------------------------------------
 -- REGISTRATION
 -- --------------------------------------------------
 
-local function registerScriptSettings(schema, canEditFn, rules)
-  debugLog('registerScriptSettings start')
+local function registerScriptConfig(schema, canEditFn, rules)
+  debugLog('registerScriptConfig start')
   local defaultData    = extractDefaults(schema) or {}
   settingsSchema       = schema
   defaults             = defaultData
@@ -615,17 +550,14 @@ local function registerScriptSettings(schema, canEditFn, rules)
   local migrations     = rules and rules.migrations or nil
   currentVer           = GetResourceMetadata(scriptName, 'version', 0) or '0.0.0'
 
-  registerUiCommand(rules)
-  debugLog(('ui command registration complete (hasRules=%s)'):format(tostring(rules ~= nil)))
-
   if not canEditFn then
     lib.print.warn(
-      ('No permission function provided for %s script settings, defaulting to allow all edits.')
+      ('No permission function provided for %s script config, defaulting to allow all edits.')
       :format(scriptName)
     )
   end
 
-  lib.print.info(('Registering script settings for %s'):format(scriptName))
+  lib.print.info(('Registering script config for %s'):format(scriptName))
   debugLog('waiting for MySQL global')
   -- Yield until MySQL global is injected by oxmysql
   local attempts = 0
@@ -633,19 +565,19 @@ local function registerScriptSettings(schema, canEditFn, rules)
     Wait(100)
     attempts = attempts + 1
     if attempts % 20 == 0 then
-      lib.print.warn(('[scriptSettings:%s] still waiting for MySQL global (%ds)...'):format(scriptName, attempts / 10))
+      lib.print.warn(('[scriptConfig:%s] still waiting for MySQL global (%ds)...'):format(scriptName, attempts / 10))
     end
   end
   debugLog('MySQL global available')
 
   -- Ensure table exists
-  local success = pcall(MySQL.scalar.await, 'SELECT 1 FROM dirk_scriptSettings LIMIT 1')
-  lib.print.info(('Script settings loading for %s'):format(scriptName))
-  debugLog(('dirk_scriptSettings table check success=%s'):format(tostring(success)))
+  local success = pcall(MySQL.scalar.await, 'SELECT 1 FROM dirk_scriptConfig LIMIT 1')
+  lib.print.info(('Script config loading for %s'):format(scriptName))
+  debugLog(('dirk_scriptConfig table check success=%s'):format(tostring(success)))
   if not success then
-    lib.print.info('Creating dirk_scriptSettings table...')
+    lib.print.info('Creating dirk_scriptConfig table...')
     MySQL.query.await([[
-      CREATE TABLE `dirk_scriptSettings` (
+      CREATE TABLE `dirk_scriptConfig` (
         `script`           VARCHAR(50)  NOT NULL,
         `data`             longtext     DEFAULT NULL,
         `client_version`   INT          DEFAULT 0,
@@ -658,28 +590,28 @@ local function registerScriptSettings(schema, canEditFn, rules)
     ]])
   else
     -- Add resource_version column to pre-existing tables if missing
-    local hasCol = pcall(MySQL.scalar.await, 'SELECT resource_version FROM dirk_scriptSettings LIMIT 1')
+    local hasCol = pcall(MySQL.scalar.await, 'SELECT resource_version FROM dirk_scriptConfig LIMIT 1')
     if not hasCol then
-      MySQL.query.await("ALTER TABLE `dirk_scriptSettings` ADD COLUMN `resource_version` VARCHAR(20) DEFAULT '0.0.0'")
-      lib.print.info('Added resource_version column to dirk_scriptSettings.')
+      MySQL.query.await("ALTER TABLE `dirk_scriptConfig` ADD COLUMN `resource_version` VARCHAR(20) DEFAULT '0.0.0'")
+      lib.print.info('Added resource_version column to dirk_scriptConfig.')
     end
 
-    local hasChangeLog = pcall(MySQL.scalar.await, 'SELECT change_log FROM dirk_scriptSettings LIMIT 1')
+    local hasChangeLog = pcall(MySQL.scalar.await, 'SELECT change_log FROM dirk_scriptConfig LIMIT 1')
     if not hasChangeLog then
-      MySQL.query.await("ALTER TABLE `dirk_scriptSettings` ADD COLUMN `change_log` LONGTEXT DEFAULT NULL")
-      lib.print.info('Added change_log column to dirk_scriptSettings.')
+      MySQL.query.await("ALTER TABLE `dirk_scriptConfig` ADD COLUMN `change_log` LONGTEXT DEFAULT NULL")
+      lib.print.info('Added change_log column to dirk_scriptConfig.')
     end
 
-    local hasLastEditor = pcall(MySQL.scalar.await, 'SELECT last_editor FROM dirk_scriptSettings LIMIT 1')
+    local hasLastEditor = pcall(MySQL.scalar.await, 'SELECT last_editor FROM dirk_scriptConfig LIMIT 1')
     if not hasLastEditor then
-      MySQL.query.await("ALTER TABLE `dirk_scriptSettings` ADD COLUMN `last_editor` LONGTEXT DEFAULT NULL")
-      lib.print.info('Added last_editor column to dirk_scriptSettings.')
+      MySQL.query.await("ALTER TABLE `dirk_scriptConfig` ADD COLUMN `last_editor` LONGTEXT DEFAULT NULL")
+      lib.print.info('Added last_editor column to dirk_scriptConfig.')
     end
   end
 
   -- Insert defaults if this resource has no row yet
   local rowExists = MySQL.scalar.await(
-    'SELECT COUNT(*) FROM dirk_scriptSettings WHERE script = ?',
+    'SELECT COUNT(*) FROM dirk_scriptConfig WHERE script = ?',
     { scriptName }
   ) or 0
   debugLog(('row exists count=%s'):format(tostring(rowExists)))
@@ -687,13 +619,13 @@ local function registerScriptSettings(schema, canEditFn, rules)
   if rowExists == 0 then
     lib.print.info(('Inserting default settings for %s into database.'):format(scriptName))
     MySQL.query.await(
-      'INSERT INTO dirk_scriptSettings (script, data, client_version, resource_version) VALUES (?, ?, ?, ?)',
+      'INSERT INTO dirk_scriptConfig (script, data, client_version, resource_version) VALUES (?, ?, ?, ?)',
       { scriptName, json.encode(defaultData), client_version, currentVer }
     )
   end
 
   local loadedData = MySQL.single.await(
-    'SELECT data, client_version, resource_version, change_log, last_editor FROM dirk_scriptSettings WHERE script = ?',
+    'SELECT data, client_version, resource_version, change_log, last_editor FROM dirk_scriptConfig WHERE script = ?',
     { scriptName }
   ) or {}
   debugLog(('loaded row (hasData=%s, storedVersion=%s, clientVersion=%s)'):format(
@@ -723,7 +655,7 @@ local function registerScriptSettings(schema, canEditFn, rules)
 
   -- 3. Smart merge: schema-driven, new keys filled from defaults, stale keys pruned, arrays by key
   debugLog('=== INIT: running smartMerge (schema is source of truth) ===')
-  scriptSettings = smartMerge(defaultData, rawData, schema)
+  scriptConfig = smartMerge(defaultData, rawData, schema)
   debugLog('=== INIT: smartMerge complete ===')
 
   -- Log a summary of values that changed from what was in DB
@@ -742,7 +674,7 @@ local function registerScriptSettings(schema, canEditFn, rules)
       end
     end
   end
-  diffLog(defaultData, rawData, scriptSettings, '')
+  diffLog(defaultData, rawData, scriptConfig, '')
   if resetCount > 0 then
     debugLog(('=== INIT: %d value(s) changed from DB during smartMerge ==='):format(resetCount))
   else
@@ -751,40 +683,41 @@ local function registerScriptSettings(schema, canEditFn, rules)
 
   -- Recompute version as a content hash — discards the stored integer counter
   -- so a manual DB reset or resource restart never causes drift.
-  local fullClientView = filterByVisibility(scriptSettings, nil, false)
+  local fullClientView = filterByVisibility(scriptConfig, nil, false)
   client_version = hashSettings(fullClientView)
 
   MySQL.prepare.await(
-    'UPDATE dirk_scriptSettings SET data = ?, client_version = ?, resource_version = ?, change_log = ?, last_editor = ? WHERE script = ?',
-    { json.encode(scriptSettings), client_version, currentVer, json.encode(changeLog), json.encode(lastEditorMeta), scriptName }
+    'UPDATE dirk_scriptConfig SET data = ?, client_version = ?, resource_version = ?, change_log = ?, last_editor = ? WHERE script = ?',
+    { json.encode(scriptConfig), client_version, currentVer, json.encode(changeLog), json.encode(lastEditorMeta), scriptName }
   )
-  dispatchScriptSettingsWatchers(scriptSettings, nil, nil, 'load', true)
+  lastPersistedHash = persistPayloadHash()
+  dispatchScriptConfigWatchers(scriptConfig, nil, nil, 'load', true)
   debugLog(('initial persist complete (client_version=%s, changeLog=%s)'):format(tostring(client_version), tostring(#changeLog)))
 
-  lib.print.info(('Script settings loaded for %s (stored v%s → current v%s)'):format(scriptName, storedVer, currentVer))
-  return scriptSettings
+  lib.print.info(('Script config loaded for %s (stored v%s → current v%s)'):format(scriptName, storedVer, currentVer))
+  return scriptConfig
 end
 
 -- --------------------------------------------------
 -- SETTER
 -- --------------------------------------------------
 
-local function setScriptSettings(data, forceVers, ctx)
-  debugLog(('setScriptSettings start (forceVers=%s, src=%s)'):format(tostring(forceVers), tostring(ctx and ctx.src)))
-  local previous = lib.table.deepClone(scriptSettings)
+local function setScriptConfig(data, forceVers, ctx)
+  debugLog(('setScriptConfig start (forceVers=%s, src=%s)'):format(tostring(forceVers), tostring(ctx and ctx.src)))
+  local previous = lib.table.deepClone(scriptConfig)
   if ctx and ctx.fullReplace then
-    scriptSettings = lib.table.deepClone(data)
+    scriptConfig = lib.table.deepClone(data)
   else
-    scriptSettings = lib.table.merge(scriptSettings, data, false)
+    scriptConfig = lib.table.merge(scriptConfig, data, false)
   end
 
   -- Compare actual state change (post-merge vs pre-merge) to avoid phantom
   -- changelog entries from stale or redundant UI data.
-  local changedLeaves = collectChangedLeaves(scriptSettings, previous, nil, {})
+  local changedLeaves = collectChangedLeaves(scriptConfig, previous, nil, {})
 
   -- Nothing actually changed and no forced version — skip persist/broadcast entirely.
   if #changedLeaves == 0 and not forceVers then
-    debugLog('setScriptSettings: no actual state changes, skipping persist/broadcast')
+    debugLog('setScriptConfig: no actual state changes, skipping persist/broadcast')
     return {
       client_version = client_version,
       changed_paths = {},
@@ -796,10 +729,10 @@ local function setScriptSettings(data, forceVers, ctx)
   if forceVers then
     client_version = forceVers
   else
-    local fullClientView = filterByVisibility(scriptSettings, nil, false)
+    local fullClientView = filterByVisibility(scriptConfig, nil, false)
     client_version = hashSettings(fullClientView)
   end
-  debugLog(('setScriptSettings changedLeaves=%s nextClientVersion=%s'):format(tostring(#changedLeaves), tostring(client_version)))
+  debugLog(('setScriptConfig changedLeaves=%s nextClientVersion=%s'):format(tostring(#changedLeaves), tostring(client_version)))
 
   local editor = buildEditorMeta(ctx and ctx.src)
   if #changedLeaves > 0 then
@@ -814,27 +747,33 @@ local function setScriptSettings(data, forceVers, ctx)
     }
 
     changeLog[#changeLog + 1] = logEntry
-    if #changeLog > 250 then
+    while #changeLog > CHANGE_LOG_MAX do
       table.remove(changeLog, 1)
     end
   end
 
   lastEditorMeta = editor
 
-  MySQL.prepare.await(
-    'UPDATE dirk_scriptSettings SET data = ?, client_version = ?, change_log = ?, last_editor = ? WHERE script = ?',
-    { json.encode(scriptSettings), client_version, json.encode(changeLog), json.encode(lastEditorMeta), scriptName }
-  )
-  debugLog('setScriptSettings persisted to DB')
+  local payloadHash = persistPayloadHash()
+  if payloadHash == lastPersistedHash then
+    debugLog('setScriptConfig persist skipped (payload unchanged)')
+  else
+    MySQL.prepare.await(
+      'UPDATE dirk_scriptConfig SET data = ?, client_version = ?, change_log = ?, last_editor = ? WHERE script = ?',
+      { json.encode(scriptConfig), client_version, json.encode(changeLog), json.encode(lastEditorMeta), scriptName }
+    )
+    lastPersistedHash = payloadHash
+    debugLog('setScriptConfig persisted to DB')
+  end
 
   -- Only send shared paths to clients
   local clientData = filterByVisibility(data, nil, false)
   if next(clientData) then
-    debugLog('broadcasting updateScriptSettings to clients')
-    TriggerClientEvent(('%s:updateScriptSettings'):format(scriptName), -1, clientData, client_version, ctx and ctx.fullReplace or false)
+    debugLog('broadcasting updateScriptConfig to clients')
+    TriggerClientEvent(('%s:updateScriptConfig'):format(scriptName), -1, clientData, client_version, ctx and ctx.fullReplace or false)
   end
 
-  dispatchScriptSettingsWatchers(scriptSettings, previous, changedLeaves, 'update', false)
+  dispatchScriptConfigWatchers(scriptConfig, previous, changedLeaves, 'update', false)
 
   return {
     client_version = client_version,
@@ -906,7 +845,7 @@ local function matchesHistoryFilters(entry, filters)
   return true
 end
 
-local function getScriptSettingsHistory(payload)
+local function getScriptConfigHistory(payload)
   local args = type(payload) == 'table' and payload or {}
 
   local offset = math.max(0, tonumber(args.offset) or 0)
@@ -956,48 +895,48 @@ end
 -- CALLBACKS
 -- --------------------------------------------------
 
-lib.callback.register(('%s:getScriptSettings'):format(scriptName), function(src, client_ver)
-  debugLog(('callback getScriptSettings src=%s rawClientVer(type=%s,val=%s)'):format(tostring(src), type(client_ver), tostring(client_ver)))
-  if not scriptSettings then
-    debugLog('callback getScriptSettings -> NotReady')
+lib.callback.register(('%s:getScriptConfig'):format(scriptName), function(src, client_ver)
+  debugLog(('callback getScriptConfig src=%s rawClientVer(type=%s,val=%s)'):format(tostring(src), type(client_ver), tostring(client_ver)))
+  if not scriptConfig then
+    debugLog('callback getScriptConfig -> NotReady')
     return nil, 'NotReady'
   end
   client_ver = tonumber(client_ver) or -1
   -- Use equality: hash ordering is meaningless, client is up-to-date iff hashes match.
   if client_ver == client_version then
-    debugLog(('callback getScriptSettings -> no update (client=%s server=%s)'):format(tostring(client_ver), tostring(client_version)))
+    debugLog(('callback getScriptConfig -> no update (client=%s server=%s)'):format(tostring(client_ver), tostring(client_version)))
     return nil
   end
-  debugLog(('callback getScriptSettings -> returning data (server=%s)'):format(tostring(client_version)))
+  debugLog(('callback getScriptConfig -> returning data (server=%s)'):format(tostring(client_version)))
   return {
     client_version = client_version,
-    data = filterByVisibility(scriptSettings, nil, false),
+    data = filterByVisibility(scriptConfig, nil, false),
   }
 end)
 
-lib.callback.register(('%s:getFullScriptSettings'):format(scriptName), function(src)
-  debugLog(('callback getFullScriptSettings src=%s'):format(tostring(src)))
-  if not scriptSettings then
-    debugLog('callback getFullScriptSettings -> NotReady')
+lib.callback.register(('%s:getFullScriptConfig'):format(scriptName), function(src)
+  debugLog(('callback getFullScriptConfig src=%s'):format(tostring(src)))
+  if not scriptConfig then
+    debugLog('callback getFullScriptConfig -> NotReady')
     return nil, 'NotReady'
   end
   if not canEditScript(src) then
-    debugLog('callback getFullScriptSettings -> NoPermission')
+    debugLog('callback getFullScriptConfig -> NoPermission')
     return nil, 'NoPermission'
   end
-  return true, nil, { settings = scriptSettings, clientVersion = client_version }
+  return true, nil, { settings = scriptConfig, clientVersion = client_version }
 end)
 
-lib.callback.register(('%s:getScriptSettingsHistory'):format(scriptName), function(src, payload)
-  debugLog(('callback getScriptSettingsHistory src=%s payloadType=%s'):format(tostring(src), type(payload)))
-  if not scriptSettings then return nil, 'NotReady' end
+lib.callback.register(('%s:getScriptConfigHistory'):format(scriptName), function(src, payload)
+  debugLog(('callback getScriptConfigHistory src=%s payloadType=%s'):format(tostring(src), type(payload)))
+  if not scriptConfig then return nil, 'NotReady' end
   if not canEditScript(src) then return nil, 'NoPermission' end
 
-  return getScriptSettingsHistory(payload)
+  return getScriptConfigHistory(payload)
 end)
 
-lib.callback.register(('%s:giveScriptSettingsItem'):format(scriptName), function(src, payload)
-  debugLog(('callback giveScriptSettingsItem src=%s payloadType=%s'):format(tostring(src), type(payload)))
+lib.callback.register(('%s:giveScriptConfigItem'):format(scriptName), function(src, payload)
+  debugLog(('callback giveScriptConfigItem src=%s payloadType=%s'):format(tostring(src), type(payload)))
   if not src or src <= 0 then return false, 'InvalidSource' end
   if not canEditScript(src) then return false, 'NoPermission' end
 
@@ -1018,9 +957,9 @@ lib.callback.register(('%s:giveScriptSettingsItem'):format(scriptName), function
 end)
 
 
-lib.callback.register(('%s:updateScriptSettings'):format(scriptName), function(src, payload)
-  debugLog(('callback updateScriptSettings src=%s payloadType=%s'):format(tostring(src), type(payload)))
-  if not scriptSettings then return false, 'NotReady' end
+lib.callback.register(('%s:updateScriptConfig'):format(scriptName), function(src, payload)
+  debugLog(('callback updateScriptConfig src=%s payloadType=%s'):format(tostring(src), type(payload)))
+  if not scriptConfig then return false, 'NotReady' end
   if not canEditScript(src) then return false, 'NoPermission' end
 
   local newSettings = payload
@@ -1032,36 +971,36 @@ lib.callback.register(('%s:updateScriptSettings'):format(scriptName), function(s
   end
 
   if type(newSettings) ~= 'table' then
-    debugLog('callback updateScriptSettings -> InvalidPayload')
+    debugLog('callback updateScriptConfig -> InvalidPayload')
     return false, 'InvalidPayload'
   end
 
   if expectedVersion ~= nil and tonumber(expectedVersion) ~= tonumber(client_version) then
-    debugLog(('callback updateScriptSettings -> VersionConflict expected=%s current=%s'):format(tostring(expectedVersion), tostring(client_version)))
+    debugLog(('callback updateScriptConfig -> VersionConflict expected=%s current=%s'):format(tostring(expectedVersion), tostring(client_version)))
     return false, 'VersionConflict', {
       latestVersion = client_version,
       lastEditor = lastEditorMeta,
-      latestData = filterByVisibility(scriptSettings, nil, false),
+      latestData = filterByVisibility(scriptConfig, nil, false),
     }
   end
 
-  local meta = setScriptSettings(newSettings, nil, {
+  local meta = setScriptConfig(newSettings, nil, {
     src = src,
     expectedVersion = expectedVersion,
     fullReplace = true,
   })
-  debugLog(('callback updateScriptSettings -> success newVersion=%s'):format(tostring(meta and meta.client_version)))
+  debugLog(('callback updateScriptConfig -> success newVersion=%s'):format(tostring(meta and meta.client_version)))
 
   return true, nil, meta
 end)
 
-lib.callback.register(('%s:resetScriptSettings'):format(scriptName), function(src)
-  debugLog(('callback resetScriptSettings src=%s — FULL RESET TO DEFAULTS'):format(tostring(src)))
-  lib.print.warn(('[scriptSettings:%s] RESET TO DEFAULTS triggered by player %s (%s)'):format(scriptName, tostring(src), GetPlayerName(src) or 'unknown'))
-  if not scriptSettings then return false, 'NotReady' end
+lib.callback.register(('%s:resetScriptConfig'):format(scriptName), function(src)
+  debugLog(('callback resetScriptConfig src=%s — FULL RESET TO DEFAULTS'):format(tostring(src)))
+  lib.print.warn(('[scriptConfig:%s] RESET TO DEFAULTS triggered by player %s (%s)'):format(scriptName, tostring(src), GetPlayerName(src) or 'unknown'))
+  if not scriptConfig then return false, 'NotReady' end
   if not canEditScript(src) then return false, 'NoPermission' end
-  local meta = setScriptSettings(defaults, nil, { src = src, fullReplace = true })
-  debugLog('callback resetScriptSettings -> success')
+  local meta = setScriptConfig(defaults, nil, { src = src, fullReplace = true })
+  debugLog('callback resetScriptConfig -> success')
   return true, nil, meta
 end)
 
@@ -1070,29 +1009,55 @@ end)
 -- --------------------------------------------------
 
 local toRet = {
-  set = setScriptSettings,
+  set = setScriptConfig,
 
   get = function(path)
     if not path or path == '' then
-      return scriptSettings
+      return scriptConfig
     end
 
-    return cloneValue(getValueAtPath(scriptSettings, path))
+    return cloneValue(getValueAtPath(scriptConfig, path))
   end,
 
-  on = onScriptSettings,
+  on = onScriptConfig,
 
   reset = function()
     debugLog('PUBLIC API reset() — FULL RESET TO DEFAULTS')
-    lib.print.warn(('[scriptSettings:%s] reset() called — all settings reverted to defaults'):format(scriptName))
-    setScriptSettings(defaults, nil, { fullReplace = true })
+    lib.print.warn(('[scriptConfig:%s] reset() called — all settings reverted to defaults'):format(scriptName))
+    setScriptConfig(defaults, nil, { fullReplace = true })
   end,
 }
 
 setmetatable(toRet, {
   __call = function(_, schema, canEditFn, rules)
-    registerScriptSettings(schema, canEditFn, rules)
+    registerScriptConfig(schema, canEditFn, rules)
   end,
 })
+
+-- --------------------------------------------------
+-- AUTO-REGISTRATION
+-- Consumer only needs `dirk_lib 'scriptConfig'` in fxmanifest + schema.json.
+-- Explicit lib.scriptConfig(schema, canEdit, rules) still works and wins this race.
+-- --------------------------------------------------
+CreateThread(function()
+  Wait(500)
+  if scriptConfig then return end
+
+  local rawSchema = LoadResourceFile(scriptName, 'schema.json')
+  if not rawSchema then
+    lib.print.warn(('[scriptConfig:%s] declared dirk_lib "scriptConfig" but no schema.json found at the resource root — skipping auto-registration.'):format(scriptName))
+    return
+  end
+
+  local ok, schema = pcall(json.decode, rawSchema)
+  if not ok or type(schema) ~= 'table' then
+    lib.print.warn(('[scriptConfig:%s] schema.json could not be parsed — skipping auto-registration.'):format(scriptName))
+    return
+  end
+
+  registerScriptConfig(schema, function(src)
+    return IsPlayerAceAllowed(src, 'admin')
+  end, {})
+end)
 
 return toRet

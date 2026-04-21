@@ -1,17 +1,17 @@
 local scriptName = GetCurrentResourceName()
 local hasUI = (GetNumResourceMetadata(cache.resource, 'ui_page') or 0) > 0
-scriptSettings = scriptSettings or {}
+scriptConfig = scriptConfig or {}
 local clientVersion = 0
 local settingsUiOpen = false
-local openEventName = ('%s:openScriptSettings'):format(scriptName)
+local openEventName = ('%s:openScriptConfig'):format(scriptName)
 local nuiReady = false
 local settingsLoaded = false
-local scriptSettingsWatchers = {}
-local nextScriptSettingsWatcherId = 0
+local scriptConfigWatchers = {}
+local nextScriptConfigWatcherId = 0
 local resourceVersion = GetResourceMetadata(scriptName, 'version', 0) or 'dev'
 
 local function debugLog(msg)
-  -- print(('[scriptSettings:%s] %s'):format(scriptName, msg))
+  -- print(('[scriptConfig:%s] %s'):format(scriptName, msg))
 end
 
 local function cloneValue(value)
@@ -97,17 +97,17 @@ local function notifyWatcher(watcher, current, previous, changedPaths, source, f
   })
 
   if not ok then
-    lib.print.error(('[scriptSettings:%s] watcher for "%s" failed: %s'):format(scriptName, watcher.path, tostring(err)))
+    lib.print.error(('[scriptConfig:%s] watcher for "%s" failed: %s'):format(scriptName, watcher.path, tostring(err)))
   end
 
   watcher.initialDelivered = true
   return watcher.once == true
 end
 
-local function dispatchScriptSettingsWatchers(current, previous, changedLeaves, source, forceInitial)
-  if not next(scriptSettingsWatchers) then return end
+local function dispatchScriptConfigWatchers(current, previous, changedLeaves, source, forceInitial)
+  if not next(scriptConfigWatchers) then return end
 
-  for watcherId, watcher in pairs(scriptSettingsWatchers) do
+  for watcherId, watcher in pairs(scriptConfigWatchers) do
     local changedPaths = {}
 
     if not forceInitial then
@@ -120,20 +120,20 @@ local function dispatchScriptSettingsWatchers(current, previous, changedLeaves, 
     end
 
     if notifyWatcher(watcher, current, previous, changedPaths, source, forceInitial) then
-      scriptSettingsWatchers[watcherId] = nil
+      scriptConfigWatchers[watcherId] = nil
     end
   end
 end
 
-local function onScriptSettings(path, cb, options)
-  assert(type(path) == 'string' and path ~= '', 'scriptSettings.on requires a non-empty path string')
-  assert(type(cb) == 'function', 'scriptSettings.on requires a callback function')
+local function onScriptConfig(path, cb, options)
+  assert(type(path) == 'string' and path ~= '', 'scriptConfig.on requires a non-empty path string')
+  assert(type(cb) == 'function', 'scriptConfig.on requires a callback function')
 
   options = options or {}
-  nextScriptSettingsWatcherId = nextScriptSettingsWatcherId + 1
+  nextScriptConfigWatcherId = nextScriptConfigWatcherId + 1
 
   local watcher = {
-    id = nextScriptSettingsWatcherId,
+    id = nextScriptConfigWatcherId,
     path = path,
     cb = cb,
     once = options.once == true,
@@ -141,41 +141,41 @@ local function onScriptSettings(path, cb, options)
     initialDelivered = false,
   }
 
-  scriptSettingsWatchers[watcher.id] = watcher
+  scriptConfigWatchers[watcher.id] = watcher
 
   if settingsLoaded and watcher.immediate then
-    if notifyWatcher(watcher, scriptSettings, nil, { path }, 'initial', true) then
-      scriptSettingsWatchers[watcher.id] = nil
+    if notifyWatcher(watcher, scriptConfig, nil, { path }, 'initial', true) then
+      scriptConfigWatchers[watcher.id] = nil
     end
   elseif settingsLoaded then
     watcher.initialDelivered = true
   end
 
   return function()
-    scriptSettingsWatchers[watcher.id] = nil
+    scriptConfigWatchers[watcher.id] = nil
   end
 end
 
 local fetchFromKVP = function()
-  local raw = GetResourceKvpString(('%s_scriptSettings'):format(scriptName))
+  local raw = GetResourceKvpString(('%s_scriptConfig'):format(scriptName))
   if not raw or raw == '' then return nil end
   return json.decode(raw)
 end
 
 local updateKVP = function(ver, data)
-  SetResourceKvp(('%s_scriptSettings'):format(scriptName), json.encode({
+  SetResourceKvp(('%s_scriptConfig'):format(scriptName), json.encode({
     client_version = ver,
     data = data,
   }))
 end
 
 local sendSettingsToNui = function()
-  if not hasUI or not scriptSettings then return end
+  if not hasUI or not scriptConfig then return end
   debugLog(('sendSettingsToNui called (nuiReady=%s)'):format(tostring(nuiReady)))
   SendNuiMessage(json.encode({
-    action = 'UPDATE_SCRIPT_SETTINGS',
+    action = 'UPDATE_SCRIPT_CONFIG',
     data = {
-      settings = scriptSettings,
+      settings = scriptConfig,
       clientVersion = clientVersion,
     },
     
@@ -183,10 +183,10 @@ local sendSettingsToNui = function()
 end
 
 local function ensureSettingsLoaded(forceRefresh)
-  local previousSettings = settingsLoaded and cloneValue(scriptSettings) or nil
+  local previousSettings = settingsLoaded and cloneValue(scriptConfig) or nil
 
   if settingsLoaded and not forceRefresh then
-    return scriptSettings
+    return scriptConfig
   end
 
   debugLog(('ensureSettingsLoaded start (forceRefresh=%s)'):format(tostring(forceRefresh)))
@@ -194,26 +194,26 @@ local function ensureSettingsLoaded(forceRefresh)
   if not forceRefresh then
     local kvp = fetchFromKVP()
     if kvp then
-      scriptSettings = kvp.data or scriptSettings
+      scriptConfig = kvp.data or scriptConfig
       clientVersion = kvp.client_version or 0
     end
     debugLog(('ensureSettingsLoaded kvp hydrate done (hasKvp=%s, version=%s)'):format(tostring(kvp ~= nil), tostring(clientVersion)))
   end
 
   debugLog('ensureSettingsLoaded fetching from server')
-  local newSettings = lib.callback.await(('%s:getScriptSettings'):format(scriptName), clientVersion or -1)
+  local newSettings = lib.callback.await(('%s:getScriptConfig'):format(scriptName), clientVersion or -1)
   debugLog(('ensureSettingsLoaded server returned (type=%s)'):format(type(newSettings)))
 
   if type(newSettings) == 'table' then
-    scriptSettings = newSettings.data or scriptSettings
+    scriptConfig = newSettings.data or scriptConfig
     clientVersion = newSettings.client_version or clientVersion
-    updateKVP(clientVersion, scriptSettings)
+    updateKVP(clientVersion, scriptConfig)
   end
 
   settingsLoaded = true
-  dispatchScriptSettingsWatchers(scriptSettings, previousSettings, nil, forceRefresh and 'refresh' or 'load', true)
+  dispatchScriptConfigWatchers(scriptConfig, previousSettings, nil, forceRefresh and 'refresh' or 'load', true)
   debugLog(('ensureSettingsLoaded complete (version=%s)'):format(tostring(clientVersion)))
-  return scriptSettings
+  return scriptConfig
 end
 
 CreateThread(function()
@@ -244,7 +244,7 @@ local openSettingsUi = function()
   if not nuiReady then
     debugLog('openSettingsUi -> NUI not ready')
     lib.notify({
-      title = 'Script Settings',
+      title = 'Script Config',
       description = 'Settings UI is still loading, please try again.',
       type = 'inform',
     })
@@ -304,17 +304,23 @@ if hasUI then
     cb({})
   end)
 
+  RegisterNuiCallback('CONFIG_PANEL_BACK', function(_, cb)
+    closeSettingsUi()
+    TriggerServerEvent('dirk_lib:reopenScriptConfigChooser')
+    cb({})
+  end)
+
   RegisterNuiCallback('FETCH_ALL_ITEMS', function(_, cb)
     cb(lib.inventory.items())
   end)
 
-  RegisterNuiCallback('GIVE_SCRIPT_SETTINGS_ITEM', function(data, cb)
-    local success, err = lib.callback.await(('%s:giveScriptSettingsItem'):format(scriptName), data or {})
+  RegisterNuiCallback('GIVE_SCRIPT_CONFIG_ITEM', function(data, cb)
+    local success, err = lib.callback.await(('%s:giveScriptConfigItem'):format(scriptName), data or {})
     cb({ success = success, _error = err })
   end)
 
-  RegisterNuiCallback('GET_FULL_SCRIPT_SETTINGS', function(_, cb)
-    local success, _error, data = lib.callback.await(('%s:getFullScriptSettings'):format(scriptName))
+  RegisterNuiCallback('GET_FULL_SCRIPT_CONFIG', function(_, cb)
+    local success, _error, data = lib.callback.await(('%s:getFullScriptConfig'):format(scriptName))
     cb({ success = success, _error = _error, data = data })
   end)
 end
@@ -331,41 +337,41 @@ end)
 -- ──────────────────────────────────────
 -- UPDATE / HISTORY / RESET
 -- ──────────────────────────────────────
-local updateScriptSettings = function(data, expectedVersion)
-  return lib.callback.await(('%s:updateScriptSettings'):format(scriptName), {
+local updateScriptConfig = function(data, expectedVersion)
+  return lib.callback.await(('%s:updateScriptConfig'):format(scriptName), {
     data = data,
     expectedVersion = expectedVersion or clientVersion,
   })
 end
 
-RegisterNetEvent(('%s:updateScriptSettings'):format(scriptName), function(data, new_version, fullReplace)
-  local previousSettings = cloneValue(scriptSettings)
+RegisterNetEvent(('%s:updateScriptConfig'):format(scriptName), function(data, new_version, fullReplace)
+  local previousSettings = cloneValue(scriptConfig)
   if fullReplace then
-    scriptSettings = data
+    scriptConfig = data
   else
-    scriptSettings = lib.table.merge(scriptSettings, data, false)
+    scriptConfig = lib.table.merge(scriptConfig, data, false)
   end
   clientVersion = new_version or clientVersion
   settingsLoaded = true
   local changedLeaves = collectChangedLeaves(data, previousSettings, nil, {})
-  SetResourceKvp(('%s_scriptSettings'):format(scriptName), json.encode({
+  SetResourceKvp(('%s_scriptConfig'):format(scriptName), json.encode({
     client_version = clientVersion,
-    data = scriptSettings,
+    data = scriptConfig,
   }))
   if hasUI then
     SendNuiMessage(json.encode({
-      action = 'UPDATE_SCRIPT_SETTINGS',
+      action = 'UPDATE_SCRIPT_CONFIG',
       data = {
-        settings = scriptSettings,
+        settings = scriptConfig,
         clientVersion = clientVersion,
       },
     }))
   end
-  dispatchScriptSettingsWatchers(scriptSettings, previousSettings, changedLeaves, 'update', false)
+  dispatchScriptConfigWatchers(scriptConfig, previousSettings, changedLeaves, 'update', false)
 end)
 
 if hasUI then
-  RegisterNuiCallback('UPDATE_SCRIPT_SETTINGS', function(data, cb)
+  RegisterNuiCallback('UPDATE_SCRIPT_CONFIG', function(data, cb)
     local payload = data
     local expectedVersion = clientVersion
     if type(data) == 'table' and data.data ~= nil then
@@ -378,20 +384,20 @@ if hasUI then
       expectedVersion = clientVersion
     end
 
-    local success, _error, meta = updateScriptSettings(payload, expectedVersion)
+    local success, _error, meta = updateScriptConfig(payload, expectedVersion)
     if type(meta) == 'table' and meta.client_version then
       clientVersion = meta.client_version
     end
     cb({ success = success, _error = _error, meta = meta })
   end)
 
-  RegisterNuiCallback('GET_SCRIPT_SETTINGS_HISTORY', function(data, cb)
-    local result, err = lib.callback.await(('%s:getScriptSettingsHistory'):format(scriptName), data or {})
+  RegisterNuiCallback('GET_SCRIPT_CONFIG_HISTORY', function(data, cb)
+    local result, err = lib.callback.await(('%s:getScriptConfigHistory'):format(scriptName), data or {})
     cb({ success = result ~= nil, _error = err, data = result })
   end)
 
-  RegisterNuiCallback('RESET_SCRIPT_SETTINGS', function(_, cb)
-    local success, _error, meta = lib.callback.await(('%s:resetScriptSettings'):format(scriptName))
+  RegisterNuiCallback('RESET_SCRIPT_CONFIG', function(_, cb)
+    local success, _error, meta = lib.callback.await(('%s:resetScriptConfig'):format(scriptName))
     if success and type(meta) == 'table' and meta.client_version then
       clientVersion = meta.client_version
     end
@@ -416,11 +422,11 @@ local toRet = {
   end,
 
   getAll = function(src)
-    return lib.callback.await(('%s:getFullScriptSettings'):format(scriptName), src)
+    return lib.callback.await(('%s:getFullScriptConfig'):format(scriptName), src)
   end,
 
-  set = updateScriptSettings,
-  on = onScriptSettings,
+  set = updateScriptConfig,
+  on = onScriptConfig,
 }
 setmetatable(toRet, {
   __call = function()

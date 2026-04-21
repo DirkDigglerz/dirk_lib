@@ -1,4 +1,4 @@
-import { useSettings } from "../stores/settings";
+import { useSettings } from "dirk-cfx-react";
 
 
 function checkImageExists(url: string) {

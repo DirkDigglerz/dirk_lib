@@ -1,68 +1,37 @@
-import { BackgroundImage, Flex, MantineProvider } from '@mantine/core';
+import { Flex } from '@mantine/core';
 import '@mantine/dates/styles.css';
-import React, { useEffect, useState } from "react";
-import { useNuiEvent } from '../hooks/useNuiEvent';
-
-import theme from '../theme';
-import { imageUrlToBase64, isEnvBrowser } from '../utils/misc';
-
-import { MantineEmotionProvider } from '@mantine/emotion';
+import { DirkProvider } from 'dirk-cfx-react';
 import { motion } from 'framer-motion';
+import React, { useEffect } from "react";
+import { useNuiEvent } from '../hooks/useNuiEvent';
 import { localeStore } from '../stores/locales';
-import { useSettings } from '../stores/settings';
 import { fetchNui } from '../utils/fetchNui';
+import { imageUrlToBase64 } from '../utils/misc';
+import AlertDialog from './AlertDialog/main';
 import Menu from './Context/main';
 import Dialog from './Dialog/main';
+import GizmoOverlay from './Gizmo/main';
 import Input from './Input/main';
 import KeyInputs from './KeyInputs/main';
 import Notifications from './Notify/main';
 import ProgressBar from './Progress/main';
 import Quiz from './Quiz/main';
+import ScriptConfigChooser from './ScriptConfigChooser/main';
 import StatusInfo from './StatusInfo/main';
 import TestBed from './TestBed/main';
 import TextUI from './TextUI/main';
-import GizmoOverlay from './Gizmo/main';
-import AlertDialog from './AlertDialog/main';
 
 
 // @ts-expect-error - This is a web component, it doesn't exist in the types
 export const MotionFlex = motion.create(Flex);
 
 const App: React.FC = () => {
-  const [curTheme, setCurTheme] = useState(theme);
-  const primaryColor = useSettings((data) => data.primaryColor);
-  const primaryShade = useSettings((data) => data.primaryShade);
-  const customTheme = useSettings((data) => data.customTheme);
-  const fetchSettings = useSettings((state) => state.fetchSettings);
-  const fetchLocales  = localeStore((state) => state.fetchLocales);
-  
-  // Ensure the theme is updated when the settings change
+  const fetchLocales = localeStore((state) => state.fetchLocales);
 
   useEffect(() => {
-    const updatedTheme = {
-      ...theme, // Start with the existing theme object
-      colors: {
-        ...theme.colors, // Copy the existing colors
-        custom: customTheme
-      },
-    };
-    
-    setCurTheme(updatedTheme);
-    // set primary color
-    setCurTheme({
-      ...updatedTheme,
-      primaryColor: primaryColor,
-      primaryShade: primaryShade,
-    });
-
-  }, [primaryColor, primaryShade, customTheme]);
-
-  useEffect(() => {
-    fetchSettings();
     fetchLocales();
-  }, [fetchSettings, fetchLocales]);
+  }, [fetchLocales]);
 
-  
   useNuiEvent('COPY_TO_CLIPBOARD', (data: string) => {
     const el = document.createElement('textarea');
     el.value = data;
@@ -87,41 +56,24 @@ const App: React.FC = () => {
       fetchNui('IMAGE_TO_BASE64_RESULT', { url, base64 });
     };
   });
-  
+
   return (
-    <MantineProvider theme={curTheme} defaultColorScheme='dark'>
-      <MantineEmotionProvider>
-          <Wrapper>
-            {/* <Radial /> */}
-            <TestBed />
-            <ProgressBar />
-            <TextUI />
-            <Notifications />
-            <Menu />
-            <Quiz />
-            <Dialog />
-            <Input />
-            <KeyInputs />
-            <StatusInfo />
-            <GizmoOverlay />
-            <AlertDialog />
-          </Wrapper>
-      </MantineEmotionProvider>
-    </MantineProvider>
+    <DirkProvider>
+      <TestBed />
+      <ProgressBar />
+      <TextUI />
+      <Notifications />
+      <Menu />
+      <Quiz />
+      <Dialog />
+      <Input />
+      <KeyInputs />
+      <StatusInfo />
+      <GizmoOverlay />
+      <AlertDialog />
+      <ScriptConfigChooser />
+    </DirkProvider>
   );
 };
 
 export default App;
-
-
-function Wrapper({ children }: { children: React.ReactNode }) {
-  return isEnvBrowser() ? ( 
-    <BackgroundImage w='100vw' h='100vh' style={{overflow:'hidden'}}
-      src="https://i.ytimg.com/vi/TOxuNbXrO28/maxresdefault.jpg"
-    >  
-      {children}
-    </BackgroundImage>
-  ) : (
-    <>{children}</>
-  )
-}
