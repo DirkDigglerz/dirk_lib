@@ -27,7 +27,7 @@
     "@types/node": "^24.10.4",
     "axios": "^1.13.2",
     "dayjs": "^1.11.13",
-    "dirk-cfx-react": "file:../../dirk-cfx-react/dirk-cfx-react-1.1.62.tgz",
+    "dirk-cfx-react": "^1.1.62",
     "embla-carousel-autoplay": "8.5.2",
     "framer-motion": "^12.23.26",
     "lucide-react": "^0.563.0",

@@ -57,8 +57,8 @@ importers:
         specifier: ^1.11.13
         version: 1.11.20
       dirk-cfx-react:
-        specifier: file:../../dirk-cfx-react/dirk-cfx-react-1.1.62.tgz
-        version: file:../../dirk-cfx-react/dirk-cfx-react-1.1.62.tgz(@fortawesome/fontawesome-svg-core@7.2.0)(@fortawesome/free-brands-svg-icons@7.2.0)(@fortawesome/free-regular-svg-icons@7.2.0)(@fortawesome/free-solid-svg-icons@7.2.0)(@fortawesome/react-fontawesome@3.3.1(@fortawesome/fontawesome-svg-core@7.2.0)(react@19.2.5))(@mantine/core@8.3.18(@mantine/hooks@8.3.18(react@19.2.5))(@types/react@18.3.28)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@mantine/hooks@8.3.18(react@19.2.5))(@mantine/notifications@8.3.18(@mantine/core@8.3.18(@mantine/hooks@8.3.18(react@19.2.5))(@types/react@18.3.28)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@mantine/hooks@8.3.18(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/react-query@5.99.2(react@19.2.5))(axios@1.15.1)(framer-motion@12.38.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(lucide-react@0.563.0(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(zustand@5.0.12(@types/react@18.3.28)(react@19.2.5))
+        specifier: ^1.1.62
+        version: 1.1.62(@fortawesome/fontawesome-svg-core@7.2.0)(@fortawesome/free-brands-svg-icons@7.2.0)(@fortawesome/free-regular-svg-icons@7.2.0)(@fortawesome/free-solid-svg-icons@7.2.0)(@fortawesome/react-fontawesome@3.3.1(@fortawesome/fontawesome-svg-core@7.2.0)(react@19.2.5))(@mantine/core@8.3.18(@mantine/hooks@8.3.18(react@19.2.5))(@types/react@18.3.28)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@mantine/hooks@8.3.18(react@19.2.5))(@mantine/notifications@8.3.18(@mantine/core@8.3.18(@mantine/hooks@8.3.18(react@19.2.5))(@types/react@18.3.28)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@mantine/hooks@8.3.18(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/react-query@5.99.2(react@19.2.5))(axios@1.15.1)(framer-motion@12.38.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(lucide-react@0.563.0(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(zustand@5.0.12(@types/react@18.3.28)(react@19.2.5))
       embla-carousel-autoplay:
         specifier: 8.5.2
         version: 8.5.2(embla-carousel@8.5.2)
@@ -894,9 +894,8 @@ packages:
   detect-node-es@1.1.0:
     resolution: {integrity: sha512-ypdmJU/TbBby2Dxibuv7ZLW3Bs1QEmM7nHjEANfohJLvE0XVujisn1qPJcZxg+qDucsr+bP6fLD1rPS3AhJ7EQ==}
 
-  dirk-cfx-react@file:../../dirk-cfx-react/dirk-cfx-react-1.1.62.tgz:
-    resolution: {integrity: sha512-9l4Eh5LBv08De0KHxxKjkVBnCXEHxDcy96abCTD04AgYPyyEjwcYgErXznXhfDtn1iwl3CSS8fDcOBVXgDeeIw==, tarball: file:../../dirk-cfx-react/dirk-cfx-react-1.1.62.tgz}
-    version: 1.1.62
+  dirk-cfx-react@1.1.62:
+    resolution: {integrity: sha512-9l4Eh5LBv08De0KHxxKjkVBnCXEHxDcy96abCTD04AgYPyyEjwcYgErXznXhfDtn1iwl3CSS8fDcOBVXgDeeIw==}
     peerDependencies:
       '@fortawesome/fontawesome-svg-core': '>=7.1.0'
       '@fortawesome/free-brands-svg-icons': '>=7.1.0'
@@ -2367,7 +2366,7 @@ snapshots:
 
   detect-node-es@1.1.0: {}
 
-  dirk-cfx-react@file:../../dirk-cfx-react/dirk-cfx-react-1.1.62.tgz(@fortawesome/fontawesome-svg-core@7.2.0)(@fortawesome/free-brands-svg-icons@7.2.0)(@fortawesome/free-regular-svg-icons@7.2.0)(@fortawesome/free-solid-svg-icons@7.2.0)(@fortawesome/react-fontawesome@3.3.1(@fortawesome/fontawesome-svg-core@7.2.0)(react@19.2.5))(@mantine/core@8.3.18(@mantine/hooks@8.3.18(react@19.2.5))(@types/react@18.3.28)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@mantine/hooks@8.3.18(react@19.2.5))(@mantine/notifications@8.3.18(@mantine/core@8.3.18(@mantine/hooks@8.3.18(react@19.2.5))(@types/react@18.3.28)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@mantine/hooks@8.3.18(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/react-query@5.99.2(react@19.2.5))(axios@1.15.1)(framer-motion@12.38.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(lucide-react@0.563.0(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(zustand@5.0.12(@types/react@18.3.28)(react@19.2.5)):
+  dirk-cfx-react@1.1.62(@fortawesome/fontawesome-svg-core@7.2.0)(@fortawesome/free-brands-svg-icons@7.2.0)(@fortawesome/free-regular-svg-icons@7.2.0)(@fortawesome/free-solid-svg-icons@7.2.0)(@fortawesome/react-fontawesome@3.3.1(@fortawesome/fontawesome-svg-core@7.2.0)(react@19.2.5))(@mantine/core@8.3.18(@mantine/hooks@8.3.18(react@19.2.5))(@types/react@18.3.28)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@mantine/hooks@8.3.18(react@19.2.5))(@mantine/notifications@8.3.18(@mantine/core@8.3.18(@mantine/hooks@8.3.18(react@19.2.5))(@types/react@18.3.28)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@mantine/hooks@8.3.18(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/react-query@5.99.2(react@19.2.5))(axios@1.15.1)(framer-motion@12.38.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(lucide-react@0.563.0(react@19.2.5))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(zustand@5.0.12(@types/react@18.3.28)(react@19.2.5)):
     dependencies:
       '@fortawesome/fontawesome-svg-core': 7.2.0
       '@fortawesome/free-brands-svg-icons': 7.2.0
