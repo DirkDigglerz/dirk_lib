@@ -3,6 +3,7 @@ import { AdminPageTitle, useFormActions, useFormField } from "dirk-cfx-react";
 import { Languages } from "lucide-react";
 import type { LocalizationSettings, ScriptConfig } from "../../stores/useScriptConfig";
 import { useScriptConfig } from "../../stores/useScriptConfig";
+import { InfoLabel } from "./InfoLabel";
 
 const LANGUAGE_OPTIONS = [
   { value: "en", label: "English (en)" },
@@ -42,37 +43,21 @@ export default function LocalizationSection() {
 
       <GroupLabel label="Strings" />
       <Select
-        label="Language"
-        description="Locale code used when resolving /locales strings"
+        label={<InfoLabel label="Language" tooltip="Locale code used when resolving /locales strings" />}
         size="xs"
         value={config.language}
         data={LANGUAGE_OPTIONS}
         allowDeselect={false}
         searchable
         onChange={(v) => v && set("language", v)}
-        styles={{
-          description: {
-            color: "rgba(255,255,255,0.25)",
-            fontFamily: "Akrobat Bold",
-            fontSize: "0.6em",
-          },
-        }}
       />
 
       <GroupLabel label="Currency" />
       <TextInput
-        label="Symbol"
-        description="Prefix used when rendering money values"
+        label={<InfoLabel label="Symbol" tooltip="Prefix used when rendering money values" />}
         size="xs"
         value={config.currency}
         onChange={(e) => set("currency", e.currentTarget.value)}
-        styles={{
-          description: {
-            color: "rgba(255,255,255,0.25)",
-            fontFamily: "Akrobat Bold",
-            fontSize: "0.6em",
-          },
-        }}
       />
     </Flex>
   );

@@ -2,9 +2,8 @@ import { Flex } from '@mantine/core';
 import '@mantine/dates/styles.css';
 import { DirkProvider } from 'dirk-cfx-react';
 import { motion } from 'framer-motion';
-import React, { useEffect } from "react";
+import React from "react";
 import { useNuiEvent } from '../hooks/useNuiEvent';
-import { localeStore } from '../stores/locales';
 import { fetchNui } from '../utils/fetchNui';
 import { imageUrlToBase64 } from '../utils/misc';
 import { useScriptConfigHooks } from '../stores/useScriptConfig';
@@ -28,12 +27,7 @@ import TextUI from './TextUI/main';
 export const MotionFlex = motion.create(Flex);
 
 const App: React.FC = () => {
-  const fetchLocales = localeStore((state) => state.fetchLocales);
   useScriptConfigHooks();
-
-  useEffect(() => {
-    fetchLocales();
-  }, [fetchLocales]);
 
   useNuiEvent('COPY_TO_CLIPBOARD', (data: string) => {
     const el = document.createElement('textarea');

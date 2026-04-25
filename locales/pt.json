@@ -1,0 +1,23 @@
+{
+  "progress_cancelled": "Cancelado",
+  "cancel_progress": "Cancelar progresso",
+  "status_time_over": "Tempo esgotado",
+  "payment_failed_no_money": "Você não tem dinheiro suficiente para pagar por este item.",
+  "CLOSE": "FECHAR",
+  "ESCAPE": "ESCAPE",
+  "shopping_cart": "Carrinho de compras",
+  "items_to_sell": "Itens para vender",
+  "payment": "Pagamento",
+  "transaction_failed": "Transação falhou",
+  "total_price": "Preço total",
+  "out_of_stock": "Esgotado",
+  "dont_have_item": "Você não tem este item",
+  "transaction_complete": "Transação concluída",
+  "transaction_complete_message": "Obrigado por comprar conosco!",
+  "GroupMenuChatSuggestion": "Sugestão do chat",
+  "CancelProgress": "Cancelado",
+  "script_config_chooser_title": "Configurador ao vivo",
+  "script_config_chooser_description": "Edite configurações de scripts sem reiniciar",
+  "script_config_global_settings": "Configurações globais da biblioteca",
+  "script_config_no_scripts": "Nenhum script registrado"
+}

@@ -258,6 +258,14 @@ local openSettingsUi = function()
   TriggerScreenblurFadeIn(0)
   SetNuiFocus(true, true)
 
+  -- Once we hold focus the chooser can safely release its own claim.
+  -- Without this, dirk_lib still holds focus from the chooser handoff,
+  -- and our SetNuiFocus(false,false) on close only releases this resource —
+  -- the cursor stays visible because dirk_lib never let go.
+  if scriptName ~= 'dirk_lib' then
+    pcall(function() exports['dirk_lib']:releaseScriptConfigChooserFocus() end)
+  end
+
   local ped = cache.ped
   local coords = GetEntityCoords(ped)
   local heading = GetEntityHeading(ped)
@@ -272,7 +280,7 @@ local openSettingsUi = function()
   }))
 end
 
-closeSettingsUi = function()
+closeSettingsUi = function(opts)
   debugLog(('closeSettingsUi called (hasUI=%s, settingsUiOpen=%s)'):format(
     tostring(hasUI), tostring(settingsUiOpen)))
   if not hasUI then return end
@@ -280,7 +288,12 @@ closeSettingsUi = function()
   settingsUiOpen = false
 
   SendNuiMessage(json.encode({ action = 'CLOSE_ADMIN_SECTION' }))
-  SetNuiFocus(false, false)
+  -- When `keepFocus` is set we are about to hand off to another NUI (the
+  -- dirk_config chooser). Releasing focus here would create a visible frame
+  -- where the player can look/move around before the chooser re-grabs it.
+  if not (opts and opts.keepFocus) then
+    SetNuiFocus(false, false)
+  end
   TriggerScreenblurFadeOut(0)
   debugLog('closeSettingsUi -> done')
 end
@@ -292,6 +305,10 @@ if hasUI then
   RegisterNuiCallback('NUI_READY', function(_, cb)
     debugLog('NUI_READY received')
     nuiReady = true
+    -- Notify any other code in this resource that wants to gate SendNuiMessage
+    -- on the iframe being mounted (e.g. server-driven push events that fire
+    -- during resource start, before React has rendered).
+    TriggerEvent('dirk_lib:nuiReady')
     cb({})
   end)
 
@@ -305,7 +322,7 @@ if hasUI then
   end)
 
   RegisterNuiCallback('CONFIG_PANEL_BACK', function(_, cb)
-    closeSettingsUi()
+    closeSettingsUi({ keepFocus = true })
     TriggerServerEvent('dirk_lib:reopenScriptConfigChooser')
     cb({})
   end)

@@ -1,9 +1,10 @@
 import { alpha, Flex, Text, Tooltip, useMantineTheme } from '@mantine/core';
 import { Title } from 'dirk-cfx-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Settings } from 'lucide-react';
+import { Settings, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useNuiEvent } from '../../hooks/useNuiEvent';
+import { locale } from '../../stores/locales';
 import { fetchNui } from '../../utils/fetchNui';
 
 type ScriptEntry = {
@@ -111,14 +112,14 @@ export default function ScriptConfigChooser() {
             >
               <Title
                 icon="sliders"
-                title="Live Configurator"
-                description="Live-edit script configs without restarts"
+                title={locale('script_config_chooser_title')}
+                description={locale('script_config_chooser_description')}
                 removeBorder
                 rightSection={
                   <Flex align="center" gap="xs">
                     {dirkLibEntry && (
                       <Tooltip
-                        label="Global library settings"
+                        label={locale('script_config_global_settings')}
                         position="bottom"
                         withArrow
                         zIndex={10000}
@@ -154,9 +155,9 @@ export default function ScriptConfigChooser() {
                             justifyContent: 'center',
                             color: 'rgba(255,255,255,0.75)',
                           }}
-                          aria-label="Open dirk_lib global settings"
+                          aria-label={locale('script_config_global_settings')}
                         >
-                          <Settings size="2vh" />
+                          <Settings size="1.7vh" />
                         </motion.button>
                       </Tooltip>
                     )}
@@ -178,13 +179,10 @@ export default function ScriptConfigChooser() {
                         alignItems: 'center',
                         justifyContent: 'center',
                         color: 'rgba(255,255,255,0.6)',
-                        fontFamily: 'Akrobat Bold',
-                        fontSize: '2vh',
-                        lineHeight: 1,
                       }}
-                      aria-label="Close"
+                      aria-label={locale('CLOSE')}
                     >
-                      ×
+                      <X size="1.7vh" />
                     </motion.button>
                   </Flex>
                 }
@@ -200,7 +198,7 @@ export default function ScriptConfigChooser() {
               {userScripts.length === 0 && (
                 <Flex direction="column" align="center" gap="xxs" py="md">
                   <Text ff="Akrobat Bold" size="xs" tt="uppercase" lts="0.06em" c="rgba(255,255,255,0.45)">
-                    No Scripts Registered
+                    {locale('script_config_no_scripts')}
                   </Text>
                 </Flex>
               )}

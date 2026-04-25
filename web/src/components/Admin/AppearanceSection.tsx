@@ -5,6 +5,7 @@ import { Palette, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import type { AppearanceSettings, ScriptConfig } from "../../stores/useScriptConfig";
 import { defaultScriptConfig, useScriptConfig } from "../../stores/useScriptConfig";
+import { InfoLabel } from "./InfoLabel";
 
 const MANTINE_COLOR_OPTIONS = [
   "dirk",
@@ -109,21 +110,13 @@ export default function AppearanceSection() {
           />
         )}
         <NumberInput
-          label="Shade"
-          description="0 lightest, 9 darkest"
+          label={<InfoLabel label="Shade" tooltip="0 lightest, 9 darkest" />}
           size="xs"
           style={{ flex: 1 }}
           min={0}
           max={9}
           value={config.primaryShade}
           onChange={(v) => set("primaryShade", Number(v))}
-          styles={{
-            description: {
-              color: "rgba(255,255,255,0.25)",
-              fontFamily: "Akrobat Bold",
-              fontSize: "0.6em",
-            },
-          }}
         />
       </Flex>
 
@@ -139,19 +132,11 @@ export default function AppearanceSection() {
           </Flex>
 
           <ColorInput
-            label="Base Color"
-            description="Generates the full 10-shade palette. Click any shade below to fine-tune."
+            label={<InfoLabel label="Base Color" tooltip="Generates the full 10-shade palette. Click any shade below to fine-tune." />}
             size="xs"
             value={config.customTheme[config.primaryShade] ?? config.customTheme[5] ?? "#000000"}
             onChange={generateFromBase}
             eyeDropperIcon={<></>}
-            styles={{
-              description: {
-                color: "rgba(255,255,255,0.25)",
-                fontFamily: "Akrobat Bold",
-                fontSize: "0.6em",
-              },
-            }}
           />
 
           <Flex gap="xxs" mt="xxs">

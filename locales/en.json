@@ -15,5 +15,9 @@
   "transaction_complete": "Transaction Complete",
   "transaction_complete_message": "Thank you for shopping with us!",
   "GroupMenuChatSuggestion": "Chat Suggestion",
-  "CancelProgress": "Cancelled"
+  "CancelProgress": "Cancelled",
+  "script_config_chooser_title": "Live Configurator",
+  "script_config_chooser_description": "Live-edit script configs without restarts",
+  "script_config_global_settings": "Global library settings",
+  "script_config_no_scripts": "No Scripts Registered"
 }

@@ -26,7 +26,10 @@ end)
 
 RegisterNuiCallback('SCRIPT_CONFIG_CHOOSER_PICK', function(data, cb)
   chooserOpen = false
-  SetNuiFocus(false, false)
+  -- Don't release NUI focus: the picked resource will take over and re-grab
+  -- focus. Releasing here causes a brief frame where the player's character
+  -- can move/look around between the chooser closing and the consumer UI
+  -- mounting.
 
   local resource = data and data.resource
   if type(resource) == 'string' and resource ~= '' then
@@ -39,4 +42,12 @@ end)
 RegisterNuiCallback('SCRIPT_CONFIG_CHOOSER_CLOSE', function(_, cb)
   closeChooser()
   cb({ success = true })
+end)
+
+-- Called by a consumer's scriptConfig module once it has finished grabbing
+-- NUI focus. Lets the chooser release its lingering focus claim without
+-- creating the focus gap that prompted us to keep it held during pick.
+exports('releaseScriptConfigChooserFocus', function()
+  if chooserOpen then return end
+  SetNuiFocus(false, false)
 end)

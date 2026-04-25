@@ -132,6 +132,26 @@ AddEventHandler('dirk_lib:setLocale', function(key)
     lib.locale(key)
 end)
 
+-- Live-reload locale strings whenever an admin changes `language` via dirk_lib's
+-- scriptConfig UI. Mirrors how appearance settings hot-reload through
+-- lib.onSettings — keeps the consumer's dict and its React-side store in sync
+-- without requiring a resource restart.
+if lib.onSettings then
+    lib.onSettings('language', function(new)
+        lib.locale(new.language)
+        if not IsDuplicityVersion() then
+            local resource = GetCurrentResourceName()
+            local hasUi = (GetNumResourceMetadata(resource, 'ui_page') or 0) > 0
+            if hasUi then
+                SendNuiMessage(json.encode({
+                    action = 'UPDATE_DIRK_LIB_LOCALES',
+                    data = dict,
+                }))
+            end
+        end
+    end)
+end
+
 
 if IsDuplicityVersion() then 
   RegisterNetEvent('dirk_lib:addNeededTranslation', function(resource, str)
