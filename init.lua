@@ -132,6 +132,13 @@ lib.FW = setmetatable({}, {
 
 _ENV.cache = cache
 
+--## SETTINGS HOT-RELOAD
+-- Registers lib.onSettings and wires up the net-event bridge that keeps this
+-- resource's lib.settings in sync with dirk_lib whenever an admin changes
+-- appearance/localization via scriptConfig. Must run after lib.settings and
+-- cache are defined.
+require 'src.onSettings'
+
 for i = 1, GetNumResourceMetadata(cache.resource, 'dirk_lib') do
   local name = GetResourceMetadata(cache.resource, 'dirk_lib', i - 1)
   if not rawget(lib, name) then

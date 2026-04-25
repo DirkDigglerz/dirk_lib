@@ -924,7 +924,7 @@ lib.callback.register(('%s:getFullScriptConfig'):format(scriptName), function(sr
     debugLog('callback getFullScriptConfig -> NoPermission')
     return nil, 'NoPermission'
   end
-  return true, nil, { settings = scriptConfig, clientVersion = client_version }
+  return true, nil, { config = scriptConfig, clientVersion = client_version }
 end)
 
 lib.callback.register(('%s:getScriptConfigHistory'):format(scriptName), function(src, payload)

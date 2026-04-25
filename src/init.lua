@@ -9,6 +9,10 @@ end
 lib = setmetatable({
   name = 'dirk_lib',
   context = IsDuplicityVersion() and 'server' or 'client',
+  onCache = function(key, cb)
+    AddEventHandler(('dirk_lib:cache:%s'):format(key), cb)
+    if cache and cache[key] ~= nil then cb(cache[key]) end
+  end,
 }, {
   __newindex = function(self,key,fn)
     rawset(self,key,fn)
@@ -71,9 +75,15 @@ lib.FW = setmetatable({}, {
 })
 
 cache = {
-  resource = GetCurrentResourceName(), 
+  resource = GetCurrentResourceName(),
   game     = GetGameName(),
 }
+
+--## SETTINGS HOT-RELOAD
+-- Same module as consumers load via require in the public init.lua so dirk_lib
+-- itself exposes lib.onSettings and stays in sync with its own scriptConfig
+-- broadcasts. Must run after lib.settings and cache are defined.
+require 'src.onSettings'
 
 local poolNatives = {
   CPed = GetAllPeds,
@@ -111,6 +121,10 @@ if context == 'client' then
   end
 
   RegisterNuiCallback('GET_SETTINGS', function(data, cb)
+    -- Ensure scriptConfig has loaded (and the settings overlay has run) before
+    -- handing lib.settings to the NUI, otherwise DirkProvider caches the
+    -- pre-overlay convar defaults and the saved theme doesn't stick.
+    pcall(function() return lib.scriptConfig.get() end)
     cb(lib.settings)
   end)
   

@@ -1,6 +1,8 @@
-import { alpha, Flex, Text, useMantineTheme } from '@mantine/core';
+import { alpha, Flex, Text, Tooltip, useMantineTheme } from '@mantine/core';
+import { Title } from 'dirk-cfx-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { Settings } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNuiEvent } from '../../hooks/useNuiEvent';
 import { fetchNui } from '../../utils/fetchNui';
 
@@ -50,6 +52,18 @@ export default function ScriptConfigChooser() {
     fetchNui('SCRIPT_CONFIG_CHOOSER_CLOSE');
   };
 
+  // dirk_lib is library-global (theme / currency / branding), not a per-script
+  // config. Surface it as a gear button next to the close button rather than
+  // mixing it into the per-script list.
+  const dirkLibEntry = useMemo(
+    () => scripts.find((s) => s.resource === 'dirk_lib'),
+    [scripts],
+  );
+  const userScripts = useMemo(
+    () => scripts.filter((s) => s.resource !== 'dirk_lib'),
+    [scripts],
+  );
+
   return (
     <AnimatePresence>
       {open && (
@@ -87,84 +101,111 @@ export default function ScriptConfigChooser() {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header — matches ConfigPanel sidebar header */}
             <Flex
-              align="center"
-              gap="xs"
               px="sm"
               py="sm"
               style={{
-                borderBottom: `0.1vh solid ${alpha(theme.colors.dark[6], 0.5)}`,
                 background: alpha(theme.colors.dark[8], 0.6),
                 flexShrink: 0,
               }}
             >
-              <div
-                style={{
-                  width: '0.4vh',
-                  height: '2.2vh',
-                  borderRadius: '0.2vh',
-                  background: color,
-                  flexShrink: 0,
-                }}
+              <Title
+                icon="sliders"
+                title="Live Configurator"
+                description="Live-edit script configs without restarts"
+                removeBorder
+                rightSection={
+                  <Flex align="center" gap="xs">
+                    {dirkLibEntry && (
+                      <Tooltip
+                        label="Global library settings"
+                        position="bottom"
+                        withArrow
+                        zIndex={10000}
+                        styles={{
+                          tooltip: {
+                            background: alpha(theme.colors.dark[7], 0.95),
+                            border: '0.1vh solid rgba(255,255,255,0.1)',
+                            color: 'rgba(255,255,255,0.75)',
+                            fontFamily: 'Akrobat Bold',
+                            fontSize: '1.3vh',
+                            lineHeight: 1.3,
+                            padding: '0.6vh 0.8vh',
+                            letterSpacing: '0.03em',
+                          },
+                        }}
+                      >
+                        <motion.button
+                          onClick={() => handlePick('dirk_lib')}
+                          whileHover={{
+                            background: alpha(color, 0.16),
+                            borderColor: alpha(color, 0.5),
+                          }}
+                          whileTap={{ scale: 0.95 }}
+                          style={{
+                            aspectRatio: '1 / 1',
+                            height: '3.2vh',
+                            background: 'transparent',
+                            border: `0.1vh solid ${alpha(theme.colors.dark[5], 0.6)}`,
+                            borderRadius: theme.radius.xs,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'rgba(255,255,255,0.75)',
+                          }}
+                          aria-label="Open dirk_lib global settings"
+                        >
+                          <Settings size="2vh" />
+                        </motion.button>
+                      </Tooltip>
+                    )}
+                    <motion.button
+                      onClick={handleClose}
+                      whileHover={{
+                        background: alpha('#ef4444', 0.16),
+                        borderColor: alpha('#ef4444', 0.5),
+                      }}
+                      whileTap={{ scale: 0.95 }}
+                      style={{
+                        aspectRatio: '1 / 1',
+                        height: '3.2vh',
+                        background: 'transparent',
+                        border: `0.1vh solid ${alpha(theme.colors.dark[5], 0.6)}`,
+                        borderRadius: theme.radius.xs,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'rgba(255,255,255,0.6)',
+                        fontFamily: 'Akrobat Bold',
+                        fontSize: '2vh',
+                        lineHeight: 1,
+                      }}
+                      aria-label="Close"
+                    >
+                      ×
+                    </motion.button>
+                  </Flex>
+                }
               />
-              <Flex direction="column" style={{ flex: 1, minWidth: 0, lineHeight: 1 }}>
-                <Text size="lg" ff="Akrobat Bold" tt="uppercase" lts="0.04em">
-                  Script Config
-                </Text>
-                <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.08em" c={color}>
-                  {scripts.length === 0
-                    ? 'No Scripts Registered'
-                    : `${scripts.length} Registered`}
-                </Text>
-              </Flex>
-              <motion.button
-                onClick={handleClose}
-                whileHover={{ background: alpha('#ef4444', 0.16), borderColor: alpha('#ef4444', 0.5) }}
-                whileTap={{ scale: 0.95 }}
-                style={{
-                  aspectRatio: '1 / 1',
-                  height: '2.4vh',
-                  background: 'transparent',
-                  border: `0.1vh solid ${alpha(theme.colors.dark[5], 0.6)}`,
-                  borderRadius: theme.radius.xs,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'rgba(255,255,255,0.6)',
-                  fontFamily: 'Akrobat Bold',
-                  fontSize: '1.4vh',
-                  lineHeight: 1,
-                }}
-              >
-                ×
-              </motion.button>
             </Flex>
 
-            {/* List */}
             <Flex
               direction="column"
               gap="xxs"
               p="xs"
               style={{ overflowY: 'auto', background: alpha(theme.colors.dark[9], 0.4) }}
             >
-              {scripts.length === 0 && (
+              {userScripts.length === 0 && (
                 <Flex direction="column" align="center" gap="xxs" py="md">
                   <Text ff="Akrobat Bold" size="xs" tt="uppercase" lts="0.06em" c="rgba(255,255,255,0.45)">
-                    No Resources Registered
-                  </Text>
-                  <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.35)">
-                    Declare{' '}
-                    <Text span ff="monospace" size="xxs" c="rgba(255,255,255,0.55)">
-                      dirk_lib 'scriptConfig'
-                    </Text>{' '}
-                    in fxmanifest
+                    No Scripts Registered
                   </Text>
                 </Flex>
               )}
 
-              {scripts.map((s, idx) => (
+              {userScripts.map((s, idx) => (
                 <ScriptRow
                   key={s.resource}
                   entry={s}

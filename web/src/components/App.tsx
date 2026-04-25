@@ -7,6 +7,8 @@ import { useNuiEvent } from '../hooks/useNuiEvent';
 import { localeStore } from '../stores/locales';
 import { fetchNui } from '../utils/fetchNui';
 import { imageUrlToBase64 } from '../utils/misc';
+import { useScriptConfigHooks } from '../stores/useScriptConfig';
+import AdminSection from './Admin/main';
 import AlertDialog from './AlertDialog/main';
 import Menu from './Context/main';
 import Dialog from './Dialog/main';
@@ -27,6 +29,7 @@ export const MotionFlex = motion.create(Flex);
 
 const App: React.FC = () => {
   const fetchLocales = localeStore((state) => state.fetchLocales);
+  useScriptConfigHooks();
 
   useEffect(() => {
     fetchLocales();
@@ -72,6 +75,7 @@ const App: React.FC = () => {
       <GizmoOverlay />
       <AlertDialog />
       <ScriptConfigChooser />
+      <AdminSection />
     </DirkProvider>
   );
 };

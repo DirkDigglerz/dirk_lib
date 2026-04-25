@@ -87,4 +87,36 @@ setr dirk_groups:maxLogOffTime 5
 
 ```
 
+## Hot-reloading settings in consumer resources
 
+`lib.onSettings(key | keys, cb, options?)` fires whenever the named keys on
+`lib.settings` change. Works across resources: dirk_lib broadcasts every
+scriptConfig change, consumers mutate their local `lib.settings` in place and
+forward the patch to their NUI as `UPDATE_DIRK_LIB_SETTINGS` (handled by
+`DirkProvider` in `dirk-cfx-react >= 1.1.63`).
+
+```lua
+lib.onSettings('currency', function(new, old)
+  print(('currency: %s -> %s'):format(old.currency, new.currency))
+end)
+
+lib.onSettings({ 'primaryColor', 'primaryShade' }, function(new)
+  refreshHud(new.primaryColor, new.primaryShade)
+end, { immediate = true }) -- fire once with current values
+```
+
+### IMPORTANT: we mutate `lib.settings` IN PLACE
+
+Do not replace `lib.settings` or any of its subtables with a new reference —
+other files capture subtable references at load time (e.g.
+`local groups = lib.settings.groups`) and a fresh reference leaves those
+captures pointing at stale data. `src/onSettings.lua` wipes + refills existing
+tables instead of swapping them; match that pattern if you add new code that
+writes to `lib.settings`.
+
+### API-sync between the two lib definitions
+
+Anything added to the public `init.lua` `lib` table that dirk_lib's own
+modules rely on must also exist in `src/init.lua`'s `lib` definition (e.g.
+`lib.onCache`). Both are loaded in different VMs but share module code, so a
+missing field in `src/init.lua` crashes dirk_lib mid-module-load.

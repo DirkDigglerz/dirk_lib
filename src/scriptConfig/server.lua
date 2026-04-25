@@ -41,7 +41,10 @@ local function collectRegisteredConfigs()
   return list
 end
 
-RegisterCommand('dirk_config', function(source)
+lib.addCommand('dirk_config', {
+  help = 'Open the Live Configurator to edit registered script configs',
+  restricted = 'group.admin',
+}, function(source)
   if source == 0 then
     lib.print.info('[dirk_config] list of registered script configs:')
     for _, entry in ipairs(collectRegisteredConfigs()) do
@@ -50,13 +53,9 @@ RegisterCommand('dirk_config', function(source)
     return
   end
 
-  if not IsPlayerAceAllowed(source, 'admin') then
-    return
-  end
-
   local list = collectRegisteredConfigs()
   TriggerClientEvent('dirk_lib:openScriptConfigChooser', source, list)
-end, false)
+end)
 
 RegisterNetEvent('dirk_lib:scriptConfigChooserPick', function(resourceName)
   local src = source

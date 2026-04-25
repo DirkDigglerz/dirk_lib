@@ -8,6 +8,8 @@ author       'DirkScripts'
 version      '1.2.28'
 description  'A library for FiveM developers to use in their projects, accepting of new features and contributions.'
 
+dirk_lib 'scriptConfig'
+
 dependencies {
   '/server:7290',
   '/onesync',
@@ -20,6 +22,7 @@ ui_page 'web/build/index.html'
 files {
   'locales/**/*',
   'init.lua',
+  'schema.json',
   'modules/**/client.lua',
   'modules/**/server.lua',
   'modules/**/shared.lua',
@@ -31,6 +34,7 @@ files {
   'src/redmNatives.lua',
   'src/autodetect.lua',
   'src/oxCompat.lua',
+  'src/onSettings.lua',
   --\\ NUI WHEN ADDED \\--
   'web/build/index.html',
   'web/build/**/*',
@@ -47,6 +51,7 @@ client_scripts {
 }
 
 server_scripts {
+  '@oxmysql/lib/MySQL.lua',
   'modules/callback/server.lua',
   'src/**/server.lua',
   'src/**/server/*.lua',

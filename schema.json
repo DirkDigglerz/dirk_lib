@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "description": "dirk_lib library-level settings. Controls global theming, localization, and other shared defaults used by every resource that depends on dirk_lib.",
+  "properties": {
+
+    "appearance": {
+      "type": "object",
+      "description": "Global UI theme and branding shared across every dirk_lib-powered NUI.",
+      "properties": {
+        "primaryColor": {
+          "type": "string",
+          "default": "dirk",
+          "description": "Mantine palette key used as the UI primary colour. Use 'dirk' to apply the custom palette defined below."
+        },
+        "primaryShade": {
+          "type": "number",
+          "default": 9,
+          "minimum": 0,
+          "maximum": 9,
+          "description": "Mantine shade index (0 lightest, 9 darkest) picked from the primary palette for buttons, borders, and accents."
+        },
+        "customTheme": {
+          "type": "array",
+          "description": "Ten-colour palette (light to dark) used when primaryColor is set to 'dirk'. Provide exactly ten hex codes ordered from lightest shade to darkest.",
+          "default": [
+            "#f8edff",
+            "#e9d9f6",
+            "#d0b2e8",
+            "#b588da",
+            "#9e65cf",
+            "#914ec8",
+            "#8a43c6",
+            "#7734af",
+            "#692d9d",
+            "#5c258b"
+          ]
+        },
+        "serverName": {
+          "type": "string",
+          "default": "DirkRP",
+          "description": "Server branding string displayed in NUIs that surface a server name."
+        },
+        "logo": {
+          "type": "string",
+          "default": "https://via.placeholder.com/150",
+          "description": "URL or nui:// path to the server logo shown in dirk_lib-powered menus."
+        }
+      }
+    },
+
+    "localization": {
+      "type": "object",
+      "description": "Language and currency defaults used by every dirk_lib consumer.",
+      "properties": {
+        "language": {
+          "type": "string",
+          "default": "en",
+          "description": "Locale code used when resolving strings from /locales."
+        },
+        "currency": {
+          "type": "string",
+          "default": "$",
+          "description": "Currency symbol prefixed to money values rendered by dirk_lib UIs."
+        }
+      }
+    }
+
+  }
+}

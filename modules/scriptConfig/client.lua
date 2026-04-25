@@ -175,10 +175,10 @@ local sendSettingsToNui = function()
   SendNuiMessage(json.encode({
     action = 'UPDATE_SCRIPT_CONFIG',
     data = {
-      settings = scriptConfig,
+      config = scriptConfig,
       clientVersion = clientVersion,
     },
-    
+
   }))
 end
 
@@ -362,7 +362,7 @@ RegisterNetEvent(('%s:updateScriptConfig'):format(scriptName), function(data, ne
     SendNuiMessage(json.encode({
       action = 'UPDATE_SCRIPT_CONFIG',
       data = {
-        settings = scriptConfig,
+        config = scriptConfig,
         clientVersion = clientVersion,
       },
     }))
