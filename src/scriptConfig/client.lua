@@ -24,6 +24,14 @@ RegisterNetEvent('dirk_lib:openScriptConfigChooser', function(list)
   }))
 end)
 
+-- Polled by per-script CONFIG_PANEL_BACK handlers so they can drop their
+-- own NUI focus claim only AFTER we've taken focus on this resource.
+-- TriggerEvent doesn't cross resources on the client, so an export poll
+-- is the simplest race-free signal.
+exports('isScriptConfigChooserOpen', function()
+  return chooserOpen
+end)
+
 RegisterNuiCallback('SCRIPT_CONFIG_CHOOSER_PICK', function(data, cb)
   chooserOpen = false
   -- Don't release NUI focus: the picked resource will take over and re-grab

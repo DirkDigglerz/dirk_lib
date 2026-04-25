@@ -26,6 +26,9 @@ importers:
       '@mantine/carousel':
         specifier: ^8.3.14
         version: 8.3.18(@mantine/core@8.3.18(@mantine/hooks@8.3.18(react@19.2.5))(@types/react@18.3.28)(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@mantine/hooks@8.3.18(react@19.2.5))(embla-carousel-react@8.6.0(react@19.2.5))(embla-carousel@8.5.2)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@mantine/colors-generator':
+        specifier: ^9.1.0
+        version: 9.1.0(chroma-js@3.2.0)
       '@mantine/core':
         specifier: ^8.3.14
         version: 8.3.18(@mantine/hooks@8.3.18(react@19.2.5))(@types/react@18.3.28)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -53,6 +56,9 @@ importers:
       axios:
         specifier: ^1.13.2
         version: 1.15.1
+      chroma-js:
+        specifier: ^3.2.0
+        version: 3.2.0
       dayjs:
         specifier: ^1.11.13
         version: 1.11.20
@@ -486,6 +492,11 @@ packages:
       react: ^18.x || ^19.x
       react-dom: ^18.x || ^19.x
 
+  '@mantine/colors-generator@9.1.0':
+    resolution: {integrity: sha512-RmhZOqipPeucWDqH5/0QjCNh4jdTFpoHzqiErJP8IIEYxlz4l662NjElh6qNQ26O+vp5RoRY/mlP46V1Mj9GrA==}
+    peerDependencies:
+      chroma-js: '>=2.4.2'
+
   '@mantine/core@8.3.18':
     resolution: {integrity: sha512-9tph1lTVogKPjTx02eUxDUOdXacPzK62UuSqb4TdGliI54/Xgxftq0Dfqu6XuhCxn9J5MDJaNiLDvL/1KRkYqA==}
     peerDependencies:
@@ -843,6 +854,9 @@ packages:
   chalk@4.1.2:
     resolution: {integrity: sha512-oKnbhFyRIXpUuez8iBMmyEa4nbj4IOQyuhc/wy9kY7/WVPcwIO9VA668Pu8RkO7+0G76SLROeyw9CpQ061i4mA==}
     engines: {node: '>=10'}
+
+  chroma-js@3.2.0:
+    resolution: {integrity: sha512-os/OippSlX1RlWWr+QDPcGUZs0uoqr32urfxESG9U93lhUfbnlyckte84Q8P1UQY/qth983AS1JONKmLS4T0nw==}
 
   clsx@2.1.1:
     resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
@@ -1984,6 +1998,10 @@ snapshots:
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
 
+  '@mantine/colors-generator@9.1.0(chroma-js@3.2.0)':
+    dependencies:
+      chroma-js: 3.2.0
+
   '@mantine/core@8.3.18(@mantine/hooks@8.3.18(react@19.2.5))(@types/react@18.3.28)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
       '@floating-ui/react': 0.27.19(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -2329,6 +2347,8 @@ snapshots:
     dependencies:
       ansi-styles: 4.3.0
       supports-color: 7.2.0
+
+  chroma-js@3.2.0: {}
 
   clsx@2.1.1: {}
 

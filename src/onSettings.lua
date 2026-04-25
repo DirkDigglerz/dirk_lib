@@ -112,15 +112,40 @@ lib.onSettings = on
 if lib.context == 'client' then
   local resource = GetCurrentResourceName()
   local hasUi = (GetNumResourceMetadata(resource, 'ui_page') or 0) > 0
+  local nuiReady = false
+  local pendingPatch = nil
+
+  local function mergePatch(patch)
+    pendingPatch = pendingPatch or {}
+    for k, v in pairs(patch) do pendingPatch[k] = v end
+  end
+
+  if hasUi then
+    AddEventHandler('dirk_lib:nuiReady', function()
+      if nuiReady then return end
+      nuiReady = true
+      if pendingPatch then
+        SendNuiMessage(json.encode({
+          action = 'UPDATE_DIRK_LIB_SETTINGS',
+          data = pendingPatch,
+        }))
+        pendingPatch = nil
+      end
+    end)
+  end
 
   local function forwardToNui(changedKeys)
     if not hasUi or not changedKeys or #changedKeys == 0 then return end
     local patch = {}
     for _, k in ipairs(changedKeys) do patch[k] = lib.settings[k] end
-    SendNuiMessage(json.encode({
-      action = 'UPDATE_DIRK_LIB_SETTINGS',
-      data = patch,
-    }))
+    if nuiReady then
+      SendNuiMessage(json.encode({
+        action = 'UPDATE_DIRK_LIB_SETTINGS',
+        data = patch,
+      }))
+    else
+      mergePatch(patch)
+    end
   end
 
   -- dirk_lib's server broadcasts snapshots via TriggerClientEvent whenever

@@ -322,8 +322,34 @@ if hasUI then
   end)
 
   RegisterNuiCallback('CONFIG_PANEL_BACK', function(_, cb)
+    -- Hand off to dirk_lib's chooser without a focus flicker. We keep our
+    -- focus claim during the server roundtrip, then poll dirk_lib for
+    -- chooser-open state and drop our claim only AFTER it has taken focus.
+    -- Polling (vs. a fixed Wait) avoids both: dropping focus before the
+    -- chooser claims it (cursor disappears) and dropping it well after
+    -- (cursor stays visible across an unfocused frame).
+    --
+    -- Skip the explicit drop entirely when this IS dirk_lib's own config —
+    -- per-script and chooser share the resource, so SetNuiFocus(false,false)
+    -- here would clobber the focus the chooser just claimed.
     closeSettingsUi({ keepFocus = true })
     TriggerServerEvent('dirk_lib:reopenScriptConfigChooser')
+    if scriptName ~= 'dirk_lib' then
+      CreateThread(function()
+        local elapsed = 0
+        while elapsed < 2000 do
+          Wait(30)
+          elapsed = elapsed + 30
+          local ok, open = pcall(function()
+            return exports['dirk_lib']:isScriptConfigChooserOpen()
+          end)
+          if ok and open then break end
+        end
+        if not settingsUiOpen then
+          SetNuiFocus(false, false)
+        end
+      end)
+    end
     cb({})
   end)
 

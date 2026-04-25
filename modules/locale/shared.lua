@@ -136,19 +136,47 @@ end)
 -- scriptConfig UI. Mirrors how appearance settings hot-reload through
 -- lib.onSettings — keeps the consumer's dict and its React-side store in sync
 -- without requiring a resource restart.
-if lib.onSettings then
-    lib.onSettings('language', function(new)
-        lib.locale(new.language)
-        if not IsDuplicityVersion() then
-            local resource = GetCurrentResourceName()
-            local hasUi = (GetNumResourceMetadata(resource, 'ui_page') or 0) > 0
-            if hasUi then
+--
+-- The watcher fires once on registration with the current `language` value
+-- (immediate dispatch). At that point the NUI iframe has not been mounted yet,
+-- and a raw SendNuiMessage triggers FiveM's "resource X has no UI frame"
+-- warning. We gate broadcasts on `dirk_lib:nuiReady` (fired by scriptConfig's
+-- NUI_READY callback) and buffer the latest dict until the iframe is up.
+if lib.onSettings and not IsDuplicityVersion() then
+    local resource = GetCurrentResourceName()
+    local hasUi = (GetNumResourceMetadata(resource, 'ui_page') or 0) > 0
+    local nuiReady = false
+    local pendingDict = nil
+
+    if hasUi then
+        AddEventHandler('dirk_lib:nuiReady', function()
+            if nuiReady then return end
+            nuiReady = true
+            if pendingDict then
                 SendNuiMessage(json.encode({
                     action = 'UPDATE_DIRK_LIB_LOCALES',
-                    data = dict,
+                    data = pendingDict,
                 }))
+                pendingDict = nil
             end
+        end)
+    end
+
+    lib.onSettings('language', function(new)
+        lib.locale(new.language)
+        if not hasUi then return end
+        if nuiReady then
+            SendNuiMessage(json.encode({
+                action = 'UPDATE_DIRK_LIB_LOCALES',
+                data = dict,
+            }))
+        else
+            pendingDict = dict
         end
+    end)
+elseif lib.onSettings then
+    lib.onSettings('language', function(new)
+        lib.locale(new.language)
     end)
 end
 
