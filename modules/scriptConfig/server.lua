@@ -1,9 +1,9 @@
 local scriptName = GetCurrentResourceName()
-local debugEnabled = GetConvarInt('dirk_scriptsettings_debug', 1) == 1
 
+-- Routes through lib.print.debug, which is gated by lib.settings.debug.
+-- Flip dirk_lib's `debug` setting in the script-config UI to enable.
 local function debugLog(message)
-  if not debugEnabled then return end
-  lib.print.info(('[scriptConfig:%s] %s'):format(scriptName, message))
+  lib.print.debug(('[scriptConfig:%s] %s'):format(scriptName, message))
 end
 
 -- --------------------------------------------------
@@ -557,7 +557,7 @@ local function registerScriptConfig(schema, canEditFn, rules)
     )
   end
 
-  lib.print.info(('Registering script config for %s'):format(scriptName))
+  lib.print.debug(('Registering script config for %s'):format(scriptName))
   debugLog('waiting for MySQL global')
   -- Yield until MySQL global is injected by oxmysql
   local attempts = 0
@@ -572,7 +572,7 @@ local function registerScriptConfig(schema, canEditFn, rules)
 
   -- Ensure table exists
   local success = pcall(MySQL.scalar.await, 'SELECT 1 FROM dirk_scriptConfig LIMIT 1')
-  lib.print.info(('Script config loading for %s'):format(scriptName))
+  lib.print.debug(('Script config loading for %s'):format(scriptName))
   debugLog(('dirk_scriptConfig table check success=%s'):format(tostring(success)))
   if not success then
     lib.print.info('Creating dirk_scriptConfig table...')
@@ -694,7 +694,7 @@ local function registerScriptConfig(schema, canEditFn, rules)
   dispatchScriptConfigWatchers(scriptConfig, nil, nil, 'load', true)
   debugLog(('initial persist complete (client_version=%s, changeLog=%s)'):format(tostring(client_version), tostring(#changeLog)))
 
-  lib.print.info(('Script config loaded for %s (stored v%s → current v%s)'):format(scriptName, storedVer, currentVer))
+  lib.print.debug(('Script config loaded for %s (stored v%s → current v%s)'):format(scriptName, storedVer, currentVer))
   return scriptConfig
 end
 
