@@ -170,6 +170,7 @@ CreateThread(function()
       'dispatch',
       'clothing',
       'skills',
+      'housing',
     }
 
     local topBorder = '┌' .. string.rep('─', 46) .. '┐'

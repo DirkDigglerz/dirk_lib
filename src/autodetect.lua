@@ -1,5 +1,5 @@
 local supportedResources = {
-  framework         = {'es_extended', 'qbx_core', 'qb-core', 'nd-framework', 'pork_core'},
+  framework         = {'es_extended', 'qbx_core', 'qb-core', 'nd-framework'},
   inventory         = {'dirk_inventory', 'ox_inventory', 'qb-inventory', 'qs-inventory', 'codem-inventory', 'tgiann_inventory', 'mf-inventory', 'core_inventory'},
   target            = {'ox_target', 'qb-target', 'q-target', 'bt-target'},
   interact          = {'redm-uiprompt', 'sleepless_interact', 'interact'},
@@ -14,7 +14,7 @@ local supportedResources = {
   dispatch          = {'bub_mdt', 'cd_dispatch', 'linden_outlawalert', 'qs_dispatch', 'ps-dispatch', 'tk_dispatch'},
   doorlock          = {'ox_doorlock', 'qb-doorlock', 'nui_doorlock', 'doors_creator'},
   skills            = {'sd_skills', 'evolent_skills', 'core_skills', 'B1-skillz', 'skill_system_v1.5',  'skillsystem_v3', 'boii_skills', 'skillsystem_v2', 'ot_skill_system'},
-  housing           = {'qs-housing', 'bcs_housing'},
+  housing           = {'qs-housing', 'rtx_housing', 'bcs_housing', 'origen_housing'},
 }
 
 local imagePaths = {

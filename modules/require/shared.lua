@@ -187,11 +187,17 @@ function lib.require(modName)
 end
 
 function lib.loadBridge(_type, resource, _context )
-  local loaded = lib.load(('@dirk_lib.bridge.%s.%s.%s'):format(_type, resource, _context), nil, true) 
-  if not loaded then 
+  -- Optional bridges (autodetect returns 'NOT FOUND' when no matching resource
+  -- is installed). Skip the load + warning silently — modules that consume the
+  -- bridge already fall back via `prison.jail or bridge.jail` patterns.
+  if not resource or resource == '' or resource == 'NOT FOUND' then
+    return {}
+  end
+  local loaded = lib.load(('@dirk_lib.bridge.%s.%s.%s'):format(_type, resource, _context), nil, true)
+  if not loaded then
     lib.print.warn(('Bridge %s for resource %s not found. Context is %s'):format(_type, resource, _context))
     return {}
-  end 
+  end
   return loaded
 end
 

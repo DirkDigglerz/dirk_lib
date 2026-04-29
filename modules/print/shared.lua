@@ -29,10 +29,25 @@ local print_types = {
     color = 'red',
     condition = function() return true end
   },
+  -- Gate debug prints on the calling resource's own debug flag when it has
+  -- registered a scriptConfig (look for `basic.debug` first, then top-level
+  -- `debug`). Falls back to dirk_lib's own `lib.settings.debug` for resources
+  -- that haven't registered a scriptConfig (incl. dirk_lib itself before
+  -- onSettings hydrates).
   debug = {
     prefixText = 'DEBUG',
     color = 'green',
-    condition = function() return lib.settings.debug end
+    condition = function()
+      if scriptConfig then
+        if type(scriptConfig.basic) == 'table' and scriptConfig.basic.debug ~= nil then
+          return scriptConfig.basic.debug == true
+        end
+        if scriptConfig.debug ~= nil then
+          return scriptConfig.debug == true
+        end
+      end
+      return lib.settings and lib.settings.debug
+    end
   },
 }
 

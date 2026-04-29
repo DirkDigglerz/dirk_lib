@@ -39,7 +39,8 @@ return {
 
   getMetadata = function(_key)
     local metadata = lib.FW.Functions.GetPlayerData().metadata
-    return _key and metadata[_key] or metadata 
+    if _key then return metadata[_key] end
+    return metadata
   end,
 
   getItems = function()
