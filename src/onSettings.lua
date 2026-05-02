@@ -162,9 +162,25 @@ if lib.context == 'client' then
   -- would otherwise stay stale until the next admin change).
   CreateThread(function()
     local ok, snapshot = pcall(lib.callback.await, 'dirk_lib:getSettingsSnapshot')
-    if ok and type(snapshot) == 'table' then
-      local changedKeys = applySnapshot(snapshot)
-      forwardToNui(changedKeys)
+    if not (ok and type(snapshot) == 'table') then return end
+
+    applySnapshot(snapshot)
+
+    -- Always push the hydrated snapshot to NUI on startup — applySnapshot
+    -- only reports keys whose Lua-side value changed, but the NUI's React
+    -- store has its own defaults (e.g. primaryColor="dirk") that stay stale
+    -- whenever lib.settings happens to already match the server snapshot
+    -- (most often when a convar override matches scriptConfig). Live updates
+    -- still go through forwardToNui's changed-keys filter below.
+    if hasUi then
+      if nuiReady then
+        SendNuiMessage(json.encode({
+          action = 'UPDATE_DIRK_LIB_SETTINGS',
+          data = snapshot,
+        }))
+      else
+        mergePatch(snapshot)
+      end
     end
   end)
 else
