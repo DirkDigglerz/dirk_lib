@@ -123,11 +123,12 @@ export default function Notification(props: NotificationProps) {
 
         <NotificationImage imageType={imageType} {...props} />
 
-        <Flex direction='column' flex={1} gap={2}>
+        <Flex direction='column' flex={1} gap='0.2vh'>
           <Text
             style={{
               fontSize: '1.3vh',
               fontWeight: 700,
+              lineHeight: 1.2,
               letterSpacing: '0.12em',
               textTransform: 'uppercase',
               color: props.titleColor || 'white',
@@ -146,6 +147,7 @@ export default function Notification(props: NotificationProps) {
             <Text
               style={{
                 fontSize: '1.2vh',
+                lineHeight: 1.3,
                 color: 'rgba(255,255,255,0.4)',
                 letterSpacing: '0.04em',
               }}
