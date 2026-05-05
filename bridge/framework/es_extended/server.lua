@@ -64,8 +64,9 @@ return {
   name = function(src)
     local ply = lib.player.get(src)
     assert(ply, 'Player does not exist')
-    local raw = ply.getName()
-    local firstName, lastName = raw:match("(%a+)%s+(.*)")
+    local raw = ply.getName() or ''
+    local firstName, lastName = raw:match("^(%S+)%s+(.+)$")
+    if not firstName then firstName = raw end
     return firstName, lastName
   end,
 

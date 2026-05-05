@@ -24,3 +24,12 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* Mantine v8 wraps input labels in <label> with display:inline-block by
+   default — that breaks width:100% on InfoLabel's inner Flex (the info
+   icon stops aligning to the right). Force the label to fill the row. */
+.mantine-InputWrapper-label {
+  display: block !important;
+  width: 100% !important;
+}
+

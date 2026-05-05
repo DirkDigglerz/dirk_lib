@@ -1,4 +1,15 @@
 -- THANKS TO THE DIVA AT OX FOR BACKEND OF PROG BARS LAZY BOI HERE https://github.com/overextended/ox_lib/blob/master/resource/interface/client/progress.lua
+local cachedBridge, cachedProvider
+local function getBridge()
+  local provider = lib.settings.progress
+  if not provider or provider == 'dirk_lib' then return nil end
+  if cachedProvider ~= provider then
+    cachedProvider = provider
+    cachedBridge = lib.loadBridge('interface', provider, 'client')
+  end
+  return cachedBridge
+end
+
 local progress
 local DisableControlAction = DisableControlAction
 local DisablePlayerFiring = DisablePlayerFiring
@@ -151,9 +162,8 @@ end
 ---@param data ProgressProps
 ---@return boolean?
 function lib.progressBar(data)
-  if lib.settings.progress == 'ox_lib' then 
-    return exports.ox_lib:progressBar(data)
-  end 
+  local b = getBridge()
+  if b and b.progressBar then return b.progressBar(data) end
 
   while progress ~= nil do Wait(0) end
 
@@ -176,9 +186,8 @@ end
 ---@param data ProgressProps
 ---@return boolean?
 function lib.progressCircle(data)
-  if lib.settings.progress == 'ox_lib' then 
-    return exports.ox_lib:progressCircle(data)
-  end 
+  local b = getBridge()
+  if b and b.progressCircle then return b.progressCircle(data) end
 
   while progress ~= nil do Wait(0) end
 
@@ -197,6 +206,9 @@ function lib.progressCircle(data)
 end
 
 function lib.cancelProgress()
+  local b = getBridge()
+  if b and b.cancelProgress then return b.cancelProgress() end
+
   if not progress then
     error('No progress bar is active')
   end
@@ -206,10 +218,9 @@ end
 
 ---@return boolean
 function lib.progressActive()
-  if lib.settings.progress == 'ox_lib' then 
-    return exports.ox_lib:progressActive()
-  end 
-  
+  local b = getBridge()
+  if b and b.progressActive then return b.progressActive() end
+
   return progress and true
 end
 

@@ -1,3 +1,14 @@
+local cachedBridge, cachedProvider
+local function getBridge()
+  local provider = lib.settings.alertDialog or lib.settings.dialog
+  if not provider or provider == 'dirk_lib' then return nil end
+  if cachedProvider ~= provider then
+    cachedProvider = provider
+    cachedBridge = lib.loadBridge('interface', provider, 'client')
+  end
+  return cachedBridge
+end
+
 ---@type promise?
 local alert = nil
 local alertId = 0
@@ -15,6 +26,9 @@ local alertId = 0
 ---@param timeout? number Force the dialog to auto-close after `x` milliseconds.
 ---@return 'cancel' | 'confirm' | nil
 function lib.alertDialog(data, timeout)
+    local b = getBridge()
+    if b and b.alertDialog then return b.alertDialog(data, timeout) end
+
     if alert then return end
 
     local id = alertId + 1

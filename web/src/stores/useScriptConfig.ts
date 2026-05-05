@@ -5,8 +5,6 @@ export type AppearanceSettings = {
   primaryColor: string;
   primaryShade: number;
   customTheme: string[];
-  serverName: string;
-  logo: string;
 };
 
 export type LocalizationSettings = {
@@ -14,9 +12,58 @@ export type LocalizationSettings = {
   currency: string;
 };
 
+export type BrandingSettings = {
+  serverName: string;
+  logo: string;
+  itemImgPath: string;
+};
+
+export type BridgingSettings = {
+  // UI providers
+  notify:      string;
+  progress:    string;
+  showTextUI:  string;
+  contextMenu: string;
+  alertDialog: string;
+  inputDialog: string;
+  // Resource providers
+  framework: string;
+  inventory: string;
+  target:    string;
+  interact:  string;
+  time:      string;
+  keys:      string;
+  fuel:      string;
+  phone:     string;
+  garage:    string;
+  clothing:  string;
+  ambulance: string;
+  prison:    string;
+  dispatch:  string;
+  doorlock:  string;
+  skills:    string;
+  housing:   string;
+};
+
+export type GroupsSettings = {
+  maxMembers:        number;
+  maxDistanceInvite: number;
+  inviteValidTime:   number;
+  maxLogOffTime:     number;
+};
+
+export type AdvancedSettings = {
+  primaryIdentifier: string;
+  debug: boolean;
+};
+
 export type ScriptConfig = {
-  appearance: AppearanceSettings;
+  appearance:   AppearanceSettings;
   localization: LocalizationSettings;
+  branding:     BrandingSettings;
+  bridging:     BridgingSettings;
+  groups:       GroupsSettings;
+  advanced:     AdvancedSettings;
 };
 
 export const defaultScriptConfig: ScriptConfig = {
@@ -35,12 +82,49 @@ export const defaultScriptConfig: ScriptConfig = {
       "#692d9d",
       "#5c258b",
     ],
-    serverName: "DirkRP",
-    logo: "https://via.placeholder.com/150",
   },
   localization: {
     language: "en",
     currency: "$",
+  },
+  branding: {
+    serverName: "DirkRP",
+    logo: "https://via.placeholder.com/150",
+    itemImgPath: "auto",
+  },
+  bridging: {
+    notify:      "ox_lib",
+    progress:    "ox_lib",
+    showTextUI:  "ox_lib",
+    contextMenu: "ox_lib",
+    alertDialog: "ox_lib",
+    inputDialog: "ox_lib",
+    framework: "auto",
+    inventory: "auto",
+    target:    "auto",
+    interact:  "auto",
+    time:      "auto",
+    keys:      "auto",
+    fuel:      "auto",
+    phone:     "auto",
+    garage:    "auto",
+    clothing:  "auto",
+    ambulance: "auto",
+    prison:    "auto",
+    dispatch:  "auto",
+    doorlock:  "auto",
+    skills:    "auto",
+    housing:   "auto",
+  },
+  groups: {
+    maxMembers:        5,
+    maxDistanceInvite: 5,
+    inviteValidTime:   5,
+    maxLogOffTime:     5,
+  },
+  advanced: {
+    primaryIdentifier: "license",
+    debug: false,
   },
 };
 

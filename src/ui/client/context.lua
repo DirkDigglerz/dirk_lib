@@ -1,4 +1,16 @@
 local settings = lib.settings
+
+local cachedBridge, cachedProvider
+local function getBridge()
+  local provider = lib.settings.contextMenu
+  if not provider or provider == 'dirk_lib' then return nil end
+  if cachedProvider ~= provider then
+    cachedProvider = provider
+    cachedBridge = lib.loadBridge('interface', provider, 'client')
+  end
+  return cachedBridge
+end
+
 local ContextMenus   = {}
 local ContextMenu    = {}
 ContextMenu.__index  = ContextMenu
@@ -141,15 +153,31 @@ end)
 
 
 
-lib.registerContext = ContextMenu.register
+lib.registerContext = function(id, data)
+  local b = getBridge()
+  if b and b.registerContext then
+    if type(id) == 'table' then data = id; id = data.id end
+    data = data or {}
+    data.id = id
+    return b.registerContext(data)
+  end
+  return ContextMenu.register(id, data)
+end
 
 lib.openContext = function(id, fromMenu)
+  local b = getBridge()
+  if b and b.showContext then return b.showContext(id) end
+
   local context = ContextMenus[id]
   if not context then error('No such context menu found') end
   return context:open(fromMenu)
-end 
+end
 
-lib.getOpenContextMenu = ContextMenu.getOpen
+lib.getOpenContextMenu = function()
+  local b = getBridge()
+  if b and b.getOpenContextMenu then return b.getOpenContextMenu() end
+  return ContextMenu.getOpen()
+end
 -- OX COMPATIBILITY
 lib.showContext = lib.openContext
 
@@ -166,7 +194,11 @@ RegisterNuiCallback('OPEN_CONTEXT', function(data,cb)
   menu:open(true)
 end)
 
-lib.closeContext = ContextMenu.closeAll
+lib.closeContext = function(onExit)
+  local b = getBridge()
+  if b and b.hideContext then return b.hideContext(onExit) end
+  return ContextMenu.closeAll()
+end
 lib.hideContext = lib.closeContext
 
 RegisterNuiCallback('CLOSE_CONTEXT', lib.closeContext)

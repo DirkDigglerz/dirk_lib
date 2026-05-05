@@ -20,8 +20,6 @@ local appearanceMap = {
   primaryColor = 'primaryColor',
   primaryShade = 'primaryShade',
   customTheme  = 'customTheme',
-  serverName   = 'serverName',
-  logo         = 'logo',
 }
 
 local localizationMap = {
@@ -29,9 +27,54 @@ local localizationMap = {
   currency = 'currency',
 }
 
+local brandingMap = {
+  serverName  = 'serverName',
+  logo        = 'logo',
+  itemImgPath = 'itemImgPath',
+}
+
+local bridgingMap = {
+  -- UI providers
+  notify      = 'notify',
+  progress    = 'progress',
+  showTextUI  = 'showTextUI',
+  contextMenu = 'contextMenu',
+  alertDialog = 'alertDialog',
+  inputDialog = 'inputDialog',
+  -- Resource providers
+  framework = 'framework',
+  inventory = 'inventory',
+  target    = 'target',
+  interact  = 'interact',
+  time      = 'time',
+  keys      = 'keys',
+  fuel      = 'fuel',
+  phone     = 'phone',
+  garage    = 'garage',
+  clothing  = 'clothing',
+  ambulance = 'ambulance',
+  prison    = 'prison',
+  dispatch  = 'dispatch',
+  doorlock  = 'doorlock',
+  skills    = 'skills',
+  housing   = 'housing',
+}
+
+local advancedMap = {
+  primaryIdentifier = 'primaryIdentifier',
+  debug             = 'debug',
+}
+
+-- groups.* — nested group, snapshot key is `groups`
+local groupsKey = 'groups'
+
 local watchedKeys = {}
 for _, settingsKey in pairs(appearanceMap) do watchedKeys[#watchedKeys + 1] = settingsKey end
 for _, settingsKey in pairs(localizationMap) do watchedKeys[#watchedKeys + 1] = settingsKey end
+for _, settingsKey in pairs(brandingMap) do watchedKeys[#watchedKeys + 1] = settingsKey end
+for _, settingsKey in pairs(bridgingMap) do watchedKeys[#watchedKeys + 1] = settingsKey end
+for _, settingsKey in pairs(advancedMap) do watchedKeys[#watchedKeys + 1] = settingsKey end
+watchedKeys[#watchedKeys + 1] = groupsKey
 
 local function collectGroup(group, keyMap, out)
   if type(group) ~= 'table' then return end
@@ -48,6 +91,27 @@ local function buildOverlaySnapshot(cfg)
   if type(cfg) ~= 'table' then return snapshot end
   collectGroup(cfg.appearance, appearanceMap, snapshot)
   collectGroup(cfg.localization, localizationMap, snapshot)
+  collectGroup(cfg.branding, brandingMap, snapshot)
+  collectGroup(cfg.bridging, bridgingMap, snapshot)
+  collectGroup(cfg.advanced, advancedMap, snapshot)
+
+  -- groups.* — pass the nested table through as `groups`. snapshot
+  -- consumers (onSettings.lua) deep-merge into the existing
+  -- lib.settings.groups table in place.
+  if type(cfg.groups) == 'table' then
+    snapshot.groups = cfg.groups
+  end
+
+  -- Resolve any "auto" bridging values via autodetect — admin chose
+  -- "let dirk_lib decide" so don't propagate the literal string.
+  local autodetected = lib.autodetected or require 'src.autodetect'
+  lib.autodetected = autodetected
+  for key, value in pairs(snapshot) do
+    if value == 'auto' and autodetected[key] and autodetected[key] ~= 'NOT FOUND' then
+      snapshot[key] = autodetected[key]
+    end
+  end
+
   return snapshot
 end
 

@@ -8,8 +8,9 @@ return {
   end,
 
   name = function()
-    local name = lib.FW.PlayerData.name 
-    local firstName, lastName = name:match("(%a+)%s+(.*)")
+    local name = lib.FW.PlayerData.name or ''
+    local firstName, lastName = name:match("^(%S+)%s+(.+)$")
+    if not firstName then firstName = name end
     return firstName, lastName
   end,
 

@@ -672,6 +672,23 @@ local function registerScriptConfig(schema, canEditFn, rules)
   dispatchScriptConfigWatchers(scriptConfig, nil, nil, 'load', true)
 
   lib.print.debug(('Script config loaded for %s (stored v%s → current v%s)'):format(scriptName, storedVer, currentVer))
+
+  -- Per-resource shortcut command — opens this script's Live Configurator
+  -- directly, skipping the /dirk_config chooser.
+  lib.addCommand(scriptName, {
+    help = ('Open the Live Configurator for %s'):format(scriptName),
+    restricted = 'group.admin',
+  }, function(source)
+    if source == 0 then
+      lib.print.info(('[scriptConfig:%s] /%s must be run by a player'):format(scriptName, scriptName))
+      return
+    end
+    if not canEditScript(source) then
+      return
+    end
+    TriggerClientEvent(('%s:openScriptConfig'):format(scriptName), source)
+  end)
+
   return scriptConfig
 end
 

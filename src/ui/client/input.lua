@@ -1,4 +1,18 @@
+local cachedBridge, cachedProvider
+local function getBridge()
+  local provider = lib.settings.inputDialog or lib.settings.dialog
+  if not provider or provider == 'dirk_lib' then return nil end
+  if cachedProvider ~= provider then
+    cachedProvider = provider
+    cachedBridge = lib.loadBridge('interface', provider, 'client')
+  end
+  return cachedBridge
+end
+
 lib.inputDialog = function(title, inputs, options)
+  local b = getBridge()
+  if b and b.inputDialog then return b.inputDialog(title, inputs, options) end
+
   if input then return end
   input = promise.new()
   options = options or {}
@@ -23,6 +37,9 @@ lib.inputDialog = function(title, inputs, options)
 end
 
 lib.closeInputDialog = function()
+  local b = getBridge()
+  if b and b.closeInputDialog then return b.closeInputDialog() end
+
   if not input then return end
 
   SendNuiMessage(json.encode({

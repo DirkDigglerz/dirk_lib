@@ -30,11 +30,22 @@ local types = {
 }
 
 
+local cachedBridge, cachedProvider
+local function getBridge()
+  local provider = lib.settings.notify
+  if not provider or provider == 'dirk_lib' then return nil end
+  if cachedProvider ~= provider then
+    cachedProvider = provider
+    cachedBridge = lib.loadBridge('interface', provider, 'client')
+  end
+  return cachedBridge
+end
+
 lib.notify = function(data)
   if not cache.playerLoaded then return end
-  if lib.settings.notify == 'ox_lib' then 
-    return TriggerEvent('ox_lib:notify', data)
-  end 
+  data.title = data.title or (data.type and types[data.type] and types[data.type].title) or 'Notification'
+  local b = getBridge()
+  if b and b.notify then return b.notify(data) end
 
   while notification do Wait(0) end
   notification = true
@@ -67,10 +78,6 @@ RegisterNetEvent('dirk_lib:notify', lib.notify)
 RegisterNetEvent('dirk_lib:defaultNotify', lib.defaultNotify)
 
 lib.defaultNotify = function(data)
-  if lib.settings.notify == 'ox_lib' then 
-    return TriggerEvent('dirk_lib:defaultNotify', data)
-  end
-
   data.type = data.status
   if data.type == 'inform' then data.type = 'info' end
   return lib.notify(data)

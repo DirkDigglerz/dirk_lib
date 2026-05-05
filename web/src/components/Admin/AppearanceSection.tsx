@@ -1,4 +1,4 @@
-import { ActionIcon, ColorInput, Flex, NumberInput, Popover, Select, Switch, Text, TextInput, useMantineTheme } from "@mantine/core";
+import { ActionIcon, ColorInput, Flex, NumberInput, Popover, Select, Switch, Text, useMantineTheme } from "@mantine/core";
 import { generateColors } from "@mantine/colors-generator";
 import { AdminPageTitle, useFormActions, useFormField } from "dirk-cfx-react";
 import { Palette, RotateCcw } from "lucide-react";
@@ -68,24 +68,6 @@ export default function AppearanceSection() {
   return (
     <Flex direction="column" gap="xs" p="sm" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
       <AdminPageTitle icon={Palette} title="Appearance" color={color} />
-
-      <GroupLabel label="Branding" />
-      <Flex gap="xs">
-        <TextInput
-          label="Server Name"
-          size="xs"
-          style={{ flex: 1 }}
-          value={config.serverName}
-          onChange={(e) => set("serverName", e.currentTarget.value)}
-        />
-        <TextInput
-          label="Logo URL"
-          size="xs"
-          style={{ flex: 2 }}
-          value={config.logo}
-          onChange={(e) => set("logo", e.currentTarget.value)}
-        />
-      </Flex>
 
       <GroupLabel label="Primary Color" />
 
