@@ -1,6 +1,6 @@
 local supportedResources = {
   framework         = {'es_extended', 'qbx_core', 'qb-core', 'nd-framework'},
-  inventory         = {'dirk_inventory', 'ox_inventory', 'qb-inventory', 'qs-inventory', 'codem-inventory', 'tgiann_inventory', 'mf-inventory', 'core_inventory'},
+  inventory         = {'dirk_inventory', 'ox_inventory', 'qb-inventory', 'qs-inventory', 'codem-inventory', 'tgiann_inventory', 'mf-inventory', 'core_inventory', 'ak47_inventory'},
   target            = {'ox_target', 'qb-target', 'q-target', 'bt-target'},
   interact          = {'redm-uiprompt', 'sleepless_interact', 'interact'},
   time              = {'av_weather', 'cd_easytime', 'qb-weathersync', 'Renewed-Weathersync', 'vSync', 'wasabi_wheather'},
@@ -26,6 +26,7 @@ local imagePaths = {
   ['tgiann_inventory'] = 'nui://tgiann_inventory/html/images/',
   ['mf-inventory'] = 'nui://mf-inventory/html/images/',
   ['core_inventory'] = 'nui://core_inventory/html/images/',
+  ['ak47_inventory'] = 'nui://ak47_inventory/html/images/',
 }
 
 local autodetected = {}

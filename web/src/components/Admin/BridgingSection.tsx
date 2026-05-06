@@ -40,7 +40,7 @@ const GROUPS: FieldGroup[] = [
   {
     label: "Inventory & Targeting",
     fields: [
-      { key: "inventory", label: "Inventory", tooltip: "Inventory system used for item lookups, give/remove, and image paths.", options: withAuto(["dirk_inventory", "ox_inventory", "qb-inventory", "qs-inventory", "codem-inventory", "tgiann_inventory", "mf-inventory", "core_inventory"]) },
+      { key: "inventory", label: "Inventory", tooltip: "Inventory system used for item lookups, give/remove, and image paths.", options: withAuto(["dirk_inventory", "ox_inventory", "qb-inventory", "qs-inventory", "codem-inventory", "tgiann_inventory", "mf-inventory", "core_inventory", "ak47_inventory"]) },
       { key: "target",    label: "Target",    tooltip: "Targeting system for entity interactions.",                              options: withAuto(["ox_target", "qb-target", "q-target", "bt-target"]) },
       { key: "interact",  label: "Interact",  tooltip: "Interact-prompt system used as the alternative to target-based interactions.", options: withAuto(["redm-uiprompt", "sleepless_interact", "interact"]) },
     ],
