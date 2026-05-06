@@ -25,14 +25,13 @@ return {
     if cachedItems then return cachedItems end
     local allItems = exports.dirk_inventory:Items()
     if not allItems then return {} end
-    local itemImgPath = lib.settings.itemImgPath or ''
     local formatted = {}
     for k, v in pairs(allItems) do
       formatted[k] = {
         name   = v.name or k,
         label  = v.label or v.name or k,
         weight = v.weight or 0,
-        image  = ('%s/%s.png'):format(itemImgPath, v.image or v.name or k),
+        image  = lib.formatImagePath(v.image or v.name or k),
       }
     end
     cachedItems = formatted

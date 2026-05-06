@@ -21,7 +21,6 @@ return {
     if cachedItems then return cachedItems end
     local src = sourceItems()
     if not src then return {} end
-    local itemImgPath = lib.settings.itemImgPath or ''
     local formatted = {}
     for k, v in pairs(src) do
       -- ESX entries vary: sometimes { label, weight }, sometimes a string label only
@@ -30,7 +29,7 @@ return {
         name   = entry.name or k,
         label  = entry.label or entry.name or k,
         weight = entry.weight or 0,
-        image  = ('%s/%s.png'):format(itemImgPath, entry.image or entry.name or k),
+        image  = lib.formatImagePath(entry.image or entry.name or k),
       }
     end
     cachedItems = formatted

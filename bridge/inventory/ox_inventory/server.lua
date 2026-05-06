@@ -86,7 +86,6 @@ return {
     if cachedItems then return cachedItems end
     local allItems = exports.ox_inventory:Items()
     if not allItems then return {} end
-    local itemImgPath = lib.settings.itemImgPath or ''
     local formatted = {}
     for k, v in pairs(allItems) do
       local img = (v.client and v.client.image) or v.name
@@ -94,7 +93,7 @@ return {
         name   = v.name or k,
         label  = v.label or v.name or k,
         weight = v.weight or 0,
-        image  = ('%s/%s.png'):format(itemImgPath, img),
+        image  = lib.formatImagePath(img),
       }
     end
     cachedItems = formatted
