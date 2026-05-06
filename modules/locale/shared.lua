@@ -181,7 +181,18 @@ elseif lib.onSettings then
 end
 
 
-if IsDuplicityVersion() then 
+if not IsDuplicityVersion() then
+  -- React-side `localeStore.locale(key)` calls miss the dictionary silently —
+  -- this NUI callback lets the NUI report missing keys back to the consumer
+  -- resource's server, which writes them through the same flow Lua uses.
+  RegisterNuiCallback('REPORT_MISSING_LOCALE', function(data, cb)
+    cb('ok')
+    if type(data) ~= 'table' or type(data.key) ~= 'string' or data.key == '' then return end
+    TriggerServerEvent('dirk_lib:addNeededTranslation', cache.resource, data.key)
+  end)
+end
+
+if IsDuplicityVersion() then
   RegisterNetEvent('dirk_lib:addNeededTranslation', function(resource, str)
     if cache.resource ~= resource then return end
     local dict = loadLocale(lib.getLocaleKey())

@@ -134,10 +134,31 @@ if lib.context == 'client' then
     end)
   end
 
+  -- Keys that must travel together to the NUI. When any member of a group
+  -- changes, the whole group is pushed so the React store can never end up
+  -- with a half-updated combination (e.g. primaryColor="custom" but stale
+  -- customTheme array, which silently falls back to the default palette).
+  local pairedGroups = {
+    { 'primaryColor', 'customTheme', 'primaryShade' },
+  }
+
   local function forwardToNui(changedKeys)
     if not hasUi or not changedKeys or #changedKeys == 0 then return end
     local patch = {}
     for _, k in ipairs(changedKeys) do patch[k] = lib.settings[k] end
+    for _, group in ipairs(pairedGroups) do
+      local touched = false
+      for _, k in ipairs(group) do
+        if patch[k] ~= nil then touched = true; break end
+      end
+      if touched then
+        for _, k in ipairs(group) do
+          if patch[k] == nil and lib.settings[k] ~= nil then
+            patch[k] = lib.settings[k]
+          end
+        end
+      end
+    end
     if nuiReady then
       SendNuiMessage(json.encode({
         action = 'UPDATE_DIRK_LIB_SETTINGS',
