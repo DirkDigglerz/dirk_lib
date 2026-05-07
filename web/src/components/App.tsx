@@ -13,6 +13,7 @@ import Menu from './Context/main';
 import Dialog from './Dialog/main';
 import GizmoOverlay from './Gizmo/main';
 import Input from './Input/main';
+import Keycode from './Keycode/main';
 import KeyInputs from './KeyInputs/main';
 import Notifications from './Notify/main';
 import ProgressBar from './Progress/main';
@@ -65,6 +66,7 @@ const App: React.FC = () => {
       <Dialog />
       <Input />
       <KeyInputs />
+      <Keycode />
       <StatusInfo />
       <GizmoOverlay />
       <AlertDialog />
