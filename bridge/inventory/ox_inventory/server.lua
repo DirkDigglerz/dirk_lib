@@ -1,6 +1,6 @@
 local cachedItems
 
-return {
+local bridge = {
 
   --- Add Item to inventory either playerid or invId
   ---@param invId string | number Inventory ID or Player ID
@@ -80,7 +80,9 @@ return {
     return exports.ox_inventory:RegisterStash(id, data.label, data.maxSlots, data.maxWeight, data.owner, data.groups, data.coords)
   end,
 
-  --- Get all items registered on the server. Cached per resource lifetime.
+  --- Get all items registered on the server. Cached, but invalidated whenever
+  --- branding.itemImgPath changes so a CDN URL set via /dirk_config doesn't
+  --- get masked by URLs baked from the boot-time autodetect default.
   ---@return table<string, { name: string, label: string, weight: number, image: string }>
   items = function()
     if cachedItems then return cachedItems end
@@ -100,3 +102,12 @@ return {
     return formatted
   end,
 }
+
+-- Invalidate the cache when branding.itemImgPath changes — otherwise URLs
+-- baked at first call (often with the boot-time autodetect default) hide
+-- a CDN URL the user later sets via /dirk_config.
+if lib.onSettings then
+  lib.onSettings('itemImgPath', function() cachedItems = nil end)
+end
+
+return bridge

@@ -1,6 +1,6 @@
 local cachedItems
 
-return {
+local bridge = {
   getItemLabel = function(item)
     local items = lib.FW?.Shared?.Items
     if not items then return false, 'NoItems' end
@@ -143,3 +143,9 @@ return {
   end,
 
 }
+
+if lib.onSettings then
+  lib.onSettings('itemImgPath', function() cachedItems = nil end)
+end
+
+return bridge

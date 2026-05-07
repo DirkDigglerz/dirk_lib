@@ -13,7 +13,7 @@ local function sourceItems()
   return nil
 end
 
-return {
+local bridge = {
   ---@function lib.inventory.items
   ---@description # Get all items from ESX. Cached per resource lifetime.
   ---@return table<string, { name: string, label: string, weight: number, image: string }>
@@ -307,4 +307,10 @@ return {
 
   end,
 }
+
+if lib.onSettings then
+  lib.onSettings('itemImgPath', function() cachedItems = nil end)
+end
+
+return bridge
 

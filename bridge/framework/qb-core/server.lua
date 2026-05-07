@@ -1,6 +1,6 @@
 local cachedItems
 
-return {
+local bridge = {
   ---@function lib.inventory.items
   ---@description # Get all items from QBCore.Shared.Items. Cached per resource lifetime.
   ---@return table<string, { name: string, label: string, weight: number, image: string }>
@@ -244,5 +244,11 @@ return {
     return lib.hasGroup(lib.player.getJob(src), lib.player.getGang(src), group)
   end,
 }
+
+if lib.onSettings then
+  lib.onSettings('itemImgPath', function() cachedItems = nil end)
+end
+
+return bridge
 
 

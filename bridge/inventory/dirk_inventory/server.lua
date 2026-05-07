@@ -1,6 +1,6 @@
 local cachedItems
 
-return {
+local bridge = {
 
   --- Add Item to inventory either playerid or invId
   ---@param invId string | number Inventory ID or Player ID
@@ -88,4 +88,10 @@ return {
     return formatted
   end,
 }
+
+if lib.onSettings then
+  lib.onSettings('itemImgPath', function() cachedItems = nil end)
+end
+
+return bridge
 

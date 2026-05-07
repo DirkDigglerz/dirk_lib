@@ -118,8 +118,14 @@ function object:spawn()
     end
   elseif self.type == 'vehicle' then
     self.entity = CreateVehicle(self.model, self.pos, false, false)
-  elseif self.type == 'object' then 
-    self.entity = CreateObject(self.model, self.pos, false, false, false)
+  elseif self.type == 'object' then
+    -- Pass coords explicitly. self.pos is a vector4 and unpacking it into
+    -- CreateObject(model, x, y, z, isNetwork, netMissionEntity, doorFlag)
+    -- pushes the W (heading) component into the isNetwork slot, which
+    -- silently spawns a networked entity whenever heading != 0 — every
+    -- player in range then spawns their own networked copy, all visible
+    -- to each other (stacked buoys / props).
+    self.entity = CreateObject(self.model, self.pos.x, self.pos.y, self.pos.z, false, false, false)
   elseif self.type == 'weapon' then 
     self.entity = CreateWeaponObject(self.model, 1, self.pos, false, 0.0)
     RequestWeaponHighDetailModel(self.entity)

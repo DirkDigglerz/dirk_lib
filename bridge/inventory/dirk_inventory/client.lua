@@ -1,6 +1,6 @@
 local cachedItems
 
-return {
+local bridge = {
   openStash = function(id, data)
     -- return exports.dirk_inventory:registerInventory(id, {
     --   type = data.type or 'stash',
@@ -38,3 +38,9 @@ return {
     return formatted
   end,
 }
+
+if lib.onSettings then
+  lib.onSettings('itemImgPath', function() cachedItems = nil end)
+end
+
+return bridge

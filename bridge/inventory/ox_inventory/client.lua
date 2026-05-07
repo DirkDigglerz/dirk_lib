@@ -1,6 +1,6 @@
 local cachedItems
 
-return {
+local bridge = {
   ---@function lib.inventory.displayMetadata 
   ---@description # Display metadata of an item with the specific key
   ---@param labels table | string # table of metadata to display the string of the metadata key
@@ -58,3 +58,12 @@ return {
     return formatted
   end,
 }
+
+-- Invalidate the cache when branding.itemImgPath changes — otherwise URLs
+-- baked at first call (often with the boot-time autodetect default) hide
+-- a CDN URL the user later sets via /dirk_config.
+if lib.onSettings then
+  lib.onSettings('itemImgPath', function() cachedItems = nil end)
+end
+
+return bridge
