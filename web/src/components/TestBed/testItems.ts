@@ -264,6 +264,27 @@ export const defaultTestItems = [
     }
   },
   {
+    index: 'keycode',
+    active: false,
+    label: 'Keycode',
+    description: 'Numeric keypad challenge — open with a target code, locks on correct entry',
+    icon: 'fa fa-keyboard',
+    onEnable: {
+      action: 'OPEN_KEYCODE',
+      data: {
+        code: '1234',
+        title: 'Security Panel',
+        description: 'Enter the 4-digit override code',
+        multipleTries: true,
+        allowCancel: true,
+        length: 4,
+      },
+    },
+    onDisable: {
+      action: 'CLOSE_KEYCODE',
+    },
+  },
+  {
     index: 'inputMenus',
     active: false,
     label: 'Input Menus',

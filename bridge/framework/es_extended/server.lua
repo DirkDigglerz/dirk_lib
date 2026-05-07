@@ -302,7 +302,73 @@ local bridge = {
     local myGang = lib.player.getGang(src)
     return lib.hasGroup(myJob, myGang, group)
   end,
-  
+
+  -- ESX has no first-class gang concept. The convention some servers follow
+  -- is to flag a job's `type` field as 'gang' — we honour that to surface
+  -- gangs separately, but it'll be empty on most installs. Jobs without
+  -- `type='gang'` are treated as jobs.
+  getJobs = function()
+    local jobs = (type(lib.FW.GetJobs) == 'function' and lib.FW.GetJobs()) or lib.FW.Jobs or {}
+    local result = {}
+    for name, j in pairs(jobs) do
+      local entry = type(j) == 'table' and j or { label = tostring(j) }
+      if entry.type ~= 'gang' then
+        local grades = {}
+        for gKey, g in pairs(entry.grades or {}) do
+          grades[#grades + 1] = {
+            grade    = tonumber(g.grade or gKey) or 0,
+            name     = g.name or '',
+            label    = g.label or g.name or '',
+            payment  = tonumber(g.salary) or 0,
+            isBoss   = false, -- ESX has no native boss flag
+            bankAuth = false,
+          }
+        end
+        table.sort(grades, function(a, b) return a.grade < b.grade end)
+        result[#result + 1] = {
+          name        = name,
+          label       = entry.label or name,
+          type        = 'job',
+          category    = entry.type,
+          whitelisted = entry.whitelisted,
+          grades      = grades,
+        }
+      end
+    end
+    table.sort(result, function(a, b) return (a.label or ''):lower() < (b.label or ''):lower() end)
+    return result
+  end,
+
+  getGangs = function()
+    local jobs = (type(lib.FW.GetJobs) == 'function' and lib.FW.GetJobs()) or lib.FW.Jobs or {}
+    local result = {}
+    for name, j in pairs(jobs) do
+      local entry = type(j) == 'table' and j or {}
+      if entry.type == 'gang' then
+        local grades = {}
+        for gKey, g in pairs(entry.grades or {}) do
+          grades[#grades + 1] = {
+            grade    = tonumber(g.grade or gKey) or 0,
+            name     = g.name or '',
+            label    = g.label or g.name or '',
+            payment  = tonumber(g.salary) or 0,
+            isBoss   = false,
+            bankAuth = false,
+          }
+        end
+        table.sort(grades, function(a, b) return a.grade < b.grade end)
+        result[#result + 1] = {
+          name   = name,
+          label  = entry.label or name,
+          type   = 'gang',
+          grades = grades,
+        }
+      end
+    end
+    table.sort(result, function(a, b) return (a.label or ''):lower() < (b.label or ''):lower() end)
+    return result
+  end,
+
   getByPlate = function(plate)
 
   end,

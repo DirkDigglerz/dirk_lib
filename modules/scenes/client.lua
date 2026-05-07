@@ -34,7 +34,21 @@ local scenes = {
   defaults = Defaults,
 
   create = function(cfg)
-    return NetworkCreateSynchronisedScene(cfg.position, cfg.rotation, cfg.rotOrder, cfg.useOcclusion, cfg.loop, cfg.unk1, cfg.animTime, cfg.animSpeed)
+    -- NetworkCreateSynchronisedScene wants 12 scalars (xPos, yPos, zPos,
+    -- xRot, yRot, zRot, rotOrder, holdLastFrame, looped, p9, animTime,
+    -- p11). FiveM's vector auto-unpack does NOT trigger reliably here —
+    -- when it fails the native silently returns -1 and every downstream
+    -- addPed/addEntity/start is a no-op (ped never plays its anim, scene
+    -- props animate but ped just stands). Same family as the lib.objects
+    -- CreateObject vector unpack memory.
+    local p = cfg.position
+    local r = cfg.rotation
+    return NetworkCreateSynchronisedScene(
+      p.x, p.y, p.z,
+      r.x, r.y, r.z,
+      cfg.rotOrder, cfg.useOcclusion, cfg.loop,
+      cfg.unk1, cfg.animTime, cfg.animSpeed
+    )
   end,
 
   sceneConfig = function(pos, rot, rotOrder, useOcclusion, loop, unk1, animTime, animSpeed)

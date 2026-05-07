@@ -147,6 +147,60 @@ for i = 1, GetNumResourceMetadata(cache.resource, 'dirk_lib') do
   end
 end
 
+-- AUTO-LOAD LOCALES
+-- If the consumer ships a locales/en.json, populate the in-memory dict so
+-- consumers don't have to remember to call lib.locale() themselves.
+if LoadResourceFile(cache.resource, 'locales/en.json') then
+  pcall(lib.locale)
+end
+
+-- AUTO-REGISTER STANDARD NUI CALLBACKS
+-- fetchNui from a consumer NUI iframe always targets the consumer resource
+-- (GetParentResourceName), not dirk_lib. So dirk_lib's own GET_SETTINGS /
+-- GET_LOCALES handlers never fire for consumer NUIs — historically every
+-- consumer had to copy these blocks into their own client init.
+--
+-- Registering them here means the handlers live in dirk_lib's code but get
+-- registered in each consumer's resource scope (because this file runs in
+-- the consumer's runtime via '@dirk_lib/init.lua'). dirk-cfx-react's
+-- useSettings + localeStore now work out of the box for every consumer
+-- with a ui_page.
+if context == 'client' and (GetNumResourceMetadata(cache.resource, 'ui_page') or 0) > 0 then
+  pcall(RegisterNuiCallback, 'GET_LOCALES', function(_, cb)
+    cb(lib.getLocales and lib.getLocales() or {})
+  end)
+
+  pcall(RegisterNuiCallback, 'GET_SETTINGS', function(_, cb)
+    -- Mirror dirk_lib's own GET_SETTINGS shape: ensure scriptConfig has
+    -- overlaid before handing settings to the NUI, so saved theme/locale
+    -- values aren't masked by the convar-default snapshot.
+    pcall(function() return lib.scriptConfig and lib.scriptConfig.get() end)
+    local s = lib.settings or {}
+    cb({
+      game            = cache.game,
+      primaryColor    = s.primaryColor,
+      primaryShade    = s.primaryShade,
+      customTheme     = s.customTheme,
+      itemImgPath     = s.itemImgPath,
+      resourceVersion = GetResourceMetadata(cache.resource, 'version', 0),
+    })
+  end)
+
+  -- Bounces the NUI's GET_FRAMEWORK_GROUPS through to dirk_lib's server-side
+  -- callback so the React side gets a normalised { jobs, gangs } payload
+  -- regardless of which underlying framework the server runs.
+  pcall(RegisterNuiCallback, 'GET_FRAMEWORK_GROUPS', function(_, cb)
+    CreateThread(function()
+      local ok, data = pcall(lib.callback.await, 'dirk_lib:getFrameworkGroups')
+      if ok and type(data) == 'table' then
+        cb(data)
+      else
+        cb({ jobs = {}, gangs = {} })
+      end
+    end)
+  end)
+end
+
 
 
 -- NATIVE CHANGES 

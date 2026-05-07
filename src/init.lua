@@ -152,6 +152,21 @@ end
 
 
 
+-- Server-side callback for the auto-registered NUI handler in consumer
+-- resources. Lives here so it's only registered once (in dirk_lib's own
+-- runtime) — any consumer's client can `lib.callback.await` it.
+CreateThread(function()
+  -- Wait until lib.framework is available + the framework bridge has loaded
+  -- its job table from the underlying framework script.
+  Wait(500)
+  pcall(function()
+    lib.callback.register('dirk_lib:getFrameworkGroups', function()
+      return lib.framework and lib.framework.getGroupsBundle and lib.framework.getGroupsBundle()
+        or { jobs = {}, gangs = {} }
+    end)
+  end)
+end)
+
 CreateThread(function()
   --- PRINT INFO FOR AUTODETCTION
   SetTimeout(1000, function()

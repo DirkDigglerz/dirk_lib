@@ -244,6 +244,71 @@ local bridge = {
   hasGroup = function(src, group)
     return lib.hasGroup(lib.player.getJob(src), lib.player.getGang(src), group)
   end,
+
+  -- Normalised list of every registered job. qbx exposes Shared.Jobs via an
+  -- export and includes the bankAuth field qb-core lacks.
+  getJobs = function()
+    local jobs = (type(exports.qbx_core) == 'table' and type(exports.qbx_core.GetJobs) == 'function')
+      and exports.qbx_core:GetJobs()
+      or (lib.FW and lib.FW.Shared and lib.FW.Shared.Jobs)
+      or {}
+    local result = {}
+    for name, j in pairs(jobs) do
+      local grades = {}
+      for gKey, g in pairs(j.grades or {}) do
+        grades[#grades + 1] = {
+          grade    = tonumber(gKey) or 0,
+          name     = g.name or '',
+          label    = g.name or '',
+          payment  = tonumber(g.payment) or 0,
+          isBoss   = g.isboss == true,
+          bankAuth = g.bankAuth == true or g.isboss == true,
+        }
+      end
+      table.sort(grades, function(a, b) return a.grade < b.grade end)
+      result[#result + 1] = {
+        name        = name,
+        label       = j.label or name,
+        type        = 'job',
+        category    = j.type,
+        defaultDuty = j.defaultDuty,
+        offDutyPay  = j.offDutyPay,
+        grades      = grades,
+      }
+    end
+    table.sort(result, function(a, b) return (a.label or ''):lower() < (b.label or ''):lower() end)
+    return result
+  end,
+
+  getGangs = function()
+    local gangs = (type(exports.qbx_core) == 'table' and type(exports.qbx_core.GetGangs) == 'function')
+      and exports.qbx_core:GetGangs()
+      or (lib.FW and lib.FW.Shared and lib.FW.Shared.Gangs)
+      or {}
+    local result = {}
+    for name, g in pairs(gangs) do
+      local grades = {}
+      for gKey, gr in pairs(g.grades or {}) do
+        grades[#grades + 1] = {
+          grade    = tonumber(gKey) or 0,
+          name     = gr.name or '',
+          label    = gr.name or '',
+          payment  = nil,
+          isBoss   = gr.isboss == true,
+          bankAuth = gr.bankAuth == true or gr.isboss == true,
+        }
+      end
+      table.sort(grades, function(a, b) return a.grade < b.grade end)
+      result[#result + 1] = {
+        name   = name,
+        label  = g.label or name,
+        type   = 'gang',
+        grades = grades,
+      }
+    end
+    table.sort(result, function(a, b) return (a.label or ''):lower() < (b.label or ''):lower() end)
+    return result
+  end,
 }
 
 if lib.onSettings then

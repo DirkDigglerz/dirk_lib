@@ -41,6 +41,16 @@ export default function Keycode() {
     setOpen(true);
   });
 
+  // Allow callers (and the TestBed harness) to dismiss the keypad without
+  // submitting. Mirrors the cancel-button path so focus state stays correct.
+  useNuiEvent("CLOSE_KEYCODE", () => {
+    setOpen(false);
+    if (!respondedRef.current) {
+      respondedRef.current = true;
+      fetchNui("KEYCODE_RESULT", { correct: false });
+    }
+  });
+
   const submit = useCallback(
     (value: string) => {
       if (!data) return;

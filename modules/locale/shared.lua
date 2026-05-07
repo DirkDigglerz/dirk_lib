@@ -23,14 +23,19 @@ end
 
 
 
--- We are going to add the str to the dict table with the str as the key and value. And resave the original locales file back to the locales folder.  
+-- Adds a missing key to the dict + saves it back to disk so devs can fill
+-- in the translation later. Only fires for keys not already in the dict —
+-- without that guard a stale dict (e.g. before lib.locale() runs) would
+-- overwrite good translations with key=key when the NUI reports them as
+-- missing on cold start.
 local addNeededTranslation = function(str)
+  if dict[str] ~= nil then return end
   lib.print.info(('Adding missing translation for: %s'):format(str))
   dict[str] = str
 
-  if not IsDuplicityVersion() then 
+  if not IsDuplicityVersion() then
     TriggerServerEvent('dirk_lib:addNeededTranslation', cache.resource, str)
-    return 
+    return
   end
   local data = json.encode(dict, {indent = true, level = 2})
   lib.print.info(('Saving missing translation %s to %s'):format(str, ('locales/%s.json'):format(lib.getLocaleKey())))
@@ -196,11 +201,16 @@ if IsDuplicityVersion() then
   RegisterNetEvent('dirk_lib:addNeededTranslation', function(resource, str)
     if cache.resource ~= resource then return end
     local dict = loadLocale(lib.getLocaleKey())
+    -- Skip if the key already has a translation on disk — same guard as the
+    -- shared-side fn above, but this handler fires from the NUI's missing-
+    -- locale report which is genuinely "I never saw it in the dict", so a
+    -- stale React store could otherwise stomp a newly added translation.
+    if dict[str] ~= nil then return end
     dict[str] = str
     local data = json.encode(dict, {indent = true, level = 2})
-    lib.print.info(('Saving missing translation %s on the server side to %s'):format(str, ('locales/%s.json'):format(lib.getLocaleKey())))    
+    lib.print.info(('Saving missing translation %s on the server side to %s'):format(str, ('locales/%s.json'):format(lib.getLocaleKey())))
     SaveResourceFile(resource, ('locales/%s.json'):format(lib.getLocaleKey()), data, -1)
-  end)  
+  end)
 end
 
 return lib.locale
