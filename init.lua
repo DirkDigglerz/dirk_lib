@@ -215,8 +215,10 @@ if context == 'client' and (GetNumResourceMetadata(cache.resource, 'ui_page') or
   -- convar — no server call needed. `setr` values are pushed to clients on
   -- connect and live-updated when the convar changes.
   RegisterNuiCallback('GET_SCRIPT_CONFIG_MASTER_GROUP', function(_, cb)
-    local g = GetConvar('dirk_lib_master_group', 'admin')
-    if g == nil or g == '' then g = 'admin' end
+    -- Match the server-side default in src/scriptConfig/server.lua —
+    -- comma-separated list, ANY one passing IsPlayerAceAllowed = master.
+    local g = GetConvar('dirk_lib_master_group', 'group.admin,admin,command')
+    if g == nil or g == '' then g = 'group.admin,admin,command' end
     cb({ group = g })
   end)
 

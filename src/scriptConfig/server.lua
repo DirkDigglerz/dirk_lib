@@ -26,20 +26,34 @@ end
 
 -- ── Access helpers ────────────────────────────────────────────────────────
 
--- Master "group" is really an ACE permission name passed straight to
--- IsPlayerAceAllowed. Default 'admin' is the standard permission granted
--- to group.admin members in any normal server.cfg setup. If a server's
--- ACE setup doesn't grant `admin` to admins (rare but possible), the
--- server owner sets the `dirk_lib_master_group` convar to whatever
--- permission their admins actually have (e.g. `command`, `mod`).
+-- Master access is gated by a comma-separated list of values passed to
+-- IsPlayerAceAllowed. ANY value that returns true grants master access.
+-- Default `group.admin,admin,command` covers the three permissions most
+-- server.cfgs grant to admins:
+--   • `group.admin`  — principal membership (works when the cfg has
+--                      `add_ace group.admin group.admin allow`)
+--   • `admin`        — bare permission (works when the cfg has
+--                      `add_ace group.admin admin allow`)
+--   • `command`      — built-in admin permission (granted by default in
+--                      most txAdmin/QB/QBX/ESX cfgs)
+-- A server owner who locks down one of these can override via the
+-- `dirk_lib_master_group` server convar with their own value(s).
+local DEFAULT_MASTER = 'group.admin,admin,command'
+
 local function getMasterGroup()
-  local cv = GetConvar('dirk_lib_master_group', 'admin')
-  if cv == nil or cv == '' then return 'admin' end
+  local cv = GetConvar('dirk_lib_master_group', DEFAULT_MASTER)
+  if cv == nil or cv == '' then return DEFAULT_MASTER end
   return cv
 end
 
 local function isMasterEditor(src)
-  return IsPlayerAceAllowed(src, getMasterGroup())
+  for perm in (getMasterGroup()):gmatch('[^,]+') do
+    perm = perm:match('^%s*(.-)%s*$')  -- trim whitespace around each value
+    if perm ~= '' and IsPlayerAceAllowed(src, perm) then
+      return true
+    end
+  end
+  return false
 end
 
 local function getOverrideForResource(resourceName)
@@ -70,48 +84,37 @@ function CanEditScriptConfigResource(src, resourceName) end -- forward decl
 
 local function canEditResource(src, resourceName)
   if not src or src == 0 then return true end
-  if isMasterEditor(src) then
-    print(('[scriptConfig:access] src=%s resource=%s → MASTER allowed'):format(tostring(src), resourceName))
-    return true
-  end
-  if resourceName == GetCurrentResourceName() then
-    print(('[scriptConfig:access] src=%s resource=%s → dirk_lib master-only, denied'):format(tostring(src), resourceName))
-    return false
-  end
+  if isMasterEditor(src) then return true end
+  if resourceName == GetCurrentResourceName() then return false end
   local o = getOverrideForResource(resourceName)
-  if not o then
-    print(('[scriptConfig:access] src=%s resource=%s → no override entry, denied'):format(tostring(src), resourceName))
-    return false
-  end
-  print(('[scriptConfig:access] src=%s resource=%s → override found: groups=%s identifiers=%s'):format(
-    tostring(src), resourceName,
-    type(o.groups) == 'table' and json.encode(o.groups) or tostring(o.groups),
-    type(o.identifiers) == 'table' and json.encode(o.identifiers) or tostring(o.identifiers)
-  ))
+  if not o then return false end
   if type(o.groups) == 'table' then
     for i = 1, #o.groups do
       local g = o.groups[i]
       if type(g) == 'string' and g ~= '' and IsPlayerAceAllowed(src, g) then
-        print(('[scriptConfig:access] src=%s resource=%s → group %s allowed'):format(tostring(src), resourceName, g))
         return true
       end
     end
   end
   if type(o.identifiers) == 'table' then
-    local plyIds = GetPlayerIdentifiers(src) or {}
-    print(('[scriptConfig:access] src=%s player identifiers: %s'):format(tostring(src), json.encode(plyIds)))
     for i = 1, #o.identifiers do
-      if playerHasIdentifier(src, o.identifiers[i]) then
-        print(('[scriptConfig:access] src=%s resource=%s → identifier %s matched'):format(tostring(src), resourceName, o.identifiers[i]))
-        return true
-      end
+      if playerHasIdentifier(src, o.identifiers[i]) then return true end
     end
   end
-  print(('[scriptConfig:access] src=%s resource=%s → no group/identifier match, denied'):format(tostring(src), resourceName))
   return false
 end
 
 CanEditScriptConfigResource = canEditResource
+
+-- Cross-VM bridge. The global above only exists in dirk_lib's own resource
+-- scope, so consumer resources (which run their own Lua VM when they import
+-- `@dirk_lib/init.lua`) can't see it. The export below makes the same check
+-- available to any consumer via `exports.dirk_lib:canEditScriptConfig(src, name)`,
+-- which is what `modules/scriptConfig/server.lua`'s save-permission wrapper
+-- now uses regardless of which VM it runs in.
+exports('canEditScriptConfig', function(src, resourceName)
+  return canEditResource(src, resourceName)
+end)
 
 local function collectRegisteredConfigs(src)
   local list = {}
@@ -152,12 +155,18 @@ lib.addCommand('dirk_config', {
     return
   end
 
-  -- Diagnostic — drop once verified working.
-  local cfg = (lib.scriptConfig and lib.scriptConfig.get and lib.scriptConfig.get('scriptConfig')) or {}
-  print(('[scriptConfig:cmd] /dirk_config invoked by src=%s, stored overrides: %s'):format(tostring(source), json.encode(cfg.overrides or {})))
-
   local list = collectRegisteredConfigs(source)
   if #list == 0 then
+    -- Surface what we actually checked — without this the only signal a
+    -- locked-out admin gets is the notify, and they can't tell whether the
+    -- convar is wrong, the cfg is missing an ACE, or the script just hasn't
+    -- registered yet.
+    local plyName = GetPlayerName(source) or ('player:' .. tostring(source))
+    lib.print.warn(('[dirk_config] %s denied — master group %q did not match any of the player\'s ACEs. Player identifiers: %s'):format(
+      plyName,
+      getMasterGroup(),
+      json.encode(GetPlayerIdentifiers(source) or {})
+    ))
     lib.notify(source, { type = 'error', description = 'No script configs available — check your access permissions.' })
     return
   end

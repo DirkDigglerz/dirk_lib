@@ -190,6 +190,22 @@ end
 -- SMART MERGE
 -- --------------------------------------------------
 
+-- True for tables with sequential integer keys 1..N (Lua array convention).
+-- Used to identify nested arrays when no JSON-Schema info is available so
+-- we don't accidentally object-merge them by index — that's how user-deleted
+-- entries silently come back from defaults.
+local function isArrayLike(t)
+  if type(t) ~= 'table' then return false end
+  local n = #t
+  if n == 0 then return next(t) == nil end
+  for k in pairs(t) do
+    if type(k) ~= 'number' or k < 1 or k > n or math.floor(k) ~= k then
+      return false
+    end
+  end
+  return true
+end
+
 -- Schema-aware merge of defaultData (source of truth) and dbData:
 -- • New keys in defaults   → filled from defaults
 -- • Keys removed in defaults → pruned from result
@@ -220,35 +236,40 @@ local function smartMerge(defaultData, dbData, schemaNode, _path)
     elseif type(defaultVal) == 'table' and type(dbVal) == 'table' then
       local mergeKey = childSchema and childSchema['x-arrayKey']
       local isArraySchema = childSchema and childSchema.type == 'array'
-      if isArraySchema and not mergeKey then
-        -- Plain array without x-arrayKey: DB is the source of truth (user-owned list).
+      -- Without explicit JSON-Schema info, infer arrays from structure so
+      -- nested user-managed arrays (e.g. store.locations inside an
+      -- x-arrayKey'd store) treat the DB as source of truth instead of
+      -- being object-merged by index — that's how user-deleted entries
+      -- come back from defaults silently.
+      local looksLikeArray = (not childSchema) and (isArrayLike(dbVal) or isArrayLike(defaultVal))
+      if (isArraySchema and not mergeKey) or looksLikeArray then
+        -- Plain array (schema'd or inferred): DB is the source of truth.
         result[k] = dbVal
       elseif mergeKey then
-        local dbIndex = {}
-        for _, item in ipairs(dbVal) do
-          if item[mergeKey] then dbIndex[item[mergeKey]] = item end
+        -- Iterate the DB array — it's the source of truth for which items exist
+        -- (user can delete seed items without them being re-added on every load).
+        -- For each DB item, if a default with the same key exists, recursively
+        -- merge so newly-added schema fields show up but nested arrays inside
+        -- (e.g. store.locations) follow the "DB wins" rule above. DB-only items
+        -- (no default counterpart) pass through verbatim. Net-new seed items in
+        -- defaults are NOT auto-added here — that's a migration concern.
+        local itemSchema = childSchema and childSchema.items
+        local defaultIndex = {}
+        for _, item in ipairs(defaultVal) do
+          if item[mergeKey] then defaultIndex[item[mergeKey]] = item end
         end
         result[k] = {}
-        for _, defaultItem in ipairs(defaultVal) do
-          local key = defaultItem[mergeKey]
+        for _, dbItem in ipairs(dbVal) do
+          local key = dbItem[mergeKey]
           if key then
-            local dbItem = dbIndex[key]
-            if dbItem then
-              result[k][#result[k] + 1] = lib.table.merge(lib.table.deepClone(defaultItem), dbItem, false)
+            local defaultItem = defaultIndex[key]
+            if defaultItem then
+              result[k][#result[k] + 1] = smartMerge(defaultItem, dbItem, itemSchema, fullPath .. '[' .. tostring(key) .. ']')
             else
-              debugLog(('FILL array item "%s" [%s=%s] — not in DB array, using default'):format(fullPath, mergeKey, tostring(key)))
-              result[k][#result[k] + 1] = defaultItem
+              result[k][#result[k] + 1] = dbItem
             end
-          end
-        end
-        -- Detect pruned array items
-        for dbKey in pairs(dbIndex) do
-          local found = false
-          for _, defaultItem in ipairs(defaultVal) do
-            if defaultItem[mergeKey] == dbKey then found = true; break end
-          end
-          if not found then
-            debugLog(('PRUNE array item "%s" [%s=%s] — in DB but not in schema defaults'):format(fullPath, mergeKey, tostring(dbKey)))
+          else
+            result[k][#result[k] + 1] = dbItem
           end
         end
       else
@@ -543,15 +564,33 @@ local function registerScriptConfig(schema, canEditFn, rules)
   local defaultData    = extractDefaults(schema) or {}
   settingsSchema       = schema
   defaults             = defaultData
-  canEditScript        = canEditFn or function() return true end
+  -- Save permission honours the same access model the chooser/open path uses
+  -- (master ACE convar + per-resource overrides) — without this, /dirk_config
+  -- could open the editor for an admin but their save would silently fail
+  -- with NoPermission. Custom canEditFn is purely additive (cannot lock out
+  -- the master) for backward compat.
+  --
+  -- We go through dirk_lib's `canEditScriptConfig` export rather than reading
+  -- the global directly: this file runs in EVERY consumer's VM, but the
+  -- access-resolution code lives in `src/scriptConfig/server.lua` which is
+  -- dirk_lib-scope only. Without the cross-VM hop, the lookup is nil for
+  -- consumers and save silently denies even for masters.
+  canEditScript = function(src)
+    local ok, allowed = pcall(function()
+      return exports.dirk_lib:canEditScriptConfig(src, scriptName)
+    end)
+    if ok and allowed then return true end
+    if canEditFn then return canEditFn(src) end
+    return false
+  end
   serverOnlyPaths      = extractServerOnly(schema, nil)
   local renames        = extractRenames(schema, nil)
   local migrations     = rules and rules.migrations or nil
   currentVer           = GetResourceMetadata(scriptName, 'version', 0) or '0.0.0'
 
   if not canEditFn then
-    lib.print.warn(
-      ('No permission function provided for %s script config, defaulting to allow all edits.')
+    lib.print.debug(
+      ('[scriptConfig:%s] no extra permission function — relying on master ACE + overrides only.')
       :format(scriptName)
     )
   end

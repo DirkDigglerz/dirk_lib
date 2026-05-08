@@ -49,7 +49,7 @@ end
 
 local settings = {
   -- ── appearance ─────────────────────────────────────────────────────
-  primaryColor = GetGameName() == 'fivem' and 'dirk' or 'red',
+  primaryColor = 'dirk',
   primaryShade = 9,
   customTheme  = {
     "#f8edff", "#e9d9f6", "#d0b2e8", "#b588da", "#9e65cf",
