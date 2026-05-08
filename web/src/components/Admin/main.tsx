@@ -10,21 +10,24 @@ import GroupsSection from "./GroupsSection";
 import LocalizationSection from "./LocalizationSection";
 import ScriptConfigSection from "./ScriptConfigSection";
 
-// NAV_ITEMS labels are resolved at module load via locale(...). Locale data
-// is fetched on NUI mount, so the first call may return the key itself
-// briefly — that's the same behaviour every locale-aware section uses.
-const NAV_ITEMS = [
-  { id: "appearance",   icon: Palette,     label: locale("dirk_lib_nav_appearance")    },
-  { id: "branding",     icon: Tag,         label: locale("dirk_lib_nav_branding")      },
-  { id: "localization", icon: Languages,   label: locale("dirk_lib_nav_localization")  },
-  { id: "bridging",     icon: Plug,        label: locale("dirk_lib_nav_bridging")      },
-  { id: "groups",       icon: Users,       label: locale("dirk_lib_nav_groups")        },
-  { id: "scriptConfig", icon: ShieldCheck, label: locale("dirk_lib_nav_script_config") },
-  { id: "advanced",     icon: Wrench,      label: locale("dirk_lib_nav_advanced")      },
-] as const;
-
 export default function AdminSection() {
   const [open, setOpen] = useState(false);
+
+  // NAV_ITEMS lives inside the component so locale() is called on every
+  // render — DirkProvider already subscribes to localeStore and re-renders
+  // the tree when GET_LOCALES lands, so the labels resolve correctly as
+  // soon as the dict is available. Defining at module scope froze the
+  // labels to the keys themselves because import-time locale() runs
+  // before any data has been fetched.
+  const NAV_ITEMS = [
+    { id: "appearance",   icon: Palette,     label: locale("dirk_lib_nav_appearance")    },
+    { id: "branding",     icon: Tag,         label: locale("dirk_lib_nav_branding")      },
+    { id: "localization", icon: Languages,   label: locale("dirk_lib_nav_localization")  },
+    { id: "bridging",     icon: Plug,        label: locale("dirk_lib_nav_bridging")      },
+    { id: "groups",       icon: Users,       label: locale("dirk_lib_nav_groups")        },
+    { id: "scriptConfig", icon: ShieldCheck, label: locale("dirk_lib_nav_script_config") },
+    { id: "advanced",     icon: Wrench,      label: locale("dirk_lib_nav_advanced")      },
+  ] as const;
 
   useNuiEvent("OPEN_ADMIN_SECTION", () => setOpen(true));
   useNuiEvent("CLOSE_ADMIN_SECTION", () => setOpen(false));

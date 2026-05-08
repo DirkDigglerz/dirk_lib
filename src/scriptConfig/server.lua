@@ -70,26 +70,44 @@ function CanEditScriptConfigResource(src, resourceName) end -- forward decl
 
 local function canEditResource(src, resourceName)
   if not src or src == 0 then return true end
-  if isMasterEditor(src) then return true end
-  -- dirk_lib itself is master-only by design — overrides on dirk_lib would
-  -- let a non-master grant themselves more access via the panel, defeating
-  -- the floor guarantee.
-  if resourceName == GetCurrentResourceName() then return false end
+  if isMasterEditor(src) then
+    print(('[scriptConfig:access] src=%s resource=%s → MASTER allowed'):format(tostring(src), resourceName))
+    return true
+  end
+  if resourceName == GetCurrentResourceName() then
+    print(('[scriptConfig:access] src=%s resource=%s → dirk_lib master-only, denied'):format(tostring(src), resourceName))
+    return false
+  end
   local o = getOverrideForResource(resourceName)
-  if not o then return false end
+  if not o then
+    print(('[scriptConfig:access] src=%s resource=%s → no override entry, denied'):format(tostring(src), resourceName))
+    return false
+  end
+  print(('[scriptConfig:access] src=%s resource=%s → override found: groups=%s identifiers=%s'):format(
+    tostring(src), resourceName,
+    type(o.groups) == 'table' and json.encode(o.groups) or tostring(o.groups),
+    type(o.identifiers) == 'table' and json.encode(o.identifiers) or tostring(o.identifiers)
+  ))
   if type(o.groups) == 'table' then
     for i = 1, #o.groups do
       local g = o.groups[i]
       if type(g) == 'string' and g ~= '' and IsPlayerAceAllowed(src, g) then
+        print(('[scriptConfig:access] src=%s resource=%s → group %s allowed'):format(tostring(src), resourceName, g))
         return true
       end
     end
   end
   if type(o.identifiers) == 'table' then
+    local plyIds = GetPlayerIdentifiers(src) or {}
+    print(('[scriptConfig:access] src=%s player identifiers: %s'):format(tostring(src), json.encode(plyIds)))
     for i = 1, #o.identifiers do
-      if playerHasIdentifier(src, o.identifiers[i]) then return true end
+      if playerHasIdentifier(src, o.identifiers[i]) then
+        print(('[scriptConfig:access] src=%s resource=%s → identifier %s matched'):format(tostring(src), resourceName, o.identifiers[i]))
+        return true
+      end
     end
   end
+  print(('[scriptConfig:access] src=%s resource=%s → no group/identifier match, denied'):format(tostring(src), resourceName))
   return false
 end
 
@@ -133,6 +151,10 @@ lib.addCommand('dirk_config', {
     end
     return
   end
+
+  -- Diagnostic — drop once verified working.
+  local cfg = (lib.scriptConfig and lib.scriptConfig.get and lib.scriptConfig.get('scriptConfig')) or {}
+  print(('[scriptConfig:cmd] /dirk_config invoked by src=%s, stored overrides: %s'):format(tostring(source), json.encode(cfg.overrides or {})))
 
   local list = collectRegisteredConfigs(source)
   if #list == 0 then
@@ -179,18 +201,7 @@ lib.callback.register('dirk_lib:getOnlinePlayers', function(source)
   return out
 end)
 
--- ── Master group introspection (for the Script Config tab banner) ─────────
-
-lib.callback.register('dirk_lib:getScriptConfigMasterGroup', function(source)
-  if source ~= 0 and not isMasterEditor(source) then return getMasterGroup() end
-  return getMasterGroup()
-end)
-
--- Full list of registered scriptConfig resources, used by the access
--- overrides UI to populate the resource picker. Master only — non-masters
--- get an empty list.
-
-lib.callback.register('dirk_lib:getScriptConfigResources', function(source)
-  if source ~= 0 and not isMasterEditor(source) then return {} end
-  return collectRegisteredConfigs(nil)
-end)
+-- (Master group + registered-resources lookups for the Script Config tab
+-- live entirely client-side now — convars replicate via `setr` and resource
+-- metadata is readable from a client NUI callback. See init.lua's
+-- GET_SCRIPT_CONFIG_MASTER_GROUP / GET_SCRIPT_CONFIG_RESOURCES handlers.)

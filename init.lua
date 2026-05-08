@@ -201,8 +201,9 @@ if context == 'client' and (GetNumResourceMetadata(cache.resource, 'ui_page') or
   end)
 
   -- Online-player list for the dirk_lib Script Config tab's identifier
-  -- picker. Server-side guarded to master only, so consumers other than
-  -- dirk_lib's NUI calling this just get an empty array — safe to expose.
+  -- picker. Server-bounced because the client only knows about local-scope
+  -- players, not the full server roster. Server-side guards this to master
+  -- only; non-masters get an empty array.
   RegisterNuiCallback('GET_SCRIPT_CONFIG_ONLINE_PLAYERS', function(_, cb)
     CreateThread(function()
       local ok, data = pcall(lib.callback.await, 'dirk_lib:getOnlinePlayers')
@@ -210,23 +211,41 @@ if context == 'client' and (GetNumResourceMetadata(cache.resource, 'ui_page') or
     end)
   end)
 
-  -- Reads the dirk_lib_master_group convar so the Script Config tab can
-  -- show which group is the floor. Anyone can call this — the value isn't
-  -- secret (and the convar is publicly visible in server.cfg anyway).
+  -- Master ACE for the Script Config tab banner. Just reads the replicated
+  -- convar — no server call needed. `setr` values are pushed to clients on
+  -- connect and live-updated when the convar changes.
   RegisterNuiCallback('GET_SCRIPT_CONFIG_MASTER_GROUP', function(_, cb)
-    CreateThread(function()
-      local ok, data = pcall(lib.callback.await, 'dirk_lib:getScriptConfigMasterGroup')
-      cb({ group = ok and type(data) == 'string' and data or 'admin' })
-    end)
+    local g = GetConvar('dirk_lib_master_group', 'admin')
+    if g == nil or g == '' then g = 'admin' end
+    cb({ group = g })
   end)
 
   -- Full list of registered scriptConfig resources for the access-overrides
-  -- resource picker. Master-only; non-masters get an empty array.
+  -- resource picker. Iterated client-side via GetResourceByFindIndex +
+  -- GetNumResourceMetadata — both natives work on client. No server bounce
+  -- required, and no permission check since this UI is only reachable from
+  -- dirk_lib's panel which is master-only by design.
   RegisterNuiCallback('GET_SCRIPT_CONFIG_RESOURCES', function(_, cb)
-    CreateThread(function()
-      local ok, data = pcall(lib.callback.await, 'dirk_lib:getScriptConfigResources')
-      cb(ok and type(data) == 'table' and data or {})
-    end)
+    local out = {}
+    local total = GetNumResources() or 0
+    for i = 0, total - 1 do
+      local name = GetResourceByFindIndex(i)
+      if name and GetResourceState(name) == 'started' then
+        local count = GetNumResourceMetadata(name, 'dirk_lib') or 0
+        for j = 0, count - 1 do
+          if GetResourceMetadata(name, 'dirk_lib', j) == 'scriptConfig' then
+            out[#out + 1] = {
+              resource = name,
+              label = name,
+              version = GetResourceMetadata(name, 'version', 0) or 'dev',
+            }
+            break
+          end
+        end
+      end
+    end
+    table.sort(out, function(a, b) return a.resource < b.resource end)
+    cb(out)
   end)
 end
 

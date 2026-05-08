@@ -132,8 +132,52 @@ if context == 'client' then
     cb(lib.getLocales())
   end)
 
+  -- Master ACE for the Script Config tab banner. Reads the replicated
+  -- convar — `setr` values are pushed to clients on connect.
+  RegisterNuiCallback('GET_SCRIPT_CONFIG_MASTER_GROUP', function(_, cb)
+    local g = GetConvar('dirk_lib_master_group', 'admin')
+    if g == nil or g == '' then g = 'admin' end
+    cb({ group = g })
+  end)
+
+  -- Resource list for the access-overrides resource picker. Pure client
+  -- iteration — `GetNumResourceMetadata` and friends work fine on client.
+  -- The surrounding UI is master-only by design (dirk_lib's own panel),
+  -- so no permission gate needed here.
+  RegisterNuiCallback('GET_SCRIPT_CONFIG_RESOURCES', function(_, cb)
+    local out = {}
+    local total = GetNumResources() or 0
+    for i = 0, total - 1 do
+      local name = GetResourceByFindIndex(i)
+      if name and GetResourceState(name) == 'started' then
+        local count = GetNumResourceMetadata(name, 'dirk_lib') or 0
+        for j = 0, count - 1 do
+          if GetResourceMetadata(name, 'dirk_lib', j) == 'scriptConfig' then
+            out[#out + 1] = {
+              resource = name,
+              label = name,
+              version = GetResourceMetadata(name, 'version', 0) or 'dev',
+            }
+            break
+          end
+        end
+      end
+    end
+    table.sort(out, function(a, b) return a.resource < b.resource end)
+    cb(out)
+  end)
+
+  -- Online-player list — server-bounced because the client only knows
+  -- about local-scope players, not the full server roster.
+  RegisterNuiCallback('GET_SCRIPT_CONFIG_ONLINE_PLAYERS', function(_, cb)
+    CreateThread(function()
+      local ok, data = pcall(lib.callback.await, 'dirk_lib:getOnlinePlayers')
+      cb(ok and type(data) == 'table' and data or {})
+    end)
+  end)
+
   return
-end 
+end
 
 
 --## SERVER
@@ -188,38 +232,60 @@ CreateThread(function()
       'housing',
     }
 
-    local topBorder = '┌' .. string.rep('─', 46) .. '┐'
-    local bottomBorder = '└' .. string.rep('─', 46) .. '┘'
+    local W = 46 -- inner width of the box (between │ and │)
+    -- All printed rows go through this so colour codes don't throw off the
+    -- right-side border alignment. `visibleLen` is the rendered character
+    -- count of the row's content, sans `^N` colour escapes; the helper pads
+    -- to W spaces and slaps the closing │ on.
+    local function row(visible, content)
+      local pad = math.max(0, W - visible)
+      print('│' .. content .. string.rep(' ', pad) .. '^7│')
+    end
+    local function strip(s) return (s:gsub('%^%d', '')) end
+    local function rowText(text)
+      -- Default `^7` foreground; padding off the visible (stripped) length.
+      row(#strip(text), '^7' .. text)
+    end
+
+    local topBorder = '┌' .. string.rep('─', W) .. '┐'
+    local bottomBorder = '└' .. string.rep('─', W) .. '┘'
     print(topBorder)
-    print('│' .. '^2 DIRK_LIB ^3V'..strVers .. string.rep(' ', 28) .. '^7│')
-    print('│' .. '^6 RESOURCE AUTO-DETECTION' .. string.rep(' ', 22) .. '^7│')
-    print('│' .. '^7 WWW.DIRKSCRIPTS.COM' .. string.rep(' ', 26) .. '^7│')
-    print('│' .. string.rep('─', 46) .. '│')
+    do
+      local content = '^2 DIRK_LIB ^3V' .. strVers
+      row(#strip(content), content)
+    end
+    do
+      local content = '^6 RESOURCE AUTO-DETECTION'
+      row(#strip(content), content)
+    end
+    do
+      local content = '^7 WWW.DIRKSCRIPTS.COM'
+      row(#strip(content), content)
+    end
+    print('│' .. string.rep('─', W) .. '│')
+
     local maxKeyLength = 0
     for _, v in ipairs(detectables) do
       maxKeyLength = math.max(maxKeyLength, #v)
     end
-    
     for _, system in ipairs(detectables) do
       local value = lib.settings[system]
-      if value then 
+      if value then
         local keyStr = string.upper(system)
         local valueStr = tostring(value)
         local keySpacing = string.rep(' ', maxKeyLength - #system)
         local valueColor = valueStr == "NOT FOUND" and "^1" or "^2"
-        local line = '│ ^5' .. keyStr .. keySpacing .. '  ' .. valueColor .. valueStr
-        local totalLength = #keyStr + #valueStr + 2 + (maxKeyLength - #system)
-        local rightPadding = string.rep(' ', 45 - totalLength)
-        
-        print(line .. rightPadding .. '^7│')
+        local content = ' ^5' .. keyStr .. keySpacing .. '  ' .. valueColor .. valueStr
+        local visible = 1 + #keyStr + (maxKeyLength - #system) + 2 + #valueStr
+        row(visible, content)
       end
     end
-    print('│^7                                              ^7│')
-    print('│^7 If you are running something other than what ^7│')
-    print('│^7 is autodetected, its because the resource    ^7│')
-    print('│^7 you use has "provide xyz" in the fxmanifest. ^7│')
-    print('│^7 If they are using this correctly it should   ^7│')
-    print('│^7 work fine otherwise overwrite with convars   ^7│')
+    rowText('')
+    rowText(' If you are running something other than what')
+    rowText(' is autodetected, its because the resource')
+    rowText(' you use has "provide xyz" in the fxmanifest.')
+    rowText(' If they are using this correctly it should')
+    rowText(' work fine — otherwise edit via /dirk_config.')
     print(bottomBorder)
   end)
 end)

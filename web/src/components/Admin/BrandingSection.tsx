@@ -39,13 +39,6 @@ export default function BrandingSection() {
         value={config.serverName}
         onChange={(e) => set("serverName", e.currentTarget.value)}
       />
-      <TextInput
-        label={<InfoLabel label={locale("dirk_lib_branding_logo_label")} tooltip={locale("dirk_lib_branding_logo_tooltip")} />}
-        size="xs"
-        value={config.logo}
-        onChange={(e) => set("logo", e.currentTarget.value)}
-      />
-
       <GroupLabel label={locale("dirk_lib_branding_assets_group")} />
       <TextInput
         label={<InfoLabel label={locale("dirk_lib_branding_imgpath_label")} tooltip={locale("dirk_lib_branding_imgpath_tooltip")} />}

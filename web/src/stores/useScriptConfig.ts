@@ -14,7 +14,6 @@ export type LocalizationSettings = {
 
 export type BrandingSettings = {
   serverName: string;
-  logo: string;
   itemImgPath: string;
 };
 
@@ -100,7 +99,6 @@ export const defaultScriptConfig: ScriptConfig = {
   },
   branding: {
     serverName: "DirkRP",
-    logo: "https://via.placeholder.com/150",
     itemImgPath: "auto",
   },
   bridging: {

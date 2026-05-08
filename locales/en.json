@@ -47,8 +47,6 @@
   "dirk_lib_branding_assets_group":    "Assets",
   "dirk_lib_branding_name_label":      "Server Name",
   "dirk_lib_branding_name_tooltip":    "Displayed in NUIs that surface a server name",
-  "dirk_lib_branding_logo_label":      "Logo URL",
-  "dirk_lib_branding_logo_tooltip":    "URL or nui:// path to the server logo shown in dirk_lib menus",
   "dirk_lib_branding_imgpath_label":   "Item Image Path",
   "dirk_lib_branding_imgpath_tooltip": "Inventory image path. 'auto' resolves from the detected inventory; override with a full nui://… or CDN URL.",
 
@@ -149,5 +147,11 @@
   "script_config_section_identifiers_placeholder": "license:...",
   "script_config_section_delete": "Delete",
   "script_config_section_delete_aria": "Delete override",
-  "script_config_section_add_override": "Add Override"
+  "script_config_section_add_override": "Add Override",
+  "script_config_section_no_grants": "no grants",
+  "script_config_section_unset_resource": "(no resource selected)",
+  "script_config_section_edit_aria": "Edit override",
+  "script_config_section_modal_new": "New Override",
+  "script_config_section_done": "Done",
+  "script_config_section_online_players_label": "Online — click to add"
 }

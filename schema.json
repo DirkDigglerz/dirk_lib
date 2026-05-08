@@ -207,12 +207,6 @@
           "x-renamedFrom": "appearance.serverName",
           "description": "Server branding string displayed in NUIs that surface a server name."
         },
-        "logo": {
-          "type": "string",
-          "default": "https://via.placeholder.com/150",
-          "x-renamedFrom": "appearance.logo",
-          "description": "URL or nui:// path to the server logo shown in dirk_lib-powered menus."
-        },
         "itemImgPath": {
           "type": "string",
           "default": "auto",
@@ -262,9 +256,8 @@
       "properties": {
         "overrides": {
           "type": "array",
-          "x-arrayKey": "resource",
           "default": [],
-          "description": "Per-resource extra access grants. Each entry lets the listed ACE groups or player identifiers edit that resource's scriptConfig in addition to the master.",
+          "description": "Per-resource extra access grants. Each entry lets the listed ACE groups or player identifiers edit that resource's scriptConfig in addition to the master. NOTE: no x-arrayKey here — this is a purely user-managed list with no schema defaults, so the smartMerge plain-array path (DB as source of truth) is correct. Adding x-arrayKey would make smartMerge iterate the empty defaults array and prune every DB entry on load.",
           "items": {
             "type": "object",
             "properties": {
