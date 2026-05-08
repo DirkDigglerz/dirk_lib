@@ -1,5 +1,5 @@
 import { Flex, Text, TextInput, useMantineTheme } from "@mantine/core";
-import { AdminPageTitle, useFormActions, useFormField } from "dirk-cfx-react";
+import { AdminPageTitle, locale, useFormActions, useFormField } from "dirk-cfx-react";
 import { Tag } from "lucide-react";
 import type { BrandingSettings, ScriptConfig } from "../../stores/useScriptConfig";
 import { useScriptConfig } from "../../stores/useScriptConfig";
@@ -30,25 +30,25 @@ export default function BrandingSection() {
 
   return (
     <Flex direction="column" gap="xs" p="sm" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-      <AdminPageTitle icon={Tag} title="Branding" color={color} />
+      <AdminPageTitle icon={Tag} title={locale("dirk_lib_branding_title")} color={color} />
 
-      <GroupLabel label="Server Identity" />
+      <GroupLabel label={locale("dirk_lib_branding_identity_group")} />
       <TextInput
-        label={<InfoLabel label="Server Name" tooltip="Displayed in NUIs that surface a server name" />}
+        label={<InfoLabel label={locale("dirk_lib_branding_name_label")} tooltip={locale("dirk_lib_branding_name_tooltip")} />}
         size="xs"
         value={config.serverName}
         onChange={(e) => set("serverName", e.currentTarget.value)}
       />
       <TextInput
-        label={<InfoLabel label="Logo URL" tooltip="URL or nui:// path to the server logo shown in dirk_lib menus" />}
+        label={<InfoLabel label={locale("dirk_lib_branding_logo_label")} tooltip={locale("dirk_lib_branding_logo_tooltip")} />}
         size="xs"
         value={config.logo}
         onChange={(e) => set("logo", e.currentTarget.value)}
       />
 
-      <GroupLabel label="Assets" />
+      <GroupLabel label={locale("dirk_lib_branding_assets_group")} />
       <TextInput
-        label={<InfoLabel label="Item Image Path" tooltip="Inventory image path. 'auto' resolves from the detected inventory; override with a full nui://… or CDN URL." />}
+        label={<InfoLabel label={locale("dirk_lib_branding_imgpath_label")} tooltip={locale("dirk_lib_branding_imgpath_tooltip")} />}
         size="xs"
         value={config.itemImgPath}
         onChange={(e) => set("itemImgPath", e.currentTarget.value)}

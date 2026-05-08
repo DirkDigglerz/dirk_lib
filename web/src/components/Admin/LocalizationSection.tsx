@@ -1,5 +1,5 @@
 import { Flex, Select, Text, TextInput, useMantineTheme } from "@mantine/core";
-import { AdminPageTitle, useFormActions, useFormField } from "dirk-cfx-react";
+import { AdminPageTitle, locale, useFormActions, useFormField } from "dirk-cfx-react";
 import { Languages } from "lucide-react";
 import type { LocalizationSettings, ScriptConfig } from "../../stores/useScriptConfig";
 import { useScriptConfig } from "../../stores/useScriptConfig";
@@ -39,11 +39,11 @@ export default function LocalizationSection() {
 
   return (
     <Flex direction="column" gap="xs" p="sm" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-      <AdminPageTitle icon={Languages} title="Localization" color={color} />
+      <AdminPageTitle icon={Languages} title={locale("dirk_lib_localization_title")} color={color} />
 
-      <GroupLabel label="Strings" />
+      <GroupLabel label={locale("dirk_lib_localization_strings_group")} />
       <Select
-        label={<InfoLabel label="Language" tooltip="Locale code used when resolving /locales strings" />}
+        label={<InfoLabel label={locale("dirk_lib_localization_language_label")} tooltip={locale("dirk_lib_localization_language_tooltip")} />}
         size="xs"
         value={config.language}
         data={LANGUAGE_OPTIONS}
@@ -52,9 +52,9 @@ export default function LocalizationSection() {
         onChange={(v) => v && set("language", v)}
       />
 
-      <GroupLabel label="Currency" />
+      <GroupLabel label={locale("dirk_lib_localization_currency_group")} />
       <TextInput
-        label={<InfoLabel label="Symbol" tooltip="Prefix used when rendering money values" />}
+        label={<InfoLabel label={locale("dirk_lib_localization_symbol_label")} tooltip={locale("dirk_lib_localization_symbol_tooltip")} />}
         size="xs"
         value={config.currency}
         onChange={(e) => set("currency", e.currentTarget.value)}

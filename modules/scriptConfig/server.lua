@@ -674,14 +674,24 @@ local function registerScriptConfig(schema, canEditFn, rules)
   lib.print.debug(('Script config loaded for %s (stored v%s → current v%s)'):format(scriptName, storedVer, currentVer))
 
   -- Per-resource shortcut command — opens this script's Live Configurator
-  -- directly, skipping the /dirk_config chooser.
+  -- directly, skipping the /dirk_config chooser. Access is gated through
+  -- the global access model (master ACE via dirk_lib_master_group convar
+  -- + per-resource overrides from dirk_lib's scriptConfig). No `restricted`
+  -- field — we let everyone run the command and silently no-op if they're
+  -- not allowed, so the chooser can surface the same access logic to a
+  -- /dirk_config invocation.
   lib.addCommand(scriptName, {
     help = ('Open the Live Configurator for %s'):format(scriptName),
-    restricted = 'group.admin',
   }, function(source)
     if source == 0 then
       lib.print.info(('[scriptConfig:%s] /%s must be run by a player'):format(scriptName, scriptName))
       return
+    end
+    -- Global access check from src/scriptConfig/server.lua. Falls back to
+    -- the legacy canEditScript hook (if a consumer registered a custom
+    -- canEditFn via lib.scriptConfig.register) for backward compat.
+    if type(CanEditScriptConfigResource) == 'function' then
+      if not CanEditScriptConfigResource(source, scriptName) then return end
     end
     if not canEditScript(source) then
       return

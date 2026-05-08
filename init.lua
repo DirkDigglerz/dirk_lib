@@ -166,11 +166,11 @@ end
 -- useSettings + localeStore now work out of the box for every consumer
 -- with a ui_page.
 if context == 'client' and (GetNumResourceMetadata(cache.resource, 'ui_page') or 0) > 0 then
-  pcall(RegisterNuiCallback, 'GET_LOCALES', function(_, cb)
+  RegisterNuiCallback('GET_LOCALES', function(_, cb)
     cb(lib.getLocales and lib.getLocales() or {})
   end)
 
-  pcall(RegisterNuiCallback, 'GET_SETTINGS', function(_, cb)
+  RegisterNuiCallback('GET_SETTINGS', function(_, cb)
     -- Mirror dirk_lib's own GET_SETTINGS shape: ensure scriptConfig has
     -- overlaid before handing settings to the NUI, so saved theme/locale
     -- values aren't masked by the convar-default snapshot.
@@ -189,7 +189,7 @@ if context == 'client' and (GetNumResourceMetadata(cache.resource, 'ui_page') or
   -- Bounces the NUI's GET_FRAMEWORK_GROUPS through to dirk_lib's server-side
   -- callback so the React side gets a normalised { jobs, gangs } payload
   -- regardless of which underlying framework the server runs.
-  pcall(RegisterNuiCallback, 'GET_FRAMEWORK_GROUPS', function(_, cb)
+  RegisterNuiCallback('GET_FRAMEWORK_GROUPS', function(_, cb)
     CreateThread(function()
       local ok, data = pcall(lib.callback.await, 'dirk_lib:getFrameworkGroups')
       if ok and type(data) == 'table' then
@@ -197,6 +197,35 @@ if context == 'client' and (GetNumResourceMetadata(cache.resource, 'ui_page') or
       else
         cb({ jobs = {}, gangs = {} })
       end
+    end)
+  end)
+
+  -- Online-player list for the dirk_lib Script Config tab's identifier
+  -- picker. Server-side guarded to master only, so consumers other than
+  -- dirk_lib's NUI calling this just get an empty array — safe to expose.
+  RegisterNuiCallback('GET_SCRIPT_CONFIG_ONLINE_PLAYERS', function(_, cb)
+    CreateThread(function()
+      local ok, data = pcall(lib.callback.await, 'dirk_lib:getOnlinePlayers')
+      cb(ok and type(data) == 'table' and data or {})
+    end)
+  end)
+
+  -- Reads the dirk_lib_master_group convar so the Script Config tab can
+  -- show which group is the floor. Anyone can call this — the value isn't
+  -- secret (and the convar is publicly visible in server.cfg anyway).
+  RegisterNuiCallback('GET_SCRIPT_CONFIG_MASTER_GROUP', function(_, cb)
+    CreateThread(function()
+      local ok, data = pcall(lib.callback.await, 'dirk_lib:getScriptConfigMasterGroup')
+      cb({ group = ok and type(data) == 'string' and data or 'admin' })
+    end)
+  end)
+
+  -- Full list of registered scriptConfig resources for the access-overrides
+  -- resource picker. Master-only; non-masters get an empty array.
+  RegisterNuiCallback('GET_SCRIPT_CONFIG_RESOURCES', function(_, cb)
+    CreateThread(function()
+      local ok, data = pcall(lib.callback.await, 'dirk_lib:getScriptConfigResources')
+      cb(ok and type(data) == 'table' and data or {})
     end)
   end)
 end

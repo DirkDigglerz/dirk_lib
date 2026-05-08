@@ -1,6 +1,6 @@
 import { ActionIcon, ColorInput, Flex, NumberInput, Popover, Select, Switch, Text, useMantineTheme } from "@mantine/core";
 import { generateColors } from "@mantine/colors-generator";
-import { AdminPageTitle, useFormActions, useFormField } from "dirk-cfx-react";
+import { AdminPageTitle, locale, useFormActions, useFormField } from "dirk-cfx-react";
 import { Palette, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import type { AppearanceSettings, ScriptConfig } from "../../stores/useScriptConfig";
@@ -67,12 +67,12 @@ export default function AppearanceSection() {
 
   return (
     <Flex direction="column" gap="xs" p="sm" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-      <AdminPageTitle icon={Palette} title="Appearance" color={color} />
+      <AdminPageTitle icon={Palette} title={locale("dirk_lib_appearance_title")} color={color} />
 
-      <GroupLabel label="Primary Color" />
+      <GroupLabel label={locale("dirk_lib_appearance_primary_group")} />
 
       <Switch
-        label="Use Custom Palette"
+        label={locale("dirk_lib_appearance_use_custom")}
         size="md"
         checked={useCustom}
         onChange={(e) => set("primaryColor", e.currentTarget.checked ? "custom" : "dirk")}
@@ -82,7 +82,7 @@ export default function AppearanceSection() {
       <Flex gap="xs">
         {!useCustom && (
           <Select
-            label="Palette"
+            label={locale("dirk_lib_appearance_palette_label")}
             size="xs"
             style={{ flex: 1 }}
             value={config.primaryColor}
@@ -92,7 +92,7 @@ export default function AppearanceSection() {
           />
         )}
         <NumberInput
-          label={<InfoLabel label="Shade" tooltip="0 lightest, 9 darkest" />}
+          label={<InfoLabel label={locale("dirk_lib_appearance_shade_label")} tooltip={locale("dirk_lib_appearance_shade_tooltip")} />}
           size="xs"
           style={{ flex: 1 }}
           min={0}
@@ -106,15 +106,15 @@ export default function AppearanceSection() {
         <>
           <Flex align="center" justify="space-between" mt="xxs">
             <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.07em" c="rgba(255,255,255,0.2)">
-              Custom Palette
+              {locale("dirk_lib_appearance_custom_palette")}
             </Text>
-            <ActionIcon size="sm" variant="subtle" onClick={resetPalette} title="Reset to defaults">
+            <ActionIcon size="sm" variant="subtle" onClick={resetPalette} title={locale("dirk_lib_appearance_reset_palette")}>
               <RotateCcw size="1.4vh" />
             </ActionIcon>
           </Flex>
 
           <ColorInput
-            label={<InfoLabel label="Base Color" tooltip="Generates the full 10-shade palette. Click any shade below to fine-tune." />}
+            label={<InfoLabel label={locale("dirk_lib_appearance_base_label")} tooltip={locale("dirk_lib_appearance_base_tooltip")} />}
             size="xs"
             value={config.customTheme[config.primaryShade] ?? config.customTheme[5] ?? "#000000"}
             onChange={generateFromBase}
@@ -152,7 +152,7 @@ function SwatchTile({
       <Popover.Target>
         <button
           onClick={() => setOpened((o) => !o)}
-          title={`Shade ${index}: ${value}`}
+          title={locale("dirk_lib_appearance_swatch_title", String(index), value)}
           style={{
             flex: 1,
             aspectRatio: "1 / 1",

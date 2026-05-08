@@ -1,5 +1,5 @@
-import { ConfigPanel, useNuiEvent } from "dirk-cfx-react";
-import { Languages, Palette, Plug, Tag, Users, Wrench } from "lucide-react";
+import { ConfigPanel, locale, useNuiEvent } from "dirk-cfx-react";
+import { Languages, Palette, Plug, ShieldCheck, Tag, Users, Wrench } from "lucide-react";
 import { useState } from "react";
 import { defaultScriptConfig, type ScriptConfig } from "../../stores/useScriptConfig";
 import AdvancedSection from "./AdvancedSection";
@@ -8,14 +8,19 @@ import BrandingSection from "./BrandingSection";
 import BridgingSection from "./BridgingSection";
 import GroupsSection from "./GroupsSection";
 import LocalizationSection from "./LocalizationSection";
+import ScriptConfigSection from "./ScriptConfigSection";
 
+// NAV_ITEMS labels are resolved at module load via locale(...). Locale data
+// is fetched on NUI mount, so the first call may return the key itself
+// briefly — that's the same behaviour every locale-aware section uses.
 const NAV_ITEMS = [
-  { id: "appearance",   icon: Palette,   label: "Appearance"   },
-  { id: "branding",     icon: Tag,       label: "Branding"     },
-  { id: "localization", icon: Languages, label: "Localization" },
-  { id: "bridging",     icon: Plug,      label: "Bridging"     },
-  { id: "groups",       icon: Users,     label: "Groups"       },
-  { id: "advanced",     icon: Wrench,    label: "Advanced"     },
+  { id: "appearance",   icon: Palette,     label: locale("dirk_lib_nav_appearance")    },
+  { id: "branding",     icon: Tag,         label: locale("dirk_lib_nav_branding")      },
+  { id: "localization", icon: Languages,   label: locale("dirk_lib_nav_localization")  },
+  { id: "bridging",     icon: Plug,        label: locale("dirk_lib_nav_bridging")      },
+  { id: "groups",       icon: Users,       label: locale("dirk_lib_nav_groups")        },
+  { id: "scriptConfig", icon: ShieldCheck, label: locale("dirk_lib_nav_script_config") },
+  { id: "advanced",     icon: Wrench,      label: locale("dirk_lib_nav_advanced")      },
 ] as const;
 
 export default function AdminSection() {
@@ -27,7 +32,7 @@ export default function AdminSection() {
   return (
     <ConfigPanel<ScriptConfig>
       navItems={NAV_ITEMS}
-      title="DirkLib"
+      title={locale("dirk_lib_panel_title")}
       open={open}
       defaultConfig={defaultScriptConfig}
       resetConfirmText="dirk_lib"
@@ -39,6 +44,7 @@ export default function AdminSection() {
           {tab === "localization" && <LocalizationSection />}
           {tab === "bridging"     && <BridgingSection />}
           {tab === "groups"       && <GroupsSection />}
+          {tab === "scriptConfig" && <ScriptConfigSection />}
           {tab === "advanced"     && <AdvancedSection />}
         </>
       )}

@@ -1,5 +1,5 @@
 import { Flex, Select, Switch, Text, useMantineTheme } from "@mantine/core";
-import { AdminPageTitle, useFormActions, useFormField } from "dirk-cfx-react";
+import { AdminPageTitle, locale, useFormActions, useFormField } from "dirk-cfx-react";
 import { Wrench } from "lucide-react";
 import type { AdvancedSettings, ScriptConfig } from "../../stores/useScriptConfig";
 import { useScriptConfig } from "../../stores/useScriptConfig";
@@ -32,11 +32,11 @@ export default function AdvancedSection() {
 
   return (
     <Flex direction="column" gap="xs" p="sm" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-      <AdminPageTitle icon={Wrench} title="Advanced" color={color} />
+      <AdminPageTitle icon={Wrench} title={locale("dirk_lib_advanced_title")} color={color} />
 
-      <GroupLabel label="Identification" />
+      <GroupLabel label={locale("dirk_lib_advanced_id_group")} />
       <Select
-        label={<InfoLabel label="Primary Identifier" tooltip="Player identifier used as the primary lookup key. Default 'license' works for the vast majority of servers." />}
+        label={<InfoLabel label={locale("dirk_lib_advanced_primary_label")} tooltip={locale("dirk_lib_advanced_primary_tooltip")} />}
         size="xs"
         value={config.primaryIdentifier}
         data={IDENTIFIER_OPTIONS}
@@ -44,9 +44,9 @@ export default function AdvancedSection() {
         onChange={(v) => v && set("primaryIdentifier", v)}
       />
 
-      <GroupLabel label="Diagnostics" />
+      <GroupLabel label={locale("dirk_lib_advanced_diag_group")} />
       <Switch
-        label="Debug Logging"
+        label={locale("dirk_lib_advanced_debug_label")}
         size="md"
         checked={config.debug}
         onChange={(e) => set("debug", e.currentTarget.checked)}

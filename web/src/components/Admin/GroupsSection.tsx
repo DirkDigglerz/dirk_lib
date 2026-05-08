@@ -1,5 +1,5 @@
 import { Flex, NumberInput, Text, useMantineTheme } from "@mantine/core";
-import { AdminPageTitle, useFormActions, useFormField } from "dirk-cfx-react";
+import { AdminPageTitle, locale, useFormActions, useFormField } from "dirk-cfx-react";
 import { Users } from "lucide-react";
 import type { GroupsSettings, ScriptConfig } from "../../stores/useScriptConfig";
 import { useScriptConfig } from "../../stores/useScriptConfig";
@@ -30,11 +30,11 @@ export default function GroupsSection() {
 
   return (
     <Flex direction="column" gap="xs" p="sm" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-      <AdminPageTitle icon={Users} title="Groups" color={color} />
+      <AdminPageTitle icon={Users} title={locale("dirk_lib_groups_title")} color={color} />
 
-      <GroupLabel label="Membership" />
+      <GroupLabel label={locale("dirk_lib_groups_membership_group")} />
       <NumberInput
-        label={<InfoLabel label="Max Members" tooltip="Maximum group size" />}
+        label={<InfoLabel label={locale("dirk_lib_groups_max_label")} tooltip={locale("dirk_lib_groups_max_tooltip")} />}
         size="xs"
         min={1}
         max={50}
@@ -42,9 +42,9 @@ export default function GroupsSection() {
         onChange={(v) => set("maxMembers", Number(v))}
       />
 
-      <GroupLabel label="Invites" />
+      <GroupLabel label={locale("dirk_lib_groups_invites_group")} />
       <NumberInput
-        label={<InfoLabel label="Max Invite Distance" tooltip="Max metres between players for an invite to land" />}
+        label={<InfoLabel label={locale("dirk_lib_groups_dist_label")} tooltip={locale("dirk_lib_groups_dist_tooltip")} />}
         size="xs"
         min={1}
         max={100}
@@ -52,7 +52,7 @@ export default function GroupsSection() {
         onChange={(v) => set("maxDistanceInvite", Number(v))}
       />
       <NumberInput
-        label={<InfoLabel label="Invite Valid Time" tooltip="Minutes an outstanding invite stays valid before expiring" />}
+        label={<InfoLabel label={locale("dirk_lib_groups_valid_label")} tooltip={locale("dirk_lib_groups_valid_tooltip")} />}
         size="xs"
         min={1}
         max={60}
@@ -60,9 +60,9 @@ export default function GroupsSection() {
         onChange={(v) => set("inviteValidTime", Number(v))}
       />
 
-      <GroupLabel label="Lifecycle" />
+      <GroupLabel label={locale("dirk_lib_groups_lifecycle_group")} />
       <NumberInput
-        label={<InfoLabel label="Max Log-Off Time" tooltip="Minutes a player can stay offline before being auto-kicked from their group" />}
+        label={<InfoLabel label={locale("dirk_lib_groups_logoff_label")} tooltip={locale("dirk_lib_groups_logoff_tooltip")} />}
         size="xs"
         min={1}
         max={60}

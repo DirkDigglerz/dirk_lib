@@ -256,6 +256,38 @@
       }
     },
 
+    "scriptConfig": {
+      "type": "object",
+      "description": "Per-resource access control for /dirk_config. The master group is configured via the `dirk_lib_master_group` server convar (defaults to `group.admin`) and can always edit any registered scriptConfig. Use `overrides` to grant additional access to specific resources for non-master ACE groups or specific player identifiers — purely additive, you cannot remove access from the master.",
+      "properties": {
+        "overrides": {
+          "type": "array",
+          "x-arrayKey": "resource",
+          "default": [],
+          "description": "Per-resource extra access grants. Each entry lets the listed ACE groups or player identifiers edit that resource's scriptConfig in addition to the master.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "resource":    { "type": "string", "description": "Resource name (e.g. dirk_druglabsv2)." },
+              "groups":      {
+                "type": "array",
+                "default": [],
+                "description": "ACE permissions checked via IsPlayerAceAllowed (e.g. group.mod, dirkscripts.command.druglabs).",
+                "items": { "type": "string" }
+              },
+              "identifiers": {
+                "type": "array",
+                "default": [],
+                "description": "Player identifiers (license:..., steam:..., discord:..., etc.) granted edit access regardless of group membership.",
+                "items": { "type": "string" }
+              }
+            },
+            "required": ["resource"]
+          }
+        }
+      }
+    },
+
     "advanced": {
       "type": "object",
       "description": "Low-level knobs most servers should leave alone.",

@@ -1,19 +1,22 @@
 import { Flex, Select, Text, useMantineTheme } from "@mantine/core";
-import { AdminPageTitle, useFormActions, useFormField } from "dirk-cfx-react";
+import { AdminPageTitle, locale, useFormActions, useFormField } from "dirk-cfx-react";
 import { Plug } from "lucide-react";
 import type { BridgingSettings, ScriptConfig } from "../../stores/useScriptConfig";
 import { useScriptConfig } from "../../stores/useScriptConfig";
 import { InfoLabel } from "./InfoLabel";
 
+// Field/group definitions store *locale keys* now, not literal strings.
+// Resolved at render via locale(...) so server owners can translate the
+// whole panel by editing /locales/{lang}.json without touching code.
 type FieldDef = {
   key: keyof BridgingSettings;
-  label: string;
-  tooltip: string;
+  labelKey: string;
+  tooltipKey: string;
   options: string[];
 };
 
 type FieldGroup = {
-  label: string;
+  labelKey: string;
   fields: FieldDef[];
 };
 
@@ -21,55 +24,55 @@ const withAuto = (opts: string[]) => ["auto", ...opts];
 
 const GROUPS: FieldGroup[] = [
   {
-    label: "User Interface",
+    labelKey: "dirk_lib_bridging_group_ui",
     fields: [
-      { key: "notify",      label: "Notify",       tooltip: "Provider for lib.notify (toast notifications).",       options: ["ox_lib", "dirk_lib"] },
-      { key: "progress",    label: "Progress",     tooltip: "Provider for lib.progressBar / lib.progressCircle.",   options: ["ox_lib", "dirk_lib"] },
-      { key: "showTextUI",  label: "Show Text UI", tooltip: "Provider for lib.showTextUI / hideTextUI.",            options: ["ox_lib", "dirk_lib"] },
-      { key: "contextMenu", label: "Context Menu", tooltip: "Provider for lib.registerContext / showContext.",      options: ["ox_lib", "dirk_lib"] },
-      { key: "alertDialog", label: "Alert Dialog", tooltip: "Provider for lib.alertDialog (confirm/cancel modals).", options: ["ox_lib", "dirk_lib"] },
-      { key: "inputDialog", label: "Input Dialog", tooltip: "Provider for lib.inputDialog (form-style prompts).",   options: ["ox_lib", "dirk_lib"] },
+      { key: "notify",      labelKey: "dirk_lib_bridging_notify_label",   tooltipKey: "dirk_lib_bridging_notify_tooltip",   options: ["ox_lib", "dirk_lib"] },
+      { key: "progress",    labelKey: "dirk_lib_bridging_progress_label", tooltipKey: "dirk_lib_bridging_progress_tooltip", options: ["ox_lib", "dirk_lib"] },
+      { key: "showTextUI",  labelKey: "dirk_lib_bridging_textui_label",   tooltipKey: "dirk_lib_bridging_textui_tooltip",   options: ["ox_lib", "dirk_lib"] },
+      { key: "contextMenu", labelKey: "dirk_lib_bridging_context_label",  tooltipKey: "dirk_lib_bridging_context_tooltip",  options: ["ox_lib", "dirk_lib"] },
+      { key: "alertDialog", labelKey: "dirk_lib_bridging_alert_label",    tooltipKey: "dirk_lib_bridging_alert_tooltip",    options: ["ox_lib", "dirk_lib"] },
+      { key: "inputDialog", labelKey: "dirk_lib_bridging_input_label",    tooltipKey: "dirk_lib_bridging_input_tooltip",    options: ["ox_lib", "dirk_lib"] },
     ],
   },
   {
-    label: "Framework",
+    labelKey: "dirk_lib_bridging_group_framework",
     fields: [
-      { key: "framework", label: "Framework", tooltip: "Server framework dirk_lib reads player data from.", options: withAuto(["es_extended", "qbx_core", "qb-core", "nd-framework"]) },
+      { key: "framework", labelKey: "dirk_lib_bridging_framework_label", tooltipKey: "dirk_lib_bridging_framework_tooltip", options: withAuto(["es_extended", "qbx_core", "qb-core", "nd-framework"]) },
     ],
   },
   {
-    label: "Inventory & Targeting",
+    labelKey: "dirk_lib_bridging_group_inventory",
     fields: [
-      { key: "inventory", label: "Inventory", tooltip: "Inventory system used for item lookups, give/remove, and image paths.", options: withAuto(["dirk_inventory", "ox_inventory", "qb-inventory", "qs-inventory", "codem-inventory", "tgiann_inventory", "mf-inventory", "core_inventory", "ak47_inventory"]) },
-      { key: "target",    label: "Target",    tooltip: "Targeting system for entity interactions.",                              options: withAuto(["ox_target", "qb-target", "q-target", "bt-target"]) },
-      { key: "interact",  label: "Interact",  tooltip: "Interact-prompt system used as the alternative to target-based interactions.", options: withAuto(["redm-uiprompt", "sleepless_interact", "interact"]) },
+      { key: "inventory", labelKey: "dirk_lib_bridging_inventory_label", tooltipKey: "dirk_lib_bridging_inventory_tooltip", options: withAuto(["dirk_inventory", "ox_inventory", "qb-inventory", "qs-inventory", "codem-inventory", "tgiann_inventory", "mf-inventory", "core_inventory", "ak47_inventory"]) },
+      { key: "target",    labelKey: "dirk_lib_bridging_target_label",    tooltipKey: "dirk_lib_bridging_target_tooltip",    options: withAuto(["ox_target", "qb-target", "q-target", "bt-target"]) },
+      { key: "interact",  labelKey: "dirk_lib_bridging_interact_label",  tooltipKey: "dirk_lib_bridging_interact_tooltip",  options: withAuto(["redm-uiprompt", "sleepless_interact", "interact"]) },
     ],
   },
   {
-    label: "Vehicles",
+    labelKey: "dirk_lib_bridging_group_vehicles",
     fields: [
-      { key: "keys",   label: "Vehicle Keys", tooltip: "Vehicle keys / lockpicking system.",        options: withAuto(["cd_garage", "MrNewbVehicleKeys", "t1ger_keys", "okokGarage", "qb-vehiclekeys", "qbx_vehiclekeys", "qs-vehiclekeys", "Renewed-Vehiclekeys", "vehicles_keys", "wasabi_carlock", "ludaro-keys"]) },
-      { key: "fuel",   label: "Fuel",         tooltip: "Vehicle fuel system.",                       options: withAuto(["cdn-fuel", "LegacyFuel", "ox_fuel", "ps-fuel", "Renewed-Fuel", "ti_fuel", "x-fuel", "wasabi_fuel", "okokGasStation"]) },
-      { key: "garage", label: "Garage",       tooltip: "Garage / vehicle storage system.",           options: withAuto(["qb-garages", "wasabi_garage", "renewed-garage"]) },
+      { key: "keys",   labelKey: "dirk_lib_bridging_keys_label",   tooltipKey: "dirk_lib_bridging_keys_tooltip",   options: withAuto(["cd_garage", "MrNewbVehicleKeys", "t1ger_keys", "okokGarage", "qb-vehiclekeys", "qbx_vehiclekeys", "qs-vehiclekeys", "Renewed-Vehiclekeys", "vehicles_keys", "wasabi_carlock", "ludaro-keys"]) },
+      { key: "fuel",   labelKey: "dirk_lib_bridging_fuel_label",   tooltipKey: "dirk_lib_bridging_fuel_tooltip",   options: withAuto(["cdn-fuel", "LegacyFuel", "ox_fuel", "ps-fuel", "Renewed-Fuel", "ti_fuel", "x-fuel", "wasabi_fuel", "okokGasStation"]) },
+      { key: "garage", labelKey: "dirk_lib_bridging_garage_label", tooltipKey: "dirk_lib_bridging_garage_tooltip", options: withAuto(["qb-garages", "wasabi_garage", "renewed-garage"]) },
     ],
   },
   {
-    label: "World",
+    labelKey: "dirk_lib_bridging_group_world",
     fields: [
-      { key: "time",     label: "Time / Weather", tooltip: "Weather/time sync resource.", options: withAuto(["av_weather", "cd_easytime", "qb-weathersync", "Renewed-Weathersync", "vSync", "wasabi_wheather"]) },
-      { key: "doorlock", label: "Doorlock",       tooltip: "Doorlock system.",            options: withAuto(["ox_doorlock", "qb-doorlock", "nui_doorlock", "doors_creator"]) },
-      { key: "housing",  label: "Housing",        tooltip: "Player housing system.",      options: withAuto(["qs-housing", "rtx_housing", "bcs_housing", "origen_housing"]) },
+      { key: "time",     labelKey: "dirk_lib_bridging_time_label",     tooltipKey: "dirk_lib_bridging_time_tooltip",     options: withAuto(["av_weather", "cd_easytime", "qb-weathersync", "Renewed-Weathersync", "vSync", "wasabi_wheather"]) },
+      { key: "doorlock", labelKey: "dirk_lib_bridging_doorlock_label", tooltipKey: "dirk_lib_bridging_doorlock_tooltip", options: withAuto(["ox_doorlock", "qb-doorlock", "nui_doorlock", "doors_creator"]) },
+      { key: "housing",  labelKey: "dirk_lib_bridging_housing_label",  tooltipKey: "dirk_lib_bridging_housing_tooltip",  options: withAuto(["qs-housing", "rtx_housing", "bcs_housing", "origen_housing"]) },
     ],
   },
   {
-    label: "Player Systems",
+    labelKey: "dirk_lib_bridging_group_player",
     fields: [
-      { key: "phone",     label: "Phone",     tooltip: "Phone resource (used for messages, mail, etc.).", options: withAuto(["lb-phone", "qb-phone", "gksphone", "high-phone", "npwd"]) },
-      { key: "clothing",  label: "Clothing",  tooltip: "Clothing / character appearance system.",         options: withAuto(["esx_skin", "qb-clothing", "rcore_clothing", "illenium-appearance", "fivem-appearance", "dirk_charCreator", "tgiann_clothing"]) },
-      { key: "skills",    label: "Skills",    tooltip: "Skills / progression system.",                    options: withAuto(["sd_skills", "evolent_skills", "core_skills", "B1-skillz", "skill_system_v1.5", "skillsystem_v3", "boii_skills", "skillsystem_v2", "ot_skill_system"]) },
-      { key: "ambulance", label: "Ambulance", tooltip: "Ambulance / death + revive system.",              options: withAuto(["qb-ambulancejob", "wasabi_ambulance", "core_ambulance"]) },
-      { key: "prison",    label: "Prison",    tooltip: "Prison / jail system.",                           options: withAuto(["qb-prison", "rcore_prison", "wasabi_jail"]) },
-      { key: "dispatch",  label: "Dispatch",  tooltip: "Dispatch / police alert system.",                 options: withAuto(["bub_mdt", "cd_dispatch", "linden_outlawalert", "qs_dispatch", "ps-dispatch", "tk_dispatch"]) },
+      { key: "phone",     labelKey: "dirk_lib_bridging_phone_label",     tooltipKey: "dirk_lib_bridging_phone_tooltip",     options: withAuto(["lb-phone", "qb-phone", "gksphone", "high-phone", "npwd"]) },
+      { key: "clothing",  labelKey: "dirk_lib_bridging_clothing_label",  tooltipKey: "dirk_lib_bridging_clothing_tooltip",  options: withAuto(["esx_skin", "qb-clothing", "rcore_clothing", "illenium-appearance", "fivem-appearance", "dirk_charCreator", "tgiann_clothing"]) },
+      { key: "skills",    labelKey: "dirk_lib_bridging_skills_label",    tooltipKey: "dirk_lib_bridging_skills_tooltip",    options: withAuto(["sd_skills", "evolent_skills", "core_skills", "B1-skillz", "skill_system_v1.5", "skillsystem_v3", "boii_skills", "skillsystem_v2", "ot_skill_system"]) },
+      { key: "ambulance", labelKey: "dirk_lib_bridging_ambulance_label", tooltipKey: "dirk_lib_bridging_ambulance_tooltip", options: withAuto(["qb-ambulancejob", "wasabi_ambulance", "core_ambulance"]) },
+      { key: "prison",    labelKey: "dirk_lib_bridging_prison_label",    tooltipKey: "dirk_lib_bridging_prison_tooltip",    options: withAuto(["qb-prison", "rcore_prison", "wasabi_jail"]) },
+      { key: "dispatch",  labelKey: "dirk_lib_bridging_dispatch_label",  tooltipKey: "dirk_lib_bridging_dispatch_tooltip",  options: withAuto(["bub_mdt", "cd_dispatch", "linden_outlawalert", "qs_dispatch", "ps-dispatch", "tk_dispatch"]) },
     ],
   },
 ];
@@ -99,16 +102,16 @@ export default function BridgingSection() {
 
   return (
     <Flex direction="column" gap="xs" p="sm" style={{ flex: 1, minHeight: 0, overflowY: "auto" }}>
-      <AdminPageTitle icon={Plug} title="Bridging" color={color} />
+      <AdminPageTitle icon={Plug} title={locale("dirk_lib_bridging_title")} color={color} />
 
       {GROUPS.map((group) => (
-        <div key={group.label}>
-          <GroupLabel label={group.label} />
+        <div key={group.labelKey}>
+          <GroupLabel label={locale(group.labelKey)} />
           <Flex direction="column" gap="xs">
             {group.fields.map((field) => (
               <Select
                 key={field.key as string}
-                label={<InfoLabel label={field.label} tooltip={field.tooltip} />}
+                label={<InfoLabel label={locale(field.labelKey)} tooltip={locale(field.tooltipKey)} />}
                 size="xs"
                 value={config[field.key] as string}
                 data={field.options.map((o) => ({ value: o, label: o }))}

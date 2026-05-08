@@ -57,12 +57,23 @@ export type AdvancedSettings = {
   debug: boolean;
 };
 
+export type ScriptConfigOverride = {
+  resource: string;
+  groups: string[];
+  identifiers: string[];
+};
+
+export type ScriptConfigSettings = {
+  overrides: ScriptConfigOverride[];
+};
+
 export type ScriptConfig = {
   appearance:   AppearanceSettings;
   localization: LocalizationSettings;
   branding:     BrandingSettings;
   bridging:     BridgingSettings;
   groups:       GroupsSettings;
+  scriptConfig: ScriptConfigSettings;
   advanced:     AdvancedSettings;
 };
 
@@ -121,6 +132,9 @@ export const defaultScriptConfig: ScriptConfig = {
     maxDistanceInvite: 5,
     inviteValidTime:   5,
     maxLogOffTime:     5,
+  },
+  scriptConfig: {
+    overrides: [],
   },
   advanced: {
     primaryIdentifier: "license",
