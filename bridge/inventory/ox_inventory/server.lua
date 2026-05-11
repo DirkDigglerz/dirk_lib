@@ -80,6 +80,23 @@ local bridge = {
     return exports.ox_inventory:RegisterStash(id, data.label, data.maxSlots, data.maxWeight, data.owner, data.groups, data.coords)
   end,
 
+  --- Single-item lookup. Returns the formatted record (matching what `items()`
+  --- yields) or nil if the item isn't registered. Faster path than walking
+  --- the cached all-items map.
+  ---@param name string
+  item = function(name)
+    if type(name) ~= 'string' or name == '' then return nil end
+    local raw = exports.ox_inventory:Items(name)
+    if not raw then return nil end
+    local img = (raw.client and raw.client.image) or raw.name
+    return {
+      name   = raw.name or name,
+      label  = raw.label or raw.name or name,
+      weight = raw.weight or 0,
+      image  = lib.formatImagePath(img),
+    }
+  end,
+
   --- Get all items registered on the server. Cached, but invalidated whenever
   --- branding.itemImgPath changes so a CDN URL set via /dirk_config doesn't
   --- get masked by URLs baked from the boot-time autodetect default.

@@ -362,6 +362,11 @@ if hasUI then
     cb({ success = success, _error = err })
   end)
 
+  RegisterNuiCallback('GET_MISSING_ITEMS', function(_, cb)
+    local success, _error, data = lib.callback.await(('%s:getMissingItems'):format(scriptName))
+    cb({ success = success, _error = _error, data = data })
+  end)
+
   RegisterNuiCallback('GET_FULL_SCRIPT_CONFIG', function(_, cb)
     local success, _error, data = lib.callback.await(('%s:getFullScriptConfig'):format(scriptName))
     cb({ success = success, _error = _error, data = data })

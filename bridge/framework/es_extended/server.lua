@@ -1,5 +1,22 @@
 local cachedItems
 
+-- ESX legacy uses 'money' as the cash account name. Most cross-framework
+-- consumers (and our own scriptConfig defaults) pass 'cash'. Normalize so
+-- whichever convention the caller uses, we resolve to whatever the player
+-- actually has. If neither alias exists on the player, fall through to the
+-- raw name so the caller's error path still sees the original value.
+local ACCOUNT_ALIASES = {
+  cash  = 'money',
+  money = 'cash',
+}
+
+local function resolveAccount(ply, acc)
+  if ply.getAccount(acc) then return acc end
+  local alias = ACCOUNT_ALIASES[acc]
+  if alias and ply.getAccount(alias) then return alias end
+  return acc
+end
+
 -- Build a normalized item table from whichever ESX item source is available.
 local function sourceItems()
   if not lib.FW then return nil end
@@ -34,6 +51,17 @@ local bridge = {
     end
     cachedItems = formatted
     return formatted
+  end,
+
+  --- Look up a single item's record by name. ESX exposes its items as a
+  --- plain table (legacy `ESX.Items` or `ESX.GetItems()`); direct hash
+  --- access, no walk.
+  ---@param name string
+  ---@return table?
+  item = function(name)
+    local src = sourceItems()
+    if not src then return nil end
+    return src[name]
   end,
 
   canUseItem = function(item)
@@ -230,31 +258,32 @@ local bridge = {
   getMoney = function(src, acc)
     local ply = lib.player.get(src)
     assert(ply, 'Player does not exist')
-    return ply.getAccount(acc).money
+    local account = ply.getAccount(resolveAccount(ply, acc))
+    return account and account.money or 0
   end,
 
   addMoney = function(src, acc, count, reason)
     local ply = lib.player.get(src)
     assert(ply, 'Player does not exist')
-    ply.addAccountMoney(acc,count)
-    return true 
-  end, 
+    ply.addAccountMoney(resolveAccount(ply, acc), count)
+    return true
+  end,
 
   removeMoney = function(src, acc, count, reason, force)
     local ply = lib.player.get(src)
     assert(ply, 'Player does not exist')
-    local accountExists = ply.getAccount(acc)
-    if not accountExists then return false, 'NoAccount' end
-    if not force and (accountExists.money < count) then return false, 'NotEnoughMoney' end
-    ply.removeAccountMoney(acc,count)
-    return true 
+    local account = ply.getAccount(resolveAccount(ply, acc))
+    if not account then return false, 'NoAccount' end
+    if not force and (account.money < count) then return false, 'NotEnoughMoney' end
+    ply.removeAccountMoney(resolveAccount(ply, acc), count)
+    return true
   end,
 
   setMoney = function(src, acc, count)
     local ply = lib.player.get(src)
     assert(ply, 'Player does not exist')
-    ply.setAccountMoney(acc,count)
-    return true 
+    ply.setAccountMoney(resolveAccount(ply, acc), count)
+    return true
   end,
 
   hasLicense = function(src, license)

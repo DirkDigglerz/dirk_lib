@@ -21,6 +21,16 @@ local bridge = {
     return formatted
   end,
 
+  --- Look up a single item's record by name. QBCore exposes Shared.Items
+  --- as a plain table — direct hash access, no walk.
+  ---@param name string
+  ---@return table?
+  item = function(name)
+    local src = lib.FW and lib.FW.Shared and lib.FW.Shared.Items
+    if not src then return nil end
+    return src[name]
+  end,
+
   canUseItem = function(item)
     local itemInfo = lib.FW.Functions.CanUseItem(item)
     if type(itemInfo) ~= 'table' then

@@ -710,6 +710,35 @@ local function registerScriptConfig(schema, canEditFn, rules)
   lastPersistedHash = persistPayloadHash()
   dispatchScriptConfigWatchers(scriptConfig, nil, nil, 'load', true)
 
+  -- Generate INSTALLATION/itemsToAdd/{ox,qb,esx} from any x-installItem /
+  -- x-installItemList annotations in this consumer's schema. Same
+  -- annotations also drive the missing-items audit, so consumers don't
+  -- duplicate item lists across install.lua + audit code anymore.
+  -- @dirk_lib/... forces resolution against the lib's resource folder rather
+  -- than the consumer's (this file runs in the consumer's VM via the lazy
+  -- module loader, so a bare path would look in the wrong place).
+  do
+    local ok, err = pcall(function()
+      require '@dirk_lib/modules/scriptConfig/installItems'.regenerate(schema, scriptConfig)
+    end)
+    if not ok then
+      lib.print.warn(('[scriptConfig:%s] install-file generation failed: %s'):format(scriptName, tostring(err)))
+    end
+  end
+
+  -- Console missing-items warning. Deferred a few seconds — the inventory
+  -- bridge isn't always fully wired up at scriptConfig load time, and an
+  -- eager audit would falsely report every item as missing.
+  CreateThread(function()
+    Wait(5000)
+    local ok, err = pcall(function()
+      require '@dirk_lib/modules/scriptConfig/installItems'.logAuditWarning(schema, scriptConfig)
+    end)
+    if not ok then
+      lib.print.warn(('missing-items audit log failed: %s'):format(tostring(err)))
+    end
+  end)
+
   lib.print.debug(('Script config loaded for %s (stored v%s → current v%s)'):format(scriptName, storedVer, currentVer))
 
   -- Per-resource shortcut command — opens this script's Live Configurator
@@ -810,6 +839,16 @@ local function setScriptConfig(data, forceVers, ctx)
   end
 
   dispatchScriptConfigWatchers(scriptConfig, previous, changedLeaves, 'update', false)
+
+  -- Re-emit install files when item-bearing fields might have changed.
+  do
+    local ok, err = pcall(function()
+      require '@dirk_lib/modules/scriptConfig/installItems'.regenerate(settingsSchema, scriptConfig)
+    end)
+    if not ok then
+      lib.print.warn(('[scriptConfig:%s] install-file regen failed: %s'):format(scriptName, tostring(err)))
+    end
+  end
 
   return {
     client_version = client_version,
@@ -948,6 +987,24 @@ lib.callback.register(('%s:getFullScriptConfig'):format(scriptName), function(sr
   return true, nil, { config = scriptConfig, clientVersion = client_version }
 end)
 
+-- Missing-items audit. Walks the schema's x-installItem / x-installItemList
+-- annotations, cross-references against `lib.inventory.item(name)`, and
+-- returns the missing names plus rendered install snippets for them. Drives
+-- the admin panel's MissingItemsBanner.
+lib.callback.register(('%s:getMissingItems'):format(scriptName), function(src)
+  if not scriptConfig then return false, 'NotReady' end
+  if not canEditScript(src) then return false, 'NoPermission' end
+
+  local ok, result = pcall(function()
+    return require '@dirk_lib/modules/scriptConfig/installItems'.audit(settingsSchema, scriptConfig)
+  end)
+  if not ok then
+    lib.print.warn(('[scriptConfig:%s] missing-items audit failed: %s'):format(scriptName, tostring(result)))
+    return false, 'AuditFailed'
+  end
+  return true, nil, result
+end)
+
 lib.callback.register(('%s:getScriptConfigHistory'):format(scriptName), function(src, payload)
   if not scriptConfig then return nil, 'NotReady' end
   if not canEditScript(src) then return nil, 'NoPermission' end
@@ -962,12 +1019,17 @@ lib.callback.register(('%s:giveScriptConfigItem'):format(scriptName), function(s
   local args = type(payload) == 'table' and payload or {}
   local itemName = type(args.itemName) == 'string' and args.itemName or nil
   local itemAmount = math.max(1, math.floor(tonumber(args.itemAmount) or 1))
+  -- Optional metadata pass-through. Lets consumers (e.g. dirk_fishing) spawn
+  -- items that need real metadata to behave normally — a fish with no
+  -- `fishWeight` metadata can't be sold/gutted properly. Caller is trusted
+  -- since they've already passed canEditScript.
+  local itemMetadata = type(args.metadata) == 'table' and args.metadata or nil
 
   if not itemName or itemName == '' then
     return false, 'InvalidItem'
   end
 
-  local added = lib.inventory.addItem(src, itemName, itemAmount)
+  local added = lib.inventory.addItem(src, itemName, itemAmount, itemMetadata)
   if not added then
     return false, 'AddItemFailed'
   end

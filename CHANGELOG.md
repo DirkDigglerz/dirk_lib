@@ -1,3 +1,37 @@
+# UPDATE 1.2.43 | 11/05/2026
+
+Lib-side fixes from the dirk_fishing customer-ticket batch (jamazzz, jahm94, battlex2307), plus a new schema-driven install + missing-items pipeline. Pairs with dirk_fishing 2.0.26.
+
+### Schema-driven install generation
+- New `x-installItem` / `x-installItemList` schema annotations describe items the consumer needs registered. dirk_lib walks them after every scriptConfig load + change and writes `INSTALLATION/itemsToAdd/{ox.lua, qb.lua, esx.sql}` straight to the consumer's resource folder. Replaces hand-rolled per-resource install.lua files.
+- ESX SQL output now matches the actual ESX legacy `items` table (`name, label, weight`) — the previous hand-rolled SQL declared a non-existent `description` column and would fail to import on some servers.
+
+### Missing-items audit + banner
+- New per-resource callback returns a list of items that are configured but not registered in the player's inventory, with ready-to-paste snippets for ox / qb / esx.
+- Server console warning fires once on resource start (deferred 5s for inventory-bridge readiness): "N items missing from your inventory: …". Caps at 5 names + "and N more". Silent when nothing's missing.
+- A missing-items banner auto-appears in the configurator above the tab list whenever items are missing — no consumer code required, just annotate the schema. Includes a refresh button; re-audits on save-success.
+
+### Inventory lookups
+- New `lib.inventory.item(name)` accessor — works on every inventory bridge.
+- Audited every underlying inventory's actual exports. Native single-item fast-paths now wired for `ox_inventory`, `tgiann-inventory`, `ak47_inventory` and `dirk_inventory`. `qs-inventory` and `codem-inventory` have no native definition lookup, so they fall back to a cached-bulk read.
+- Framework-level fast-paths added too: `qb-core`, `qbx_core` and `es_extended` now do direct shared-table indexing, skipping the bulk-fetch cache build entirely.
+- Fixed an edge case where an inventory's own items table (e.g. qs-inventory's `shared/items.lua`) was being shadowed by the framework's. Resolution chain now uses the inventory's own table when it has one, before falling back to the framework's. No more "item exists in the inventory but the lookup says it doesn't".
+
+### ESX bridge
+- `getMoney` now nil-checks the account — returns 0 instead of crashing on `.money`-of-nil when an account is missing. (This was the source of battlex2307's permit-purchase crash on first install.)
+- New `cash` ↔ `money` alias resolver shared across `getMoney` / `addMoney` / `removeMoney` / `setMoney`. If you ask for `cash` and the player only has `money` (or vice versa), the bridge resolves to whichever the player actually has — cross-framework consumers don't need to special-case ESX legacy's account naming.
+
+### Security
+- `schema.json` removed from `dirk_lib/fxmanifest.lua`'s `files{}` block. It was reachable via `nui://dirk_lib/schema.json` from any iframe. Server-side `LoadResourceFile` reads don't need that exposure — only NUI / asset manifests do.
+
+### scriptConfig
+- `<scriptName>:giveScriptConfigItem` callback now accepts an optional `metadata` payload that's passed through to `addItem`. Lets consumers include real catch metadata on items the admin spawns from the configurator, so the spawned item behaves identically to one earned naturally. Optional — no breaking change.
+
+### Release pipeline
+- Released zip now includes `schema.json`. The release workflow's bundled-files copy was missing it, so FiveM warned `could not find file 'schema.json'` on first boot for installs from the GitHub release (self-built copies were always fine).
+
+---
+
 # UPDATE 1.2.42 | 08/05/2026
 
 ### scriptConfig — permissions

@@ -22,7 +22,10 @@ ui_page 'web/build/index.html'
 files {
   'locales/**/*',
   'init.lua',
-  'schema.json',
+  -- schema.json deliberately NOT listed here — it's loaded server-side via
+  -- LoadResourceFile(scriptName, 'schema.json') and must not be NUI-fetchable
+  -- (declaring it under files{} would make it accessible at nui://dirk_lib/schema.json
+  -- from any iframe). LoadResourceFile bypasses files{} on the server.
   'modules/**/client.lua',
   'modules/**/server.lua',
   'modules/**/shared.lua',

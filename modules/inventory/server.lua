@@ -95,9 +95,33 @@ return {
   ---@param metadata: table
   getItemByMetadata = inventoryBridge.getItemByMetadata or frameworkBridge.getItemByMetadata,
 
-  ---@param item: string
-  ---@return table
-  item              = inventoryBridge.item or frameworkBridge.item,
+  ---@function lib.inventory.item
+  ---@description # Look up a single item's record by name.
+  ---@description Returns the item table (name/label/weight/image/...) if registered, or nil if missing.
+  ---@description Useful for "is this item installed?" checks (e.g. the missing-items audit).
+  ---@param name string
+  ---@return { name: string, label: string, weight: number, image: string }?
+  item = inventoryBridge.item or (function()
+    -- Resolution priority:
+    --   1. inventory bridge `item(name)`                — fastest, native single-item
+    --   2. fallback to `items()[name]` IF the inventory has its own `items()` —
+    --      the inventory is the source of truth, framework table may be stale or empty
+    --   3. framework bridge `item(name)`                — fastest when inventory pulls from framework
+    --   4. fallback to `items()[name]`                  — final correctness guarantee
+    -- This avoids the footgun where e.g. qs-inventory has its own item list
+    -- but the QBCore.Shared.Items table is empty/incomplete on that server.
+    if inventoryBridge.items then
+      return function(name)
+        return (lib.inventory.items() or {})[name]
+      end
+    end
+    if frameworkBridge.item then
+      return frameworkBridge.item
+    end
+    return function(name)
+      return (lib.inventory.items() or {})[name]
+    end
+  end)(),
 
   ---@function lib.inventory.canCarryItem
   ---@description # Check if player can carry item

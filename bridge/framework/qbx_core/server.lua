@@ -21,6 +21,16 @@ local bridge = {
     return formatted
   end,
 
+  --- Look up a single item's record by name. Qbox shares the QBCore item
+  --- table — direct hash access.
+  ---@param name string
+  ---@return table?
+  item = function(name)
+    local src = lib.FW and lib.FW.Shared and lib.FW.Shared.Items
+    if not src then return nil end
+    return src[name]
+  end,
+
   canUseItem = function(item)
     return exports.qbx_core:CanUseItem(item)
   end,

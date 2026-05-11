@@ -40,6 +40,16 @@ local bridge = {
     return item_exists and item_exists.label or false
   end,
 
+  --- Look up a single item's record by name. dirk_inventory's `Items(name)`
+  --- returns the matching record (or nil) directly.
+  ---@param name string
+  ---@return table?
+  item = function(name)
+    local result = exports.dirk_inventory:Items(name)
+    if not result then return nil end
+    return result
+  end,
+
   registerStash = function(id, data)
     return exports.dirk_inventory:registerInventory(id, {
       type = data.type or 'stash', 

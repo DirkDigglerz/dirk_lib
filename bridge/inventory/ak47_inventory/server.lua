@@ -60,6 +60,16 @@ return {
     return item_exists.label
   end,
 
+  --- Look up a single item's record by name. ak47_inventory mirrors
+  --- ox_inventory's `Items(name)` shape natively.
+  ---@param name string
+  ---@return table?
+  item = function(name)
+    local result = exports[INV]:Items(name)
+    if not result then return nil end
+    return result
+  end,
+
   canCarryItem = function(src, item, count, md)
     if type(src) == 'string' then return false, 'DoesntSupportInvId' end
     return exports[INV]:CanCarryItem(src, item, count, md)

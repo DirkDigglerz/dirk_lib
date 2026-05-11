@@ -61,6 +61,16 @@ return {
     return exports["tgiann-inventory"]:GetItemLabel(item)
   end,
 
+  --- Look up a single item's record by name. Native single-arg form of
+  --- tgiann-inventory's bulk Items() export — same shape, just one entry.
+  ---@param name string
+  ---@return table?
+  item = function(name)
+    local result = exports["tgiann-inventory"]:Items(name)
+    if not result then return nil end
+    return result
+  end,
+
 
 
   registerStash = function(id, data)
