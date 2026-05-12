@@ -60,7 +60,13 @@ local bridge = {
   end,
 
   getItems = function(invId)
-    return exports.ox_inventory:GetInventoryItems(invId)
+    -- ox_inventory has no `GetInventoryItems` export — that was a wrong
+    -- guess in earlier versions of this bridge. The correct path is
+    -- GetInventory(invId, true), which returns the inventory data with
+    -- its `.items` slot-indexed table populated. Without the `true` flag
+    -- the response omits items entirely.
+    local inv = exports.ox_inventory:GetInventory(invId, true)
+    return (inv and inv.items) or {}
   end,
 
   setMetadata = function(invId, slot, metadata)

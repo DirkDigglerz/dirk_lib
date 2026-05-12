@@ -1,3 +1,10 @@
+# UPDATE 1.2.46 | 12/05/2026
+
+### Hotfix — ox_inventory bridge: wrong export name
+- `lib.inventory.getItems(invId)` on the ox_inventory bridge was calling a non-existent `exports.ox_inventory:GetInventoryItems` — it crashed with `No such export GetInventoryItems in resource ox_inventory` on every store/loadout/market lookup. Now uses the correct `GetInventory(invId, true)` and returns its `.items` table. Affects everywhere `lib.inventory.getItems` is used (fish markets, equipment stores, loadout, bait market, reward backfill).
+
+---
+
 # UPDATE 1.2.45 | 12/05/2026
 
 ### Hotfix — configurator crash on malformed inventory items
