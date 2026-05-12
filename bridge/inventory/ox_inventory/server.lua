@@ -60,12 +60,18 @@ local bridge = {
   end,
 
   getItems = function(invId)
-    -- ox_inventory has no `GetInventoryItems` export — that was a wrong
-    -- guess in earlier versions of this bridge. The correct path is
-    -- GetInventory(invId, true), which returns the inventory data with
-    -- its `.items` slot-indexed table populated. Without the `true` flag
-    -- the response omits items entirely.
-    local inv = exports.ox_inventory:GetInventory(invId, true)
+    -- Modern ox_inventory has a `GetInventoryItems` convenience export, but
+    -- ox-compatible inventories that re-declare `provides 'ox_inventory'`
+    -- (notably ak47_inventory) emulate an older snapshot of the API and
+    -- don't ship it — calling it there crashes with "No such export".
+    --
+    -- `GetInventory(invId)` has been part of ox's API since day one and
+    -- returns an OxInventory object whose `.items` is the slot-indexed
+    -- table the caller wants. Same shape as GetInventoryItems' return,
+    -- works on every version + emulation. No second arg — modern ox
+    -- treats arg 2 as `owner` (string|number), not a flag, so passing
+    -- `true` there is undefined behaviour.
+    local inv = exports.ox_inventory:GetInventory(invId)
     return (inv and inv.items) or {}
   end,
 

@@ -1,7 +1,14 @@
+# UPDATE 1.2.47 | 12/05/2026
+
+### Hotfix — ox_inventory bridge `getItems` cleanup
+- 1.2.46 swapped to `GetInventory(invId, true)`, but ox_inventory's second arg is `owner` (string|number), not a `full` flag — passing `true` is undefined on modern ox. Dropped the second arg. Items still come back the same way via `.items` on the returned OxInventory object. Strictly broader compatibility.
+
+---
+
 # UPDATE 1.2.46 | 12/05/2026
 
 ### Hotfix — ox_inventory bridge: wrong export name
-- `lib.inventory.getItems(invId)` on the ox_inventory bridge was calling a non-existent `exports.ox_inventory:GetInventoryItems` — it crashed with `No such export GetInventoryItems in resource ox_inventory` on every store/loadout/market lookup. Now uses the correct `GetInventory(invId, true)` and returns its `.items` table. Affects everywhere `lib.inventory.getItems` is used (fish markets, equipment stores, loadout, bait market, reward backfill).
+- `lib.inventory.getItems(invId)` was calling `exports.ox_inventory:GetInventoryItems(invId)`. The export exists on modern ox_inventory, but ox-compatible inventories that re-declare `provides 'ox_inventory'` (e.g. ak47_inventory) emulate an older snapshot of the API and don't ship it — calling it there crashes with `No such export GetInventoryItems in resource ox_inventory`. Switched to `GetInventory(invId)` which has been in ox's API since day one and works on every version + emulation. Affects everywhere `lib.inventory.getItems` is used (fish markets, equipment stores, loadout, bait market, reward backfill).
 
 ---
 
