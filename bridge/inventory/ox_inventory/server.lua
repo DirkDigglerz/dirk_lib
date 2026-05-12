@@ -88,7 +88,7 @@ local bridge = {
     if type(name) ~= 'string' or name == '' then return nil end
     local raw = exports.ox_inventory:Items(name)
     if not raw then return nil end
-    local img = (raw.client and raw.client.image) or raw.name
+    local img = (raw.client and raw.client.image) or raw.name or name
     return {
       name   = raw.name or name,
       label  = raw.label or raw.name or name,
@@ -107,7 +107,7 @@ local bridge = {
     if not allItems then return {} end
     local formatted = {}
     for k, v in pairs(allItems) do
-      local img = (v.client and v.client.image) or v.name
+      local img = (v.client and v.client.image) or v.name or k
       formatted[k] = {
         name   = v.name or k,
         label  = v.label or v.name or k,

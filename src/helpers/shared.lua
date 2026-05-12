@@ -1,7 +1,11 @@
 -- Build a fully-qualified item image URL from `name` using lib.settings.itemImgPath.
 -- Honours an existing extension on `name` (so "fish_knife.webp" stays .webp) and
 -- avoids the //double-slash that breaks CDN setups when itemImgPath ends in `/`.
+-- Defensive: a malformed/custom inventory item with no `name` field used to
+-- crash here with "attempt to index a nil value" on the :match call. Now we
+-- just return '' so the consumer renders a blank image instead of erroring.
 lib.formatImagePath = function(name)
+  if type(name) ~= 'string' or name == '' then return '' end
   local p = lib.settings.itemImgPath or ''
   local sep = (p == '' or p:sub(-1) == '/') and '' or '/'
   local ext = name:match('%.%w+$') and '' or '.png'

@@ -1,3 +1,11 @@
+# UPDATE 1.2.45 | 12/05/2026
+
+### Hotfix — configurator crash on malformed inventory items
+- `lib.formatImagePath` now safely returns `""` when called with `nil`/empty/non-string input, instead of crashing with `attempt to index a nil value (local 'name')`. The configurator could fail to open on servers whose inventory had at least one item registered without a `name` field — a custom or malformed entry was enough to break the whole items lookup.
+- ox_inventory bridge: `items()` and `item()` now fall back to the item's table key when both `client.image` and `name` are missing, matching the defensive `or k`/`or name` pattern the other bridges already had.
+
+---
+
 # UPDATE 1.2.43 | 11/05/2026
 
 Lib-side fixes from the dirk_fishing customer-ticket batch (jamazzz, jahm94, battlex2307), plus a new schema-driven install + missing-items pipeline. Pairs with dirk_fishing 2.0.26.
