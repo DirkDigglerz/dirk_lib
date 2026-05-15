@@ -10,6 +10,13 @@ local scriptConfigWatchers = {}
 local nextScriptConfigWatcherId = 0
 local resourceVersion = GetResourceMetadata(scriptName, 'version', 0) or 'dev'
 
+-- Single-shot back-handler hook. Consumers that open the configurator from
+-- their own UI (e.g. dirk_multichar's character-list cog) install a handler
+-- right before triggering the open flow; it runs in place of the default
+-- "reopen chooser" branch when the user hits Back, then is cleared so the
+-- next standalone /<resource> open still drops into the chooser as normal.
+local customBackHandler = nil
+
 local function debugLog(msg)
   -- print(('[scriptConfig:%s] %s'):format(scriptName, msg))
 end
@@ -287,11 +294,22 @@ closeSettingsUi = function(opts)
   if not settingsUiOpen then return end
   settingsUiOpen = false
 
+  -- Drain the consumer-installed back handler under the same shot regardless
+  -- of which exit path closed the panel (CONFIG_PANEL_BACK button, Esc key,
+  -- × close button, etc.). Lets a consumer that opened us from its own UI
+  -- (e.g. dirk_multichar's character-list cog) keep NUI focus claimed instead
+  -- of getting it yanked when the admin hits Esc.
+  local handler = customBackHandler
+  customBackHandler = nil
+
   SendNuiMessage(json.encode({ action = 'CLOSE_ADMIN_SECTION' }))
-  -- When `keepFocus` is set we are about to hand off to another NUI (the
-  -- dirk_config chooser). Releasing focus here would create a visible frame
-  -- where the player can look/move around before the chooser re-grabs it.
-  if not (opts and opts.keepFocus) then
+
+  if handler then
+    pcall(handler)
+    -- Handler is responsible for focus from here. Don't release ours.
+  elseif not (opts and opts.keepFocus) then
+    -- Default behaviour: release focus unless caller asked to keep it (e.g.
+    -- back path that's about to hand off to the chooser).
     SetNuiFocus(false, false)
   end
   TriggerScreenblurFadeOut(0)
@@ -322,6 +340,15 @@ if hasUI then
   end)
 
   RegisterNuiCallback('CONFIG_PANEL_BACK', function(_, cb)
+    -- A consumer installed a custom back handler — closeSettingsUi will fire
+    -- it and keep focus claimed (see the handler-drain branch in that fn).
+    -- We just need to close; no chooser reopen.
+    if customBackHandler then
+      closeSettingsUi()
+      cb({})
+      return
+    end
+
     -- Hand off to dirk_lib's chooser without a focus flicker. We keep our
     -- focus claim during the server roundtrip, then poll dirk_lib for
     -- chooser-open state and drop our claim only AFTER it has taken focus.
@@ -465,8 +492,13 @@ end)
 -- PUBLIC API
 -- ──────────────────────────────────────
 local toRet = {
-  get = function()
-    return ensureSettingsLoaded()
+  -- `.get()` returns the whole config; `.get('basic')` / `.get('basic.time')`
+  -- drills into nested fields. Mirrors the server-side API so fishing-style
+  -- `lib.scriptConfig.get('basic').foo` works on either side.
+  get = function(path)
+    local cfg = ensureSettingsLoaded()
+    if not path or path == '' then return cfg end
+    return getValueAtPath(cfg, path)
   end,
 
   getAll = function(src)
@@ -475,6 +507,13 @@ local toRet = {
 
   set = updateScriptConfig,
   on = onScriptConfig,
+
+  -- Install a one-shot back-handler. Called instead of the default chooser
+  -- reopen the next time the user hits Back inside the configurator. Cleared
+  -- after that invocation. Pass `nil` to drop a previously-installed handler.
+  setBackHandler = function(fn)
+    customBackHandler = fn
+  end,
 }
 setmetatable(toRet, {
   __call = function()
