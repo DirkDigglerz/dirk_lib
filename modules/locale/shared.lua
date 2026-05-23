@@ -170,6 +170,10 @@ if lib.onSettings and not IsDuplicityVersion() then
     lib.onSettings('language', function(new)
         lib.locale(new.language)
         if not hasUi then return end
+        -- Skip broadcast if dict didn't populate (missing locale file, etc).
+        -- An empty payload would wipe the NUI store's already-good dict on
+        -- the consumer side — defensive zero-data check protects that.
+        if not next(dict) then return end
         if nuiReady then
             SendNuiMessage(json.encode({
                 action = 'UPDATE_DIRK_LIB_LOCALES',

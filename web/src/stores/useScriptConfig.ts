@@ -51,6 +51,11 @@ export type GroupsSettings = {
   maxLogOffTime:     number;
 };
 
+export type DiscordSettings = {
+  botToken: string;
+  guildId:  string;
+};
+
 export type AdvancedSettings = {
   primaryIdentifier: string;
   debug: boolean;
@@ -73,6 +78,7 @@ export type ScriptConfig = {
   bridging:     BridgingSettings;
   groups:       GroupsSettings;
   scriptConfig: ScriptConfigSettings;
+  discord:      DiscordSettings;
   advanced:     AdvancedSettings;
 };
 
@@ -133,6 +139,10 @@ export const defaultScriptConfig: ScriptConfig = {
   },
   scriptConfig: {
     overrides: [],
+  },
+  discord: {
+    botToken: "",
+    guildId:  "",
   },
   advanced: {
     primaryIdentifier: "license",

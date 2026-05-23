@@ -1,0 +1,338 @@
+-- Discord API wrapper — lives in dirk_lib's own resource so:
+--   1. The cache / rate-limit queue is shared across every consumer (one
+--      process, one set of HTTP requests).
+--   2. The bot token never leaves dirk_lib's VM — consumers reach this
+--      module via exports, so their memory image never holds the token.
+--   3. The /dirk_lib admin "Test Connection" callback registers at boot
+--      instead of waiting for a consumer to first touch lib.discord
+--      (previously caused the test to hang forever on a fresh install).
+--
+-- Consumer-facing API lives in modules/discord/server.lua and proxies
+-- every call through `exports.dirk_lib:discord_<name>(...)`.
+
+local DISCORD_API = 'https://discord.com/api/v10'
+local USER_AGENT = ('DiscordBot (https://github.com/DirkDigglerz/dirk_lib, %s)'):format(
+  GetResourceMetadata('dirk_lib', 'version', 0) or 'dev'
+)
+
+local TTL = {
+  guild   = 60 * 60 * 1000,
+  roles   =  5 * 60 * 1000,
+  members =       60 * 1000,
+  member  =       30 * 1000,
+}
+
+local cache = {}
+
+local function cacheGet(key)
+  local entry = cache[key]
+  if not entry then return nil, false end
+  if entry.expiresAt and GetGameTimer() > entry.expiresAt then
+    return entry.value, true
+  end
+  return entry.value, false
+end
+
+local function cachePut(key, value, ttl)
+  cache[key] = { value = value, expiresAt = GetGameTimer() + (ttl or 60000) }
+end
+
+local function cacheKey(guildId, kind, extra)
+  if extra then return ('%s:%s:%s'):format(guildId, kind, extra) end
+  return ('%s:%s'):format(guildId, kind)
+end
+
+local function cacheWipe(prefix)
+  if not prefix then cache = {} return end
+  for k in pairs(cache) do
+    if k:sub(1, #prefix) == prefix then cache[k] = nil end
+  end
+end
+
+local lastSeenGuild = nil
+CreateThread(function()
+  Wait(0)
+  if lib.scriptConfig and lib.scriptConfig.on then
+    lib.scriptConfig.on('discord', function(new)
+      local g = new and new.guildId or nil
+      if g ~= lastSeenGuild then
+        cache = {}
+        lastSeenGuild = g
+      end
+    end)
+  end
+end)
+
+local function getCreds()
+  local discord = (lib.scriptConfig and lib.scriptConfig.get and lib.scriptConfig.get('discord')) or {}
+  local token = discord and discord.botToken
+  local guildId = discord and discord.guildId
+  if not token or token == '' or not guildId or guildId == '' then
+    return nil, nil
+  end
+  return token, guildId
+end
+
+local function rawRequest(method, path, token)
+  local p = promise.new()
+  PerformHttpRequest(DISCORD_API .. path, function(status, body)
+    p:resolve({ status = status, body = body })
+  end, method, '', {
+    ['Authorization'] = 'Bot ' .. token,
+    ['Content-Type']  = 'application/json',
+    ['User-Agent']    = USER_AGENT,
+  })
+  return Citizen.Await(p)
+end
+
+local function fetchJson(method, path, token)
+  local resp = rawRequest(method, path, token)
+  if resp.status == 429 then
+    local parsed = resp.body and json.decode(resp.body) or nil
+    local retry = (parsed and parsed.retry_after) or 1
+    Wait(math.ceil(retry * 1000) + 100)
+    resp = rawRequest(method, path, token)
+  end
+  if not resp.status or resp.status < 200 or resp.status >= 300 then
+    return nil, ('HTTP %s'):format(tostring(resp.status))
+  end
+  local ok, parsed = pcall(json.decode, resp.body or '')
+  if not ok then return nil, 'BadJson' end
+  return parsed
+end
+
+local function cachedFetch(key, ttl, doFetch)
+  local cached, stale = cacheGet(key)
+  if cached and not stale then return cached end
+  local fresh, err = doFetch()
+  if fresh then
+    cachePut(key, fresh, ttl)
+    return fresh
+  end
+  if cached then
+    lib.print.warn(('[lib.discord] %s refresh failed (%s) — returning stale'):format(key, err or '?'))
+    return cached
+  end
+  return nil, err or 'FetchFailed'
+end
+
+local function withCreds(callerGuildId)
+  local token, defaultGuild = getCreds()
+  if not token then return nil, nil, 'NotConfigured' end
+  return token, callerGuildId or defaultGuild, nil
+end
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Internal API. These are then surfaced to consumers via exports below.
+-- ─────────────────────────────────────────────────────────────────────────
+
+local function isConfigured()
+  local token, guildId = getCreds()
+  return token ~= nil and guildId ~= nil
+end
+
+local function getGuild(guildId)
+  local token, gid, err = withCreds(guildId)
+  if err then return nil, err end
+  return cachedFetch(cacheKey(gid, 'guild'), TTL.guild, function()
+    return fetchJson('GET', ('/guilds/%s'):format(gid), token)
+  end)
+end
+
+local function getRoles(guildId)
+  local token, gid, err = withCreds(guildId)
+  if err then return nil, err end
+  return cachedFetch(cacheKey(gid, 'roles'), TTL.roles, function()
+    local roles, ferr = fetchJson('GET', ('/guilds/%s/roles'):format(gid), token)
+    if not roles then return nil, ferr end
+    local out = {}
+    for _, r in ipairs(roles) do
+      if r.id ~= gid then out[#out + 1] = r end
+    end
+    table.sort(out, function(a, b) return (a.position or 0) > (b.position or 0) end)
+    return out
+  end)
+end
+
+local function getMembers(guildId)
+  local token, gid, err = withCreds(guildId)
+  if err then return nil, err end
+  return cachedFetch(cacheKey(gid, 'members'), TTL.members, function()
+    return fetchJson('GET', ('/guilds/%s/members?limit=1000'):format(gid), token)
+  end)
+end
+
+local function getMember(userId, guildId)
+  if not userId or userId == '' then return nil, 'BadUserId' end
+  local token, gid, err = withCreds(guildId)
+  if err then return nil, err end
+  return cachedFetch(cacheKey(gid, 'member', tostring(userId)), TTL.member, function()
+    return fetchJson('GET', ('/guilds/%s/members/%s'):format(gid, userId), token)
+  end)
+end
+
+local function userHasRole(userId, roleId, guildId)
+  if not roleId or roleId == '' then return false end
+  local member, err = getMember(userId, guildId)
+  if not member then return false, err end
+  for _, r in ipairs(member.roles or {}) do
+    if r == roleId then return true end
+  end
+  return false
+end
+
+local function userHasAnyRole(userId, roleIds, guildId)
+  if type(roleIds) ~= 'table' or #roleIds == 0 then return false end
+  local member, err = getMember(userId, guildId)
+  if not member then return false, err end
+  local owned = {}
+  for _, r in ipairs(member.roles or {}) do owned[r] = true end
+  for _, rid in ipairs(roleIds) do
+    if owned[rid] then return true end
+  end
+  return false
+end
+
+local function clearCache(guildId)
+  if guildId then cacheWipe(tostring(guildId) .. ':') else cacheWipe() end
+end
+
+-- Diagnose accepts optional overrides so the admin panel can test values
+-- that are still sitting in the form (i.e. not yet saved to disk).
+local function diagnose(overrideToken, overrideGuildId)
+  local cfgToken, cfgGuild = getCreds()
+  local token = (type(overrideToken) == 'string' and overrideToken ~= '') and overrideToken or cfgToken
+  local guildId = (type(overrideGuildId) == 'string' and overrideGuildId ~= '') and overrideGuildId or cfgGuild
+
+  local checks = {}
+  local result = { ok = false, bot = nil, guild = nil, checks = checks }
+
+  if not token or not guildId then
+    checks[#checks + 1] = {
+      id = 'config',
+      ok = false,
+      message = (not token and not guildId) and 'Bot Token and Guild ID are both empty'
+        or (not token) and 'Bot Token is empty'
+        or 'Guild ID is empty',
+    }
+    return result
+  end
+
+  local me, meErr = fetchJson('GET', '/users/@me', token)
+  if not me then
+    checks[#checks + 1] = {
+      id = 'token',
+      ok = false,
+      message = meErr == 'HTTP 401' and 'Bot Token is invalid (401)' or ('Identity check failed (' .. tostring(meErr) .. ')'),
+    }
+    return result
+  end
+  result.bot = me
+  checks[#checks + 1] = {
+    id = 'token',
+    ok = true,
+    message = ('Authenticated as %s'):format(me.username or me.id or '?'),
+  }
+
+  local guild, gErr = fetchJson('GET', ('/guilds/%s'):format(guildId), token)
+  if not guild then
+    checks[#checks + 1] = {
+      id = 'guild',
+      ok = false,
+      message = gErr == 'HTTP 403' and 'Bot is not a member of this guild — invite it first'
+        or gErr == 'HTTP 404' and 'Guild not found — check the Guild ID'
+        or ('Guild check failed (' .. tostring(gErr) .. ')'),
+    }
+    return result
+  end
+  result.guild = guild
+  checks[#checks + 1] = {
+    id = 'guild',
+    ok = true,
+    message = ('Connected to "%s"'):format(guild.name or guildId),
+  }
+
+  local _, mErr = fetchJson('GET', ('/guilds/%s/members?limit=1'):format(guildId), token)
+  if mErr then
+    checks[#checks + 1] = {
+      id = 'intent',
+      ok = false,
+      message = mErr == 'HTTP 403'
+        and 'Server Members Intent missing — enable it on the Bot page of the Developer Portal'
+        or ('Member fetch failed (' .. tostring(mErr) .. ')'),
+    }
+  else
+    checks[#checks + 1] = {
+      id = 'intent',
+      ok = true,
+      message = 'Server Members Intent enabled',
+    }
+  end
+
+  local roles, rErr = fetchJson('GET', ('/guilds/%s/roles'):format(guildId), token)
+  if roles then
+    local count = 0
+    for _, r in ipairs(roles) do if r.id ~= guildId then count = count + 1 end end
+    checks[#checks + 1] = {
+      id = 'roles',
+      ok = true,
+      message = ('%d role%s available'):format(count, count == 1 and '' or 's'),
+    }
+  else
+    checks[#checks + 1] = {
+      id = 'roles',
+      ok = false,
+      message = ('Role fetch failed (' .. tostring(rErr) .. ')'),
+    }
+  end
+
+  result.ok = true
+  for _, c in ipairs(checks) do
+    if c.id == 'token' or c.id == 'guild' then
+      if not c.ok then result.ok = false break end
+    end
+  end
+
+  return result
+end
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Cross-resource exports (consumer-facing). The modules/discord/server.lua
+-- proxy reaches these. Sync from the consumer's POV — FiveM dispatches
+-- exports inline within the same process.
+-- ─────────────────────────────────────────────────────────────────────────
+
+exports('discord_isConfigured',  function()                      return isConfigured() end)
+exports('discord_getGuild',      function(guildId)               return getGuild(guildId) end)
+exports('discord_getRoles',      function(guildId)               return getRoles(guildId) end)
+exports('discord_getMembers',    function(guildId)               return getMembers(guildId) end)
+exports('discord_getMember',     function(userId, guildId)       return getMember(userId, guildId) end)
+exports('discord_userHasRole',   function(userId, roleId, gid)   return userHasRole(userId, roleId, gid) end)
+exports('discord_userHasAnyRole',function(userId, roleIds, gid)  return userHasAnyRole(userId, roleIds, gid) end)
+exports('discord_clearCache',    function(guildId)               clearCache(guildId) end)
+exports('discord_diagnose',      function(token, guildId)        return diagnose(token, guildId) end)
+
+-- Admin-gated NUI/callback for the /dirk_lib panel "Test Connection"
+-- button. Lives here so it's registered at boot — previously sat inside
+-- a lazy-loaded module, which meant the test hung forever until some
+-- consumer first dereferenced lib.discord.
+do
+  local DEFAULT_MASTER = 'group.admin,admin,command'
+  local function isMaster(src)
+    if not src or src == 0 then return true end
+    local cv = GetConvar('dirk_lib_master_group', DEFAULT_MASTER)
+    if cv == nil or cv == '' then cv = DEFAULT_MASTER end
+    for perm in cv:gmatch('[^,]+') do
+      perm = perm:match('^%s*(.-)%s*$')
+      if perm ~= '' and IsPlayerAceAllowed(src, perm) then return true end
+    end
+    return false
+  end
+
+  lib.callback.register('dirk_lib:discord:diagnose', function(src, overrideToken, overrideGuildId)
+    if not isMaster(src) then
+      return { ok = false, checks = { { id = 'acl', ok = false, message = 'Not authorised' } } }
+    end
+    return diagnose(overrideToken, overrideGuildId)
+  end)
+end

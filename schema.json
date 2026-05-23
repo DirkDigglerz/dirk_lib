@@ -282,6 +282,24 @@
       }
     },
 
+    "discord": {
+      "type": "object",
+      "description": "Discord bot credentials used by lib.discord for role lookups, member queries, and any other Discord-backed feature across dirk_lib consumers. Leave blank to disable — features that need it will surface a friendly 'configure in /dirk_lib' message instead of silently failing.",
+      "properties": {
+        "botToken": {
+          "type": "string",
+          "default": "",
+          "x-serverOnly": true,
+          "description": "Bot token for the Discord application that lib.discord authenticates as. NEVER leaves the server — stripped from any client-bound snapshot."
+        },
+        "guildId": {
+          "type": "string",
+          "default": "",
+          "description": "Guild (Discord server) ID lib.discord targets by default. Used for role lists, member lookups, etc."
+        }
+      }
+    },
+
     "advanced": {
       "type": "object",
       "description": "Low-level knobs most servers should leave alone.",

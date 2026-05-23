@@ -178,6 +178,23 @@ if context == 'client' then
     end)
   end)
 
+  -- Discord connection diagnostic — fires when the admin clicks "Test
+  -- Connection" in the Discord tab. Server-bounced so it can hit Discord
+  -- with the (server-only) bot token. Form values are forwarded so the
+  -- test runs against what the admin has *typed*, even before they save.
+  RegisterNuiCallback('DISCORD_DIAGNOSE', function(data, cb)
+    CreateThread(function()
+      local token = type(data) == 'table' and type(data.botToken) == 'string' and data.botToken or nil
+      local guild = type(data) == 'table' and type(data.guildId)  == 'string' and data.guildId  or nil
+      local ok, result = pcall(lib.callback.await, 'dirk_lib:discord:diagnose', token, guild)
+      if ok and type(result) == 'table' then
+        cb(result)
+      else
+        cb({ ok = false, checks = { { id = 'transport', ok = false, message = 'Server callback failed' } } })
+      end
+    end)
+  end)
+
   return
 end
 
