@@ -43,7 +43,7 @@ const GROUPS: FieldGroup[] = [
   {
     labelKey: "dirk_lib_bridging_group_inventory",
     fields: [
-      { key: "inventory", labelKey: "dirk_lib_bridging_inventory_label", tooltipKey: "dirk_lib_bridging_inventory_tooltip", options: withAuto(["dirk_inventory", "ox_inventory", "qb-inventory", "qs-inventory", "codem-inventory", "tgiann_inventory", "mf-inventory", "core_inventory", "ak47_inventory"]) },
+      { key: "inventory", labelKey: "dirk_lib_bridging_inventory_label", tooltipKey: "dirk_lib_bridging_inventory_tooltip", options: withAuto(["dirk_inventory", "ox_inventory", "qb-inventory", "qs-inventory", "codem-inventory", "tgiann-inventory", "mf-inventory", "core_inventory", "ak47_inventory"]) },
       { key: "target",    labelKey: "dirk_lib_bridging_target_label",    tooltipKey: "dirk_lib_bridging_target_tooltip",    options: withAuto(["ox_target", "qb-target", "q-target", "bt-target"]) },
       { key: "interact",  labelKey: "dirk_lib_bridging_interact_label",  tooltipKey: "dirk_lib_bridging_interact_tooltip",  options: withAuto(["redm-uiprompt", "sleepless_interact", "interact"]) },
     ],
@@ -68,7 +68,7 @@ const GROUPS: FieldGroup[] = [
     labelKey: "dirk_lib_bridging_group_player",
     fields: [
       { key: "phone",     labelKey: "dirk_lib_bridging_phone_label",     tooltipKey: "dirk_lib_bridging_phone_tooltip",     options: withAuto(["lb-phone", "qb-phone", "gksphone", "high-phone", "npwd"]) },
-      { key: "clothing",  labelKey: "dirk_lib_bridging_clothing_label",  tooltipKey: "dirk_lib_bridging_clothing_tooltip",  options: withAuto(["esx_skin", "qb-clothing", "rcore_clothing", "illenium-appearance", "fivem-appearance", "dirk_charCreator", "tgiann_clothing"]) },
+      { key: "clothing",  labelKey: "dirk_lib_bridging_clothing_label",  tooltipKey: "dirk_lib_bridging_clothing_tooltip",  options: withAuto(["esx_skin", "qb-clothing", "rcore_clothing", "illenium-appearance", "fivem-appearance", "dirk_charCreator", "tgiann-clothing"]) },
       { key: "skills",    labelKey: "dirk_lib_bridging_skills_label",    tooltipKey: "dirk_lib_bridging_skills_tooltip",    options: withAuto(["sd_skills", "evolent_skills", "core_skills", "B1-skillz", "skill_system_v1.5", "skillsystem_v3", "boii_skills", "skillsystem_v2", "ot_skill_system"]) },
       { key: "ambulance", labelKey: "dirk_lib_bridging_ambulance_label", tooltipKey: "dirk_lib_bridging_ambulance_tooltip", options: withAuto(["qb-ambulancejob", "wasabi_ambulance", "core_ambulance"]) },
       { key: "prison",    labelKey: "dirk_lib_bridging_prison_label",    tooltipKey: "dirk_lib_bridging_prison_tooltip",    options: withAuto(["qb-prison", "rcore_prison", "wasabi_jail"]) },
