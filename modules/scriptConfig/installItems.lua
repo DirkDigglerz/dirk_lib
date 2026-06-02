@@ -80,8 +80,28 @@ local function pushRecord(out, name, record)
   }
 end
 
-local function walk(schemaNode, data, pathParts, out)
+-- Resolve a "#/definitions/foo" JSON-Schema $ref against the root schema.
+-- Returns the referenced node, or nil if the ref isn't resolvable.
+local function resolveRef(rootSchema, refPath)
+  if type(refPath) ~= 'string' or refPath:sub(1, 2) ~= '#/' then return nil end
+  local cur = rootSchema
+  for segment in refPath:sub(3):gmatch('[^/]+') do
+    if type(cur) ~= 'table' then return nil end
+    cur = cur[segment]
+  end
+  return type(cur) == 'table' and cur or nil
+end
+
+local function walk(schemaNode, data, pathParts, out, rootSchema)
   if type(schemaNode) ~= 'table' then return end
+
+  -- Resolve $ref before doing anything else — annotations inside the
+  -- referenced node (e.g. definitions/stage's requiredItems) should still
+  -- be reachable from any field that uses the ref.
+  if type(schemaNode['$ref']) == 'string' then
+    local resolved = resolveRef(rootSchema, schemaNode['$ref'])
+    if resolved then schemaNode = resolved end
+  end
 
   -- Handle x-installItem on the current node (scalar single-item field)
   local installItem = schemaNode['x-installItem']
@@ -129,25 +149,33 @@ local function walk(schemaNode, data, pathParts, out)
   if type(schemaNode.properties) == 'table' then
     for key, child in pairs(schemaNode.properties) do
       pathParts[#pathParts + 1] = key
-      walk(child, data, pathParts, out)
+      walk(child, data, pathParts, out, rootSchema)
       pathParts[#pathParts] = nil
     end
   end
 
-  -- Recurse into array items' properties — for nested item refs inside list
-  -- entries (e.g. a per-fish reward-items array carrying x-installItem on its
-  -- name field). Note: we don't auto-walk every list entry's properties,
-  -- only when there's an `items.properties` schema node; the outer
-  -- x-installItemList already handles flat arrays-of-items.
-  if type(schemaNode.items) == 'table' and type(schemaNode.items.properties) == 'table' then
-    -- We can't address individual array entries via a static path, so this
-    -- branch is skipped. Add support if a real use case shows up.
+  -- Recurse into array items by iterating the actual data array. Each entry
+  -- gets visited with the path extended by its numeric index so annotations
+  -- on the item schema (or on properties nested deeper, e.g.
+  -- labs[].stages[].requiredItems) can resolve their data values via
+  -- getAtPath. Without this we miss every annotation that lives inside an
+  -- array's item shape — including druglabsv2's stage.requiredItems /
+  -- rewardItems / ingOrders.items.
+  if type(schemaNode.items) == 'table' then
+    local arr = getAtPath(data, pathParts)
+    if type(arr) == 'table' then
+      for i = 1, #arr do
+        pathParts[#pathParts + 1] = i
+        walk(schemaNode.items, data, pathParts, out, rootSchema)
+        pathParts[#pathParts] = nil
+      end
+    end
   end
 end
 
 local function collectInstallItems(schema, scriptConfig)
   local out = {}
-  walk(schema, scriptConfig, {}, out)
+  walk(schema, scriptConfig, {}, out, schema)
   -- Dedupe by name — last writer wins. Common when the same item is referenced
   -- both as a list entry and as a scalar override; the scalar's metadata is
   -- usually richer so let it overwrite.

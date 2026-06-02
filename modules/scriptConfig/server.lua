@@ -85,6 +85,13 @@ end
 -- SCHEMA UTILITIES
 -- --------------------------------------------------
 
+-- Hoisted forward declaration. Assigned in registerScriptConfig (search
+-- 'settingsSchema = schema'). Several functions above the assignment site
+-- (collectChangedLeaves, etc.) reference this — without the early local,
+-- they'd close over an undefined global and always see nil, defeating the
+-- implicit-default suppression check in the diff path.
+local settingsSchema = nil
+
 -- Recursively extracts default values from a JSON Schema node.
 -- • Objects without an explicit 'default': recurse into 'properties'
 -- • Everything else (arrays, primitives, objects with explicit 'default'): return schema.default
@@ -145,11 +152,24 @@ local function getSchemaNode(schema, dotPath)
   local current = schema
 
   for segment in dotPath:gmatch('[^.]+') do
-    if type(current) ~= 'table' or type(current.properties) ~= 'table' then
-      return nil
-    end
+    if type(current) ~= 'table' then return nil end
 
-    current = current.properties[segment]
+    -- Arrays in JSON Schema describe per-element shape via `items`, not
+    -- `properties`. A path segment that lands on an array node represents
+    -- an array index (or `x-arrayKey` value) — there's no per-index schema,
+    -- so descend into `items` and consume the segment.
+    --
+    -- Without this, any path through an array (e.g. `labs.1.access.public`)
+    -- returned nil and the implicit-default check in collectChangedLeaves
+    -- couldn't see the schema default — producing phantom "undefined → false"
+    -- change-log entries every time you saved an array item.
+    if current.type == 'array' then
+      if type(current.items) ~= 'table' then return nil end
+      current = current.items
+    else
+      if type(current.properties) ~= 'table' then return nil end
+      current = current.properties[segment]
+    end
   end
 
   return current
@@ -422,7 +442,10 @@ end
 -- --------------------------------------------------
 
 local defaults = {}
-local settingsSchema = nil
+-- settingsSchema is declared early at the top of the SCHEMA UTILITIES
+-- block so it's visible to functions defined above this point (notably
+-- collectChangedLeaves). Don't re-declare here — a second `local` would
+-- shadow the hoisted one and bring back the always-nil bug.
 scriptConfig = nil
 local client_version = 0
 local currentVer     = '0.0.0'

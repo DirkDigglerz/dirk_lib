@@ -29,6 +29,11 @@ files {
   'modules/**/client.lua',
   'modules/**/server.lua',
   'modules/**/shared.lua',
+  -- Admin tools subsystem (modules/scriptConfig/admin/) uses free-form file
+  -- names (init.lua, tools/<toolname>.lua) rather than the strict
+  -- client.lua/server.lua convention, so its files don't match the patterns
+  -- above. Wildcard the entire subtree.
+  'modules/scriptConfig/admin/**/*.lua',
   'bridge/**/client.lua',
   'bridge/**/server.lua',
   'bridge/**/shared.lua',

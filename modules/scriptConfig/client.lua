@@ -260,6 +260,11 @@ local openSettingsUi = function()
 
 
   settingsUiOpen = true
+  -- Lifecycle event for the admin-tool subsystem (modules/scriptConfig/admin).
+  -- Flips the shared `adminEditing` flag so position/goto/etc tools become
+  -- callable. Fired AFTER server-side perms validation (the server only
+  -- triggers `<resource>:openScriptConfig` when canEditScript passes).
+  TriggerEvent('dirk_lib:scriptConfigOpened', scriptName)
 
   while IsScreenblurFadeRunning() do Wait(0) end
   TriggerScreenblurFadeIn(0)
@@ -293,6 +298,10 @@ closeSettingsUi = function(opts)
   if not hasUI then return end
   if not settingsUiOpen then return end
   settingsUiOpen = false
+  -- Mirror of the open event — flips the admin-tool subsystem flag back to
+  -- false so position/goto/etc tools can't be triggered once the panel is
+  -- gone, even if a stale NUI iframe somehow stays alive.
+  TriggerEvent('dirk_lib:scriptConfigClosed', scriptName)
 
   -- Drain the consumer-installed back handler under the same shot regardless
   -- of which exit path closed the panel (CONFIG_PANEL_BACK button, Esc key,
@@ -520,5 +529,10 @@ setmetatable(toRet, {
     return ensureSettingsLoaded()
   end,
 })
+
+-- Bootstrap the admin-tool subsystem (capture position, goto coord, etc).
+-- Self-contained — registers its own NUI callbacks gated on the
+-- scriptConfig open/close lifecycle events fired above.
+require '@dirk_lib/modules/scriptConfig/admin/init'
 
 return toRet
