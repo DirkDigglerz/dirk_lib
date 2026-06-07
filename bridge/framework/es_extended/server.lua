@@ -403,6 +403,68 @@ local bridge = {
   end,
 }
 
+-- ── Player discovery ─────────────────────────────────────────────────────
+-- See qb-core/server.lua's matching section for the contract — same shape,
+-- same purpose. ESX stores first/last as discrete columns rather than JSON.
+
+bridge.getOnlinePlayers = function()
+  local result = {}
+  local players = lib.FW.GetPlayers() or {}
+  for i = 1, #players do
+    local src = players[i]
+    local ply = lib.FW.GetPlayerFromId(src)
+    if ply then
+      local raw = (ply.getName and ply.getName()) or ''
+      local firstName, lastName = raw:match('^(%S+)%s+(.+)$')
+      result[#result + 1] = {
+        id        = src,
+        citizenId = ply.identifier,
+        name      = GetPlayerName(src) or '',
+        charName  = ((firstName or raw) .. ' ' .. (lastName or '')):gsub('%s+$', ''),
+        online    = true,
+      }
+    end
+  end
+  return result
+end
+
+bridge.searchPlayers = function(opts)
+  opts = opts or {}
+  local rawSearch = opts.search or ''
+  local limit = math.min(tonumber(opts.limit) or 50, 50)
+  local searchLike = '%' .. rawSearch:lower() .. '%'
+
+  local onlineByIdent = {}
+  for _, p in ipairs(bridge.getOnlinePlayers()) do
+    onlineByIdent[p.citizenId] = p.id
+  end
+
+  local rows = MySQL.query.await([[
+    SELECT identifier, firstname, lastname
+    FROM users
+    WHERE LOWER(firstname) LIKE ?
+       OR LOWER(lastname) LIKE ?
+       OR LOWER(identifier) LIKE ?
+    LIMIT ?
+  ]], { searchLike, searchLike, searchLike, limit }) or {}
+
+  local result = {}
+  for i = 1, #rows do
+    local row = rows[i]
+    local first = row.firstname or ''
+    local last  = row.lastname or ''
+    local online = onlineByIdent[row.identifier]
+    result[#result + 1] = {
+      id        = online,
+      citizenId = row.identifier,
+      name      = '', -- ESX users table doesn't carry the steam/discord name; left blank
+      charName  = (first .. ' ' .. last):gsub('^%s+', ''):gsub('%s+$', ''),
+      online    = online ~= nil,
+    }
+  end
+  return result
+end
+
 if lib.onSettings then
   lib.onSettings('itemImgPath', function() cachedItems = nil end)
 end

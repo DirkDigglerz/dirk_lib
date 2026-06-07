@@ -314,6 +314,79 @@ local bridge = {
   end,
 }
 
+-- ── Player discovery ─────────────────────────────────────────────────────
+-- Normalised player listing for admin UIs (player pickers etc.). See
+-- modules/scriptConfig/admin/tools/players.lua for the NUI-facing wrapper
+-- and lib.framework.getOnlinePlayers / searchPlayers for the public API.
+--
+-- Shape returned by both:
+--   { id = src|nil, citizenId = string, name = string, charName = string, online = boolean }
+
+local function qbCharName(charinfo)
+  charinfo = type(charinfo) == 'string' and (json.decode(charinfo) or {}) or (charinfo or {})
+  local first = charinfo.firstname or ''
+  local last  = charinfo.lastname  or ''
+  return (first .. ' ' .. last):gsub('^%s+', ''):gsub('%s+$', '')
+end
+
+bridge.getOnlinePlayers = function()
+  local result = {}
+  local players = lib.FW.Functions.GetPlayers() or {}
+  for i = 1, #players do
+    local src = players[i]
+    local ply = lib.FW.Functions.GetPlayer(src)
+    if ply then
+      result[#result + 1] = {
+        id        = src,
+        citizenId = ply.PlayerData.citizenid,
+        name      = GetPlayerName(src) or '',
+        charName  = qbCharName(ply.PlayerData.charinfo),
+        online    = true,
+      }
+    end
+  end
+  return result
+end
+
+bridge.searchPlayers = function(opts)
+  opts = opts or {}
+  local rawSearch = opts.search or ''
+  local limit = math.min(tonumber(opts.limit) or 50, 50)
+  local searchLike = '%' .. rawSearch:lower() .. '%'
+
+  -- Snapshot currently-online citizenids so we can flag rows accordingly.
+  local onlineByCitizen = {}
+  for _, p in ipairs(bridge.getOnlinePlayers()) do
+    onlineByCitizen[p.citizenId] = p.id
+  end
+
+  -- Search the persistent players table (qb stores charinfo as JSON).
+  -- LIKE on JSON_EXTRACT covers first/last name; we also look at citizenid
+  -- and account name directly. LIMIT capped at 50 to keep response small.
+  local rows = MySQL.query.await([[
+    SELECT citizenid, charinfo, name
+    FROM players
+    WHERE LOWER(JSON_UNQUOTE(JSON_EXTRACT(charinfo, '$.firstname'))) LIKE ?
+       OR LOWER(JSON_UNQUOTE(JSON_EXTRACT(charinfo, '$.lastname'))) LIKE ?
+       OR LOWER(citizenid) LIKE ?
+       OR LOWER(name) LIKE ?
+    LIMIT ?
+  ]], { searchLike, searchLike, searchLike, searchLike, limit }) or {}
+
+  local result = {}
+  for i = 1, #rows do
+    local row = rows[i]
+    result[#result + 1] = {
+      id        = onlineByCitizen[row.citizenid],
+      citizenId = row.citizenid,
+      name      = row.name or '',
+      charName  = qbCharName(row.charinfo),
+      online    = onlineByCitizen[row.citizenid] ~= nil,
+    }
+  end
+  return result
+end
+
 if lib.onSettings then
   lib.onSettings('itemImgPath', function() cachedItems = nil end)
 end

@@ -45,4 +45,16 @@ return {
   getGroupsBundle = function()
     return { jobs = getJobs(), gangs = getGangs() }
   end,
+  -- Player discovery. Proxies to the bridge — see qb-core/qbx_core/es_extended
+  -- server.lua's "Player discovery" sections. Used by the admin player picker.
+  getOnlinePlayers = function()
+    if type(frameworkBridge.getOnlinePlayers) ~= 'function' then return {} end
+    local ok, result = pcall(frameworkBridge.getOnlinePlayers)
+    return (ok and type(result) == 'table' and result) or {}
+  end,
+  searchPlayers = function(opts)
+    if type(frameworkBridge.searchPlayers) ~= 'function' then return {} end
+    local ok, result = pcall(frameworkBridge.searchPlayers, opts or {})
+    return (ok and type(result) == 'table' and result) or {}
+  end,
 }

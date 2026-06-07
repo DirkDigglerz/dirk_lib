@@ -321,6 +321,77 @@ local bridge = {
   end,
 }
 
+-- ── Player discovery ─────────────────────────────────────────────────────
+-- See qb-core/server.lua for the contract; QBX is a QB-Core fork so the
+-- `players` table schema is identical. Online listing uses qbx_core's
+-- export instead of QBCore.Functions.
+
+local function qbxCharName(charinfo)
+  charinfo = type(charinfo) == 'string' and (json.decode(charinfo) or {}) or (charinfo or {})
+  local first = charinfo.firstname or ''
+  local last  = charinfo.lastname  or ''
+  return (first .. ' ' .. last):gsub('^%s+', ''):gsub('%s+$', '')
+end
+
+bridge.getOnlinePlayers = function()
+  local result = {}
+  -- QBX doesn't expose its own GetPlayers export (only the singular
+  -- GetPlayer). Use the FiveM-native GetPlayers() which returns string-typed
+  -- source ids — tonumber them before passing to GetPlayer.
+  local players = GetPlayers() or {}
+  for i = 1, #players do
+    local src = tonumber(players[i])
+    if src then
+      local ply = exports['qbx_core']:GetPlayer(src)
+      if ply then
+        result[#result + 1] = {
+          id        = src,
+          citizenId = ply.PlayerData.citizenid,
+          name      = GetPlayerName(src) or '',
+          charName  = qbxCharName(ply.PlayerData.charinfo),
+          online    = true,
+        }
+      end
+    end
+  end
+  return result
+end
+
+bridge.searchPlayers = function(opts)
+  opts = opts or {}
+  local rawSearch = opts.search or ''
+  local limit = math.min(tonumber(opts.limit) or 50, 50)
+  local searchLike = '%' .. rawSearch:lower() .. '%'
+
+  local onlineByCitizen = {}
+  for _, p in ipairs(bridge.getOnlinePlayers()) do
+    onlineByCitizen[p.citizenId] = p.id
+  end
+
+  local rows = MySQL.query.await([[
+    SELECT citizenid, charinfo, name
+    FROM players
+    WHERE LOWER(JSON_UNQUOTE(JSON_EXTRACT(charinfo, '$.firstname'))) LIKE ?
+       OR LOWER(JSON_UNQUOTE(JSON_EXTRACT(charinfo, '$.lastname'))) LIKE ?
+       OR LOWER(citizenid) LIKE ?
+       OR LOWER(name) LIKE ?
+    LIMIT ?
+  ]], { searchLike, searchLike, searchLike, searchLike, limit }) or {}
+
+  local result = {}
+  for i = 1, #rows do
+    local row = rows[i]
+    result[#result + 1] = {
+      id        = onlineByCitizen[row.citizenid],
+      citizenId = row.citizenid,
+      name      = row.name or '',
+      charName  = qbxCharName(row.charinfo),
+      online    = onlineByCitizen[row.citizenid] ~= nil,
+    }
+  end
+  return result
+end
+
 if lib.onSettings then
   lib.onSettings('itemImgPath', function() cachedItems = nil end)
 end

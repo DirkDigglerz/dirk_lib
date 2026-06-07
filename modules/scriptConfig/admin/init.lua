@@ -85,3 +85,41 @@ end)
 -- one require line below — no central registry to wire up.
 require '@dirk_lib/modules/scriptConfig/admin/tools/position'
 require '@dirk_lib/modules/scriptConfig/admin/tools/models'
+require '@dirk_lib/modules/scriptConfig/admin/tools/players'
+
+-- ── pickDoor forwarder ────────────────────────────────────────────────
+-- The picker logic lives in dirk_lib's own VM (src/devtools/client/
+-- pickDoorTool.lua) so it draws sphere/outline natives from a clean
+-- render context. This consumer-side forwarder just relays:
+--
+--   ADMIN_TOOL_BEGIN {id='pickDoor'} → dirk_lib:adminTool:pickDoor:begin
+--                                         (handled in dirk_lib's VM)
+--   ↓ picker runs ↓
+--   dirk_lib:adminTool:pickDoor:result → SendNuiMessage to this
+--                                         consumer's NUI so the React
+--                                         promise resolver settles
+--
+-- Two thin lines per direction, zero picker logic in the consumer.
+
+_G.__dirkLibAdminToolHandlers.begin['pickDoor'] = function()
+  -- SetNuiFocus is per-resource. The admin clicked Pick Door from THIS
+  -- consumer's NUI, so this consumer owns the focus — dirk_lib calling
+  -- SetNuiFocus(false, false) from its own VM wouldn't release it.
+  -- Release here, regrab on result below.
+  SetNuiFocus(false, false)
+  TriggerScreenblurFadeOut(0)
+  TriggerEvent('dirk_lib:adminTool:pickDoor:begin', cache.resource)
+end
+
+AddEventHandler('dirk_lib:adminTool:pickDoor:result', function(originResource, payload)
+  -- Only relay results meant for THIS consumer — every consumer's init
+  -- runs in its own VM and listens to the same global event, so we
+  -- filter on the origin tag the tool fired with.
+  if originResource ~= cache.resource then return end
+  SetNuiFocus(true, true)
+  TriggerScreenblurFadeIn(0)
+  SendNuiMessage(json.encode({
+    action = payload and 'pickDoor_RESULT' or 'pickDoor_CANCELLED',
+    data   = payload,
+  }))
+end)

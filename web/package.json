@@ -11,6 +11,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@adamscybot/react-leaflet-component-marker": "^2.0.3",
     "@fortawesome/fontawesome-svg-core": "^7.1.0",
     "@fortawesome/free-brands-svg-icons": "^7.1.0",
     "@fortawesome/free-regular-svg-icons": "^7.1.0",
@@ -32,11 +33,13 @@
     "dirk-cfx-react": "^1.1.64",
     "embla-carousel-autoplay": "8.5.2",
     "framer-motion": "^12.23.26",
+    "leaflet": "^1.9.4",
     "lucide-react": "^0.563.0",
     "react": "^19.2.3",
     "react-circular-menu": "^2.4.15",
     "react-dom": "^19.2.3",
     "react-icons": "^5.4.0",
+    "react-leaflet": "^5.0.0",
     "react-scale-text": "^1.2.2",
     "usehooks-ts": "^3.1.0",
     "zustand": "^5.0.9"

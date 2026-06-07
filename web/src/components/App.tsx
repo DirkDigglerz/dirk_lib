@@ -13,6 +13,7 @@ import Menu from './Context/main';
 import Dialog from './Dialog/main';
 import GizmoOverlay from './Gizmo/main';
 import Input from './Input/main';
+import Instructions from './Instructions/main';
 import Keycode from './Keycode/main';
 import KeyInputs from './KeyInputs/main';
 import Notifications from './Notify/main';
@@ -70,6 +71,7 @@ const App: React.FC = () => {
       <StatusInfo />
       <GizmoOverlay />
       <AlertDialog />
+      <Instructions />
       <ScriptConfigChooser />
       <AdminSection />
     </DirkProvider>

@@ -1157,4 +1157,9 @@ CreateThread(function()
   end, {})
 end)
 
+-- Admin-tool server-side counterparts. Add new ones via a sibling
+-- _server.lua file under admin/tools/ and require it below — same pattern
+-- as admin/init.lua's client-side tool loader.
+require '@dirk_lib/modules/scriptConfig/admin/tools/players_server'
+
 return toRet
