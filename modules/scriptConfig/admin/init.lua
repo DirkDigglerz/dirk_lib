@@ -7,16 +7,13 @@
 -- per-consumer Lua, no fxmanifest tweaks, no manual hooks.
 --
 -- Tools live under tools/* and each one:
---   • Registers its own NUI callbacks (ADMIN_TOOL_BEGIN / ADMIN_TOOL_INVOKE
---     handlers route to the correct tool by `data.id`)
---   • Adds its function(s) to the `lib.adminTool.*` namespace
---   • Self-guards on the shared "admin panel currently open" flag below
+--   • Calls `lib.adminTool.register(id, kind, fn)` to plug into the
+--     central NUI dispatcher — no per-tool RegisterNUICallback needed.
+--   • Adds its public Lua API (if any) to the `lib.adminTool.*` namespace.
+--   • Self-guards on `lib.adminTool.isEditing()` so a NUI iframe that
+--     somehow stays alive after the admin closes the panel can't fire
+--     tools.
 --
--- The flag below is the only thing shared across tools — flipped true when
--- the scriptConfig admin UI opens (server already validated perms at that
--- point) and false when it closes. Every tool's NUI handler checks the
--- flag before doing anything, so a player who somehow keeps an NUI iframe
--- alive after losing admin perms can't trigger tools.
 -- `lib` has a __index lazy loader that returns a loader-function for any
 -- key not already present (so `lib.foo` tries to load `modules/foo`). That
 -- means `lib.adminTool = lib.adminTool or {}` would see the loader function
@@ -27,7 +24,8 @@ end
 
 local adminEditing = false
 
-function _G.__dirkLibIsAdminEditing()
+---@return boolean editing True while the scriptConfig admin panel is open.
+function lib.adminTool.isEditing()
   return adminEditing
 end
 
@@ -39,21 +37,43 @@ AddEventHandler('dirk_lib:scriptConfigClosed', function()
   adminEditing = false
 end)
 
--- ── Central NUI callback dispatchers ──────────────────────────────────────
--- Tools register their handlers via `adminToolHandlers[id]` rather than
--- their own RegisterNUICallback. Keeps the NUI surface tight (two endpoints
--- total) and means tool authors don't need to think about NUI plumbing.
-_G.__dirkLibAdminToolHandlers = _G.__dirkLibAdminToolHandlers or {
-  begin  = {}, -- id -> function() — long-running flows like capturePosition
-  invoke = {}, -- id -> function(payload) — fire-and-forget like gotoCoord
-  query  = {}, -- id -> function(payload) -> result — request/response like validateModels
-}
+-- ── Central handler registry + NUI dispatchers ───────────────────────────
+-- One entry per (kind, id). `kind` reflects the NUI lifecycle the React
+-- side expects:
+--   begin  — long-running flow (capture position, pick door). React fires
+--            ADMIN_TOOL_BEGIN, Lua does work, sends back <id>_RESULT or
+--            <id>_CANCELLED via SendNuiMessage when it's done.
+--   invoke — fire-and-forget (gotoCoord). React fires ADMIN_TOOL_INVOKE,
+--            Lua does the work, no reply.
+--   query  — sync request/response (validateModels). React fires
+--            ADMIN_TOOL_QUERY, fetchNui resolves with the return value.
+local handlers = { begin = {}, invoke = {}, query = {} }
+
+---Register a handler for one admin-tool NUI dispatch.
+---@param id     string  Tool id. Matches `data.id` from the React fetchNui call.
+---@param kind   '"begin"'|'"invoke"'|'"query"'
+---@param fn     function Handler. begin/invoke receive `data`; query receives `data` and returns the response value.
+function lib.adminTool.register(id, kind, fn)
+  if type(id) ~= 'string' or id == '' then
+    lib.print.warn('[lib.adminTool.register] id (string) is required')
+    return
+  end
+  if not handlers[kind] then
+    lib.print.warn(('[lib.adminTool.register] unknown kind "%s" — expected begin|invoke|query'):format(tostring(kind)))
+    return
+  end
+  if type(fn) ~= 'function' then
+    lib.print.warn(('[lib.adminTool.register] handler for [%s/%s] must be a function'):format(kind, id))
+    return
+  end
+  handlers[kind][id] = fn
+end
 
 RegisterNUICallback('ADMIN_TOOL_BEGIN', function(data, cb)
   cb({})
   if not adminEditing then return end
   if type(data) ~= 'table' or type(data.id) ~= 'string' then return end
-  local handler = _G.__dirkLibAdminToolHandlers.begin[data.id]
+  local handler = handlers.begin[data.id]
   if type(handler) == 'function' then handler(data) end
 end)
 
@@ -61,17 +81,14 @@ RegisterNUICallback('ADMIN_TOOL_INVOKE', function(data, cb)
   cb({})
   if not adminEditing then return end
   if type(data) ~= 'table' or type(data.id) ~= 'string' then return end
-  local handler = _G.__dirkLibAdminToolHandlers.invoke[data.id]
+  local handler = handlers.invoke[data.id]
   if type(handler) == 'function' then handler(data) end
 end)
 
--- Query dispatcher: synchronous request/response. Handler returns a value
--- which is sent back via cb so fetchNui resolves with it. Used by tools
--- where the React side needs an answer (e.g. validateModels).
 RegisterNUICallback('ADMIN_TOOL_QUERY', function(data, cb)
   if not adminEditing then return cb(nil) end
   if type(data) ~= 'table' or type(data.id) ~= 'string' then return cb(nil) end
-  local handler = _G.__dirkLibAdminToolHandlers.query[data.id]
+  local handler = handlers.query[data.id]
   if type(handler) ~= 'function' then return cb(nil) end
   local ok, result = pcall(handler, data)
   if not ok then
@@ -88,7 +105,7 @@ require '@dirk_lib/modules/scriptConfig/admin/tools/models'
 require '@dirk_lib/modules/scriptConfig/admin/tools/players'
 
 -- ── pickDoor forwarder ────────────────────────────────────────────────
--- The picker logic lives in dirk_lib's own VM (src/devtools/client/
+-- The picker logic lives in dirk_lib's own VM (src/tools/client/
 -- pickDoorTool.lua) so it draws sphere/outline natives from a clean
 -- render context. This consumer-side forwarder just relays:
 --
@@ -100,8 +117,7 @@ require '@dirk_lib/modules/scriptConfig/admin/tools/players'
 --                                         promise resolver settles
 --
 -- Two thin lines per direction, zero picker logic in the consumer.
-
-_G.__dirkLibAdminToolHandlers.begin['pickDoor'] = function()
+lib.adminTool.register('pickDoor', 'begin', function()
   -- SetNuiFocus is per-resource. The admin clicked Pick Door from THIS
   -- consumer's NUI, so this consumer owns the focus — dirk_lib calling
   -- SetNuiFocus(false, false) from its own VM wouldn't release it.
@@ -109,7 +125,7 @@ _G.__dirkLibAdminToolHandlers.begin['pickDoor'] = function()
   SetNuiFocus(false, false)
   TriggerScreenblurFadeOut(0)
   TriggerEvent('dirk_lib:adminTool:pickDoor:begin', cache.resource)
-end
+end)
 
 AddEventHandler('dirk_lib:adminTool:pickDoor:result', function(originResource, payload)
   -- Only relay results meant for THIS consumer — every consumer's init

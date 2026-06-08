@@ -1157,9 +1157,10 @@ CreateThread(function()
   end, {})
 end)
 
--- Admin-tool server-side counterparts. Add new ones via a sibling
--- _server.lua file under admin/tools/ and require it below — same pattern
--- as admin/init.lua's client-side tool loader.
-require '@dirk_lib/modules/scriptConfig/admin/tools/players_server'
+-- Admin-tool server-side counterparts now live under dirk_lib's own
+-- src/helpers/ tree and load via the `src/**/server.lua` glob in
+-- fxmanifest — no manual require needed here. Kept this comment as a
+-- breadcrumb in case future grep brings someone looking for the old
+-- require path.
 
 return toRet

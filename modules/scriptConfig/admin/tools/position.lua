@@ -30,6 +30,7 @@ local function endCapture(success, payload)
   capturing = false
   SetNuiFocus(true, true)
   TriggerScreenblurFadeIn(0)
+  lib.hideInstructions()
   if success then
     SendNuiMessage(json.encode({
       action = TOOL_ID .. '_RESULT',
@@ -49,13 +50,16 @@ local function endCapture(success, payload)
   captureCallback = nil
 end
 
-local function startCapture(cb)
+local function startCapture(cb, instructions)
   if capturing then return end
   capturing = true
   captureCallback = cb
 
   SetNuiFocus(false, false)
   TriggerScreenblurFadeOut(0)
+  if type(instructions) == 'table' and instructions.title then
+    lib.showInstructions(instructions)
+  end
 
   CreateThread(function()
     while capturing do
@@ -84,7 +88,7 @@ local function startCapture(cb)
 end
 
 lib.adminTool.capturePosition = function(cb)
-  if not _G.__dirkLibIsAdminEditing() then
+  if not lib.adminTool.isEditing() then
     if type(cb) == 'function' then cb(nil) end
     return
   end
@@ -92,7 +96,7 @@ lib.adminTool.capturePosition = function(cb)
 end
 
 lib.adminTool.gotoCoord = function(v)
-  if not _G.__dirkLibIsAdminEditing() then return end
+  if not lib.adminTool.isEditing() then return end
   if type(v) ~= 'table' then return end
   local x = tonumber(v.x) or 0.0
   local y = tonumber(v.y) or 0.0
@@ -107,14 +111,16 @@ lib.adminTool.gotoCoord = function(v)
 end
 
 -- Wire the NUI dispatchers to this tool.
-_G.__dirkLibAdminToolHandlers.begin[TOOL_ID] = function()
+lib.adminTool.register(TOOL_ID, 'begin', function(data)
   -- React side just wants the result via SendNuiMessage; no direct cb.
-  startCapture(nil)
-end
+  -- `data.instructions` is the {title, hint, keys} spec from the React
+  -- WorldPositionPicker — drives the bottom-right card via showInstructions.
+  startCapture(nil, data and data.instructions)
+end)
 
-_G.__dirkLibAdminToolHandlers.invoke['gotoCoord'] = function(data)
+lib.adminTool.register('gotoCoord', 'invoke', function(data)
   lib.adminTool.gotoCoord(data and data.value)
-end
+end)
 
 -- Safety: if the resource stops mid-capture, restore focus so the admin
 -- isn't left cursorless. NUI is gone so SendNuiMessage no-ops anyway.
@@ -123,5 +129,6 @@ AddEventHandler('onResourceStop', function(name)
     capturing = false
     captureCallback = nil
     SetNuiFocus(false, false)
+    lib.hideInstructions()
   end
 end)

@@ -4,8 +4,15 @@
 -- ONLY. Consumers run their auth checks server-side and then call the
 -- server API directly — no client-trusted lock toggles. The client side
 -- exists for two things only:
---   1. lib.doorlock.pick()  — an in-world door picker for admin UIs
---   2. lib.doorlock.list()  — read-only inspection via server callback
+--   1. lib.doorlock.pick()    — an in-world door picker for admin UIs
+--   2. lib.doorlock.cancel()  — external cancel for any in-flight pick
+--   3. lib.doorlock.list()    — read-only inspection via server callback
+
+-- Module-level handle to the active picker's finish() closure. nil when
+-- no picker is running. Exposed via lib.doorlock.cancel() so external
+-- callers (e.g. an admin tool watching for its invoking consumer
+-- resource to stop) can force-resolve the pick with nil.
+local activeCancel = nil
 
 -- Interactive door picker. Spawns an in-world prompt that highlights the
 -- entity the admin is currently aiming at; on confirm returns the door's
@@ -84,8 +91,16 @@ local function pickDoor(options)
     if showPrompt then lib.hideInstructions() end
     if deathHandler then RemoveEventHandler(deathHandler); deathHandler = nil end
     if stopHandler  then RemoveEventHandler(stopHandler);  stopHandler  = nil end
+    -- Clear the module-level cancel handle so a subsequent
+    -- lib.doorlock.cancel() doesn't try to re-finish a dead picker.
+    if activeCancel == finish then activeCancel = nil end
     p:resolve(value)
   end
+
+  -- Publish this pick's finish as the active cancel target. If another
+  -- pick was somehow active, the new one wins — caller's responsibility
+  -- not to overlap picks.
+  activeCancel = finish
 
   -- Death watcher. Player dies mid-pick → cancel.
   deathHandler = AddEventHandler('dirk_lib:cache:dead', function(isDead)
@@ -186,8 +201,6 @@ local function pickDoor(options)
     -- entire system and only fires on the physical Backspace key.
     local VK_BACKSPACE = 8
     local prevBackspace = false
-    -- Tracks last debug-printed entity so we only log on change.
-    local debugLastEntity = -1
 
     while not done do
       Wait(0)
@@ -197,29 +210,6 @@ local function pickDoor(options)
       local aimCoords, entity = castFromCamera()
       local validEntity = entity and entity > 0
       local inGroup     = validEntity and group[entity] ~= nil
-
-      -- DEBUG: print entity info once per change so we can diagnose why
-      -- SetEntityDrawOutline isn't rendering fully. Remove after diagnosis.
-      if entity ~= debugLastEntity then
-        debugLastEntity = entity
-        if validEntity then
-          local model      = GetEntityModel(entity)
-          local etype      = GetEntityType(entity)
-          local exists     = DoesEntityExist(entity)
-          local isNetworked = NetworkGetEntityIsNetworked(entity)
-          local owner      = NetworkGetEntityOwner(entity)
-          print(('[doorlock DEBUG] entity=%s model=0x%X type=%s exists=%s networked=%s owner=%s'):format(
-            tostring(entity),
-            tonumber(model) or 0,
-            tostring(etype),
-            tostring(exists),
-            tostring(isNetworked),
-            tostring(owner)
-          ))
-        else
-          print('[doorlock DEBUG] entity=0 (no hit)')
-        end
-      end
 
       -- Compute desired outline set for this frame: every group door +
       -- the aim target. Colours: group+aimed → RED, group+notAimed →
@@ -255,13 +245,15 @@ local function pickDoor(options)
         outlined[entity] = true
       end
 
-      -- Aim sphere at whatever surface the crosshair lands on. Sized big
-      -- enough to be visible from typical admin pick distances.
+      -- Aim sphere (DrawSphere — white, where the crosshair lands).
       DrawSphere(aimCoords.x, aimCoords.y, aimCoords.z, 0.15, 255, 255, 255, 220)
 
-      -- Group centroid sphere — same DrawSphere shape and size as the
-      -- aim sphere so the two visuals feel consistent. Green to distinguish
-      -- from the white aim cursor.
+      -- Group centroid uses DrawMarker(28) instead of a second DrawSphere
+      -- because two DrawSphere calls per frame were only rendering one of
+      -- them in our setup (cause unknown — possibly a per-frame quota on
+      -- the debug-sphere native). Marker(28) is the production sphere
+      -- shape and supports multiple per-frame calls reliably. Visual
+      -- size matched to the aim sphere via scale 0.3 (≈ radius 0.15).
       if groupCount > 0 then
         local sx, sy, sz, n = 0.0, 0.0, 0.0, 0
         for ent, door in pairs(group) do
@@ -271,7 +263,12 @@ local function pickDoor(options)
           end
         end
         if n > 0 then
-          DrawSphere(sx / n, sy / n, sz / n, 0.15, 56, 220, 120, 220)
+          DrawMarker(28,
+            sx / n, sy / n, sz / n,
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            0.2, 0.2, 0.2,
+            56, 220, 120, 220,
+            false, true, 0, true, false, false, false)
         end
       end
 
@@ -336,6 +333,16 @@ lib.doorlock = {
   ---@param options? table { maxDistance?: number }
   ---@return table|nil result { doors = { { entity, model, coords, heading }, ... } }
   pick = pickDoor,
+
+  ---Force-cancel any in-flight pick (resolves the picker's promise
+  ---with nil). Useful when the resource that triggered the pick stops
+  ---mid-flow — admin tools watch their invoking consumer's
+  ---onResourceStop and call this so the orphaned picker cleans up
+  ---instead of waiting forever for input. No-op when no pick is
+  ---running.
+  cancel = function()
+    if activeCancel then activeCancel(nil) end
+  end,
 
   ---Read-only registry inspection. Round-trips to the server which owns
   ---the authoritative door list. Returns an array of door specs.

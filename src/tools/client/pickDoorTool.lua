@@ -1,6 +1,6 @@
 -- Pick-door admin tool — dirk_lib-owned.
 --
--- Lives in src/devtools so it loads once in dirk_lib's own VM, not in
+-- Lives in src/tools so it loads once in dirk_lib's own VM, not in
 -- every consumer that pulls dirk_lib 'scriptConfig'. Critical reasons
 -- to keep this here and NOT under modules/scriptConfig/admin/tools:
 --
@@ -35,6 +35,15 @@ AddEventHandler('dirk_lib:adminTool:' .. TOOL_ID .. ':begin', function(originRes
   -- consumer's forwarder in modules/scriptConfig/admin/init.lua
   -- releases focus before triggering this event and regrabs on result.
 
+  -- Cancel the picker if the consumer that triggered it restarts
+  -- mid-flow. Without this the picker would block forever waiting for
+  -- input that can never come (the React side that was awaiting the
+  -- result is gone). Removed after the pick completes so we don't leak
+  -- handlers across runs.
+  local originStopHandler = AddEventHandler('onResourceStop', function(name)
+    if name == originResource then lib.doorlock.cancel() end
+  end)
+
   CreateThread(function()
     local picked = lib.doorlock.pick({
       title = 'Pick Door',
@@ -47,19 +56,28 @@ AddEventHandler('dirk_lib:adminTool:' .. TOOL_ID .. ':begin', function(originRes
     })
 
     picking = false
+    if originStopHandler then RemoveEventHandler(originStopHandler) end
 
     if picked and picked.doors and #picked.doors > 0 then
+      -- Load the hash → modelName lookup table on demand. Same pattern
+      -- viewModels.lua uses. 53k entries; we drop the reference after
+      -- the lookup so it can GC.
+      local modelNames = lib.load('src.helpers.modelNames')
       -- Serialise into a plain table so SendNuiMessage round-trips it
-      -- cleanly into the React-side PickedDoorGroup shape.
+      -- cleanly into the React-side PickedDoorGroup shape. modelName is
+      -- nil for entities whose hash isn't in the lookup table (custom
+      -- props, MLO-specific assets) — React falls back to the hash.
       local panels = {}
       for i, d in ipairs(picked.doors) do
         panels[i] = {
-          model   = d.model,
-          coords  = { x = d.coords.x, y = d.coords.y, z = d.coords.z },
-          heading = d.heading,
-          isDoor  = d.isDoor,
+          model     = d.model,
+          modelName = modelNames and modelNames[d.model] or nil,
+          coords    = { x = d.coords.x, y = d.coords.y, z = d.coords.z },
+          heading   = d.heading,
+          isDoor    = d.isDoor,
         }
       end
+      modelNames = nil
       TriggerEvent('dirk_lib:adminTool:' .. TOOL_ID .. ':result', originResource, { doors = panels })
     else
       TriggerEvent('dirk_lib:adminTool:' .. TOOL_ID .. ':result', originResource, nil)

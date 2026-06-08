@@ -37,7 +37,7 @@ files {
   'bridge/**/client.lua',
   'bridge/**/server.lua',
   'bridge/**/shared.lua',
-  'src/devtools/modelNames.lua',
+  'src/helpers/modelNames.lua',
   'src/settings.lua',
   'src/redmNatives.lua',
   'src/autodetect.lua',

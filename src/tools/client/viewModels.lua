@@ -4,7 +4,7 @@ local viewingModels = false
 local viewModels = function()
   
   if not viewingModels then return end
-  local modelNames = lib.load('src.devtools.modelNames')
+  local modelNames = lib.load('src.helpers.modelNames')
   CreateThread(function()
     while viewingModels do 
       local wait_time = 0 

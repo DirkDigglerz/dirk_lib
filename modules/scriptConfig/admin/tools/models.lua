@@ -47,15 +47,15 @@ local function validateBatch(names)
 end
 
 lib.adminTool.validateModel = function(name)
-  if not _G.__dirkLibIsAdminEditing() then return false end
+  if not lib.adminTool.isEditing() then return false end
   return checkOne(name)
 end
 
 lib.adminTool.validateModels = function(names)
-  if not _G.__dirkLibIsAdminEditing() then return {} end
+  if not lib.adminTool.isEditing() then return {} end
   return validateBatch(names)
 end
 
-_G.__dirkLibAdminToolHandlers.query['validateModels'] = function(data)
+lib.adminTool.register('validateModels', 'query', function(data)
   return validateBatch(data and data.value)
-end
+end)
