@@ -1,6 +1,7 @@
-import { Flex, Select, Text, useMantineTheme } from "@mantine/core";
+import { Flex, Select, Text, TextInput, useMantineTheme } from "@mantine/core";
 import { AdminPageTitle, locale, useFormActions, useFormField } from "dirk-cfx-react";
 import { Plug } from "lucide-react";
+import { Fragment } from "react";
 import type { BridgingSettings, ScriptConfig } from "../../stores/useScriptConfig";
 import { useScriptConfig } from "../../stores/useScriptConfig";
 import { InfoLabel } from "./InfoLabel";
@@ -109,16 +110,27 @@ export default function BridgingSection() {
           <GroupLabel label={locale(group.labelKey)} />
           <Flex direction="column" gap="xs">
             {group.fields.map((field) => (
-              <Select
-                key={field.key as string}
-                label={<InfoLabel label={locale(field.labelKey)} tooltip={locale(field.tooltipKey)} />}
-                size="xs"
-                value={config[field.key] as string}
-                data={field.options.map((o) => ({ value: o, label: o }))}
-                allowDeselect={false}
-                searchable
-                onChange={(v) => v && set(field.key, v as BridgingSettings[typeof field.key])}
-              />
+              <Fragment key={field.key as string}>
+                <Select
+                  label={<InfoLabel label={locale(field.labelKey)} tooltip={locale(field.tooltipKey)} />}
+                  size="xs"
+                  value={config[field.key] as string}
+                  data={field.options.map((o) => ({ value: o, label: o }))}
+                  allowDeselect={false}
+                  searchable
+                  onChange={(v) => v && set(field.key, v as BridgingSettings[typeof field.key])}
+                />
+                {/* Item image path sits right under the inventory selector — it's a
+                    free-text path/URL, not a provider dropdown. */}
+                {field.key === "inventory" && (
+                  <TextInput
+                    label={<InfoLabel label={locale("dirk_lib_bridging_imgpath_label")} tooltip={locale("dirk_lib_bridging_imgpath_tooltip")} />}
+                    size="xs"
+                    value={config.itemImgPath ?? ""}
+                    onChange={(e) => set("itemImgPath", e.currentTarget.value)}
+                  />
+                )}
+              </Fragment>
             ))}
           </Flex>
         </div>

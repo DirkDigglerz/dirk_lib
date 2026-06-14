@@ -82,11 +82,8 @@
 
   "dirk_lib_branding_title":           "Branding",
   "dirk_lib_branding_identity_group":  "Server Identity",
-  "dirk_lib_branding_assets_group":    "Assets",
   "dirk_lib_branding_name_label":      "Server Name",
   "dirk_lib_branding_name_tooltip":    "Displayed in NUIs that surface a server name",
-  "dirk_lib_branding_imgpath_label":   "Item Image Path",
-  "dirk_lib_branding_imgpath_tooltip": "Inventory image path. 'auto' resolves from the detected inventory; override with a full nui://… or CDN URL.",
 
   "dirk_lib_localization_title":           "Localization",
   "dirk_lib_localization_strings_group":   "Strings",
@@ -119,6 +116,8 @@
   "dirk_lib_bridging_framework_tooltip": "Server framework dirk_lib reads player data from.",
   "dirk_lib_bridging_inventory_label":   "Inventory",
   "dirk_lib_bridging_inventory_tooltip": "Inventory system used for item lookups, give/remove, and image paths.",
+  "dirk_lib_bridging_imgpath_label":     "Item Image Path",
+  "dirk_lib_bridging_imgpath_tooltip":   "Inventory image path. 'auto' resolves from the detected inventory; override with a full nui://… or CDN URL.",
   "dirk_lib_bridging_target_label":      "Target",
   "dirk_lib_bridging_target_tooltip":    "Targeting system for entity interactions.",
   "dirk_lib_bridging_interact_label":    "Interact",

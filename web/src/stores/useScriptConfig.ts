@@ -14,7 +14,6 @@ export type LocalizationSettings = {
 
 export type BrandingSettings = {
   serverName: string;
-  itemImgPath: string;
 };
 
 export type BridgingSettings = {
@@ -26,10 +25,11 @@ export type BridgingSettings = {
   alertDialog: string;
   inputDialog: string;
   // Resource providers
-  framework: string;
-  inventory: string;
-  target:    string;
-  interact:  string;
+  framework:   string;
+  inventory:   string;
+  itemImgPath: string;
+  target:      string;
+  interact:    string;
   time:      string;
   keys:      string;
   fuel:      string;
@@ -105,7 +105,6 @@ export const defaultScriptConfig: ScriptConfig = {
   },
   branding: {
     serverName: "DirkRP",
-    itemImgPath: "auto",
   },
   bridging: {
     notify:      "ox_lib",
@@ -114,10 +113,11 @@ export const defaultScriptConfig: ScriptConfig = {
     contextMenu: "ox_lib",
     alertDialog: "ox_lib",
     inputDialog: "ox_lib",
-    framework: "auto",
-    inventory: "auto",
-    target:    "auto",
-    interact:  "auto",
+    framework:   "auto",
+    inventory:   "auto",
+    itemImgPath: "auto",
+    target:      "auto",
+    interact:    "auto",
     time:      "auto",
     keys:      "auto",
     fuel:      "auto",
