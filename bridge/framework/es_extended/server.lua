@@ -69,18 +69,8 @@ local bridge = {
   end,
 
   useableItem = function(item, cb)
-    return lib.FW.RegisterUsableItem(item, function(src, name, passedItem)
-      -- Stock ESX + ox_inventory hands back a usable slot object (has .slot) —
-      -- pass it straight through, unchanged.
-      if type(passedItem) == 'table' and passedItem.slot then
-        return cb(src, passedItem)
-      end
-      -- Other inventories routed through ESX's usable-item system (e.g.
-      -- tgiann-inventory) don't populate that arg, so the consumer ends up with
-      -- a nil item and no .slot. Resolve the real slot object via the
-      -- inventory-agnostic bridge instead (tgiann/qs/etc all implement this).
-      local resolved = (lib.inventory.getItemByName and lib.inventory.getItemByName(src, name)) or { name = name }
-      cb(src, resolved)
+    return lib.FW.RegisterUsableItem(item, function(src, name, item)
+      cb(src, item)
     end)
   end,
 
