@@ -106,27 +106,11 @@ local bridge = {
     return bridge.getItemByName(invId, item, md)
   end,
 
-  --- Register a usable item.
-  --- tgiann routes item-use through its own `usingItem` hook, which hands us
-  --- the exact slot + metadata the player used. We deliver that to the consumer
-  --- so the SERVER gets an authoritative { name, slot, metadata } — rather than
-  --- trusting the framework's ESX.RegisterUsableItem callback (which tgiann
-  --- leaves empty) or guessing the slot from a name lookup.
-  --- NOTE: the item must be `useable = true` in its tgiann item definition for
-  --- the hook to fire.
-  ---@param itemName string
-  ---@param cb fun(src: number, item: { name: string, slot: number, metadata: table, count: number })
-  useableItem = function(itemName, cb)
-    return exports[TGI]:registerHook('usingItem', function(payload)
-      local item = payload.item or {}
-      cb(payload.source, {
-        name     = item.name or itemName,
-        slot     = payload.slot,
-        metadata = payload.metadata or item.metadata or item.info or {},
-        count    = payload.amount or item.amount or item.count or 1,
-      })
-    end, { itemFilter = { [itemName] = true } })
-  end,
+  -- NOTE: useableItem (via tgiann's `usingItem` registerHook) is intentionally
+  -- omitted pending live verification on a tgiann box — see commit 48d54ac for
+  -- the implementation to restore. Without it, lib.inventory.useableItem falls
+  -- back to the framework bridge path (last-released behaviour), so this is not
+  -- a regression.
 
   --- Set metadata of an item at a specific slot.
   setMetadata = function(invId, slot, metadata)
