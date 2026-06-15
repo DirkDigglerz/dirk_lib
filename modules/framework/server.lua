@@ -7,6 +7,15 @@
 local settings = lib.settings
 local frameworkBridge = lib.loadBridge('framework', settings.framework, 'server')
 
+-- getGroupsBundle is fetched once by every consumer's NUI on load. On a resource
+-- restart with a full server that fans out to one full jobs+gangs rebuild per
+-- player (the same work N times in a burst). Memoise it with a short TTL so the
+-- burst collapses to a single build, while runtime job/gang changes still appear
+-- within a few seconds.
+local GROUPS_BUNDLE_TTL = 15 -- seconds
+local groupsBundleCache
+local groupsBundleCachedAt = 0
+
 local function emptyArr() return {} end
 
 local function getJobs()
@@ -41,9 +50,18 @@ return {
   getGangs  = getGangs,
   getGroups = getGroups,
   getGroup  = getGroup,
-  -- Convenience for the auto-registered NUI callback below.
+  -- Convenience for the auto-registered NUI callback below. Memoised (see TTL
+  -- note above) so a full-server restart doesn't rebuild jobs+gangs once per
+  -- player. The cached table is read-only to callers (serialised straight to
+  -- the NUI), so sharing the reference is safe.
   getGroupsBundle = function()
-    return { jobs = getJobs(), gangs = getGangs() }
+    local nowSec = os.time()
+    if groupsBundleCache and (nowSec - groupsBundleCachedAt) < GROUPS_BUNDLE_TTL then
+      return groupsBundleCache
+    end
+    groupsBundleCache = { jobs = getJobs(), gangs = getGangs() }
+    groupsBundleCachedAt = nowSec
+    return groupsBundleCache
   end,
   -- Player discovery. Proxies to the bridge — see qb-core/qbx_core/es_extended
   -- server.lua's "Player discovery" sections. Used by the admin player picker.
