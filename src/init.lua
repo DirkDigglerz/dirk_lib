@@ -201,6 +201,13 @@ end
 
 --## SERVER
 
+--## SQL DIAGNOSTICS (convar-gated, default OFF)
+-- Wraps this VM's oxmysql MySQL methods to capture SQL errors/hitches when the
+-- `dirk_diag` convar is 'true'. INERT otherwise — lib.diag.instrument() returns
+-- immediately before touching anything. MySQL.lua loads first in server_scripts,
+-- so the global exists by now. pcall'd so it can never break dirk_lib startup.
+pcall(function() lib.diag.instrument() end)
+
 if not LoadResourceFile(lib.name, 'web/build/index.html') then
   CreateThread(function()
     while true do
