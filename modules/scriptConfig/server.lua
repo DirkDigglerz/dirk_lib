@@ -628,7 +628,13 @@ local function registerScriptConfig(schema, canEditFn, rules)
     end
   end
 
-  -- Ensure table exists
+  -- Ensure table + columns exist. This shared table is probed by EVERY dirk
+  -- resource, but the module runs in each consumer's VM — so without a guard all
+  -- N consumers re-run these ~4 schema probes on boot. Gate behind a server-wide
+  -- GlobalState flag: only the first consumer this boot checks/migrates the
+  -- schema, the rest skip straight to their own row. The probes/ALTERs are
+  -- idempotent, so a concurrent first-batch race is harmless.
+  if not GlobalState.dirk_scriptConfigSchemaReady then
   local success = pcall(MySQL.scalar.await, 'SELECT 1 FROM dirk_scriptConfig LIMIT 1')
   if not success then
     lib.print.info('Creating dirk_scriptConfig table...')
@@ -664,6 +670,8 @@ local function registerScriptConfig(schema, canEditFn, rules)
       lib.print.info('Added last_editor column to dirk_scriptConfig.')
     end
   end
+    GlobalState.dirk_scriptConfigSchemaReady = true
+  end
 
   -- Insert defaults if this resource has no row yet
   local rowExists = MySQL.scalar.await(
@@ -689,6 +697,19 @@ local function registerScriptConfig(schema, canEditFn, rules)
   local storedVer = loadedData?.resource_version or '0.0.0'
   changeLog = json.decode(loadedData?.change_log or '[]') or {}
   lastEditorMeta = json.decode(loadedData?.last_editor or 'null')
+
+  -- Hash of the state we just loaded from the DB, captured BEFORE any rename /
+  -- migration / merge mutates rawData or recomputes client_version. Compared
+  -- against the post-merge payload below so a clean restart can skip the
+  -- boot-time UPDATE — that write is the single biggest startup stall
+  -- (~0.9s on an idle server, several seconds under DB contention).
+  local loadedHash = hashSettings({
+    data             = rawData,
+    client_version   = client_version,
+    resource_version = storedVer,
+    change_log       = changeLog,
+    last_editor      = lastEditorMeta,
+  })
 
   -- 1. Apply declarative renames from schema x-renamedFrom
   rawData = applyRenames(rawData, renames)
@@ -726,11 +747,19 @@ local function registerScriptConfig(schema, canEditFn, rules)
   local fullClientView = filterByVisibility(scriptConfig, nil, false)
   client_version = hashSettings(fullClientView)
 
-  MySQL.prepare.await(
-    'UPDATE dirk_scriptConfig SET data = ?, client_version = ?, resource_version = ?, change_log = ?, last_editor = ? WHERE script = ?',
-    { json.encode(scriptConfig), client_version, currentVer, json.encode(changeLog), json.encode(lastEditorMeta), scriptName }
-  )
-  lastPersistedHash = persistPayloadHash()
+  -- Only persist when the merge / migration / version bump actually changed
+  -- something vs what we loaded. On a clean restart (same version, no schema
+  -- drift) this is byte-identical, so we skip the write and the stall with it.
+  -- Still awaited in the rare case it IS needed, so the new state is durable
+  -- before clients read it.
+  local bootHash = persistPayloadHash()
+  if bootHash ~= loadedHash then
+    MySQL.prepare.await(
+      'UPDATE dirk_scriptConfig SET data = ?, client_version = ?, resource_version = ?, change_log = ?, last_editor = ? WHERE script = ?',
+      { json.encode(scriptConfig), client_version, currentVer, json.encode(changeLog), json.encode(lastEditorMeta), scriptName }
+    )
+  end
+  lastPersistedHash = bootHash
   dispatchScriptConfigWatchers(scriptConfig, nil, nil, 'load', true)
 
   -- Generate INSTALLATION/itemsToAdd/{ox,qb,esx} from any x-installItem /

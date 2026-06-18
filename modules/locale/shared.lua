@@ -23,16 +23,27 @@ end
 
 
 
--- Adds a missing key to the dict + saves it back to disk so devs can fill
--- in the translation later. Only fires for keys not already in the dict —
+-- Dev-only missing-translation collection. When a key isn't in the dict we used
+-- to echo it back (client → server event → disk write) so a dev could fill it in
+-- later. On a live server with partial locales that fires once per missing key on
+-- boot — hundreds of server round-trips, each rewriting an ever-growing JSON to
+-- disk — which showed up as a startup hitch. Off by default; set
+-- `setr dirk_lib:collectMissingLocales true` on a dev server to restore it.
+local collectMissingLocales = GetConvar('dirk_lib:collectMissingLocales', 'false') == 'true'
+
+-- Adds a missing key to the dict + (in dev mode) saves it back to disk so devs
+-- can fill in the translation later. Only fires for keys not already in the dict —
 -- without that guard a stale dict (e.g. before lib.locale() runs) would
 -- overwrite good translations with key=key when the NUI reports them as
 -- missing on cold start.
 local addNeededTranslation = function(str)
   if dict[str] ~= nil then return end
-  lib.print.info(('Adding missing translation for: %s'):format(str))
+  -- Cache the key as its own fallback regardless of mode, so locale() keeps
+  -- returning the key string and we only ever evaluate a given miss once.
   dict[str] = str
+  if not collectMissingLocales then return end
 
+  lib.print.info(('Adding missing translation for: %s'):format(str))
   if not IsDuplicityVersion() then
     TriggerServerEvent('dirk_lib:addNeededTranslation', cache.resource, str)
     return
@@ -196,6 +207,7 @@ if not IsDuplicityVersion() then
   -- resource's server, which writes them through the same flow Lua uses.
   RegisterNuiCallback('REPORT_MISSING_LOCALE', function(data, cb)
     cb('ok')
+    if not collectMissingLocales then return end
     if type(data) ~= 'table' or type(data.key) ~= 'string' or data.key == '' then return end
     TriggerServerEvent('dirk_lib:addNeededTranslation', cache.resource, data.key)
   end)
@@ -203,6 +215,7 @@ end
 
 if IsDuplicityVersion() then
   RegisterNetEvent('dirk_lib:addNeededTranslation', function(resource, str)
+    if not collectMissingLocales then return end
     if cache.resource ~= resource then return end
     local dict = loadLocale(lib.getLocaleKey())
     -- Skip if the key already has a translation on disk — same guard as the
