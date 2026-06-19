@@ -22,15 +22,15 @@ local appearanceMap = {
   customTheme  = 'customTheme',
 }
 
-local localizationMap = {
-  language = 'language',
-  currency = 'currency',
-}
-
-local brandingMap = {
-  serverName  = 'serverName',
-  logo        = 'logo',
-  itemImgPath = 'itemImgPath',
+-- The `basic` schema tab consolidates what used to be the `branding`
+-- (serverName) and `localization` (language/currency) sections, plus the debug
+-- toggle moved out of `advanced`. The flat lib.settings keys are unchanged, so
+-- consumers reading lib.settings.serverName/language/currency/debug are unaffected.
+local basicMap = {
+  serverName = 'serverName',
+  language   = 'language',
+  currency   = 'currency',
+  debug      = 'debug',
 }
 
 local bridgingMap = {
@@ -44,6 +44,9 @@ local bridgingMap = {
   -- Resource providers
   framework = 'framework',
   inventory = 'inventory',
+  -- itemImgPath lives in the bridging tab (under inventory). 'auto' resolves
+  -- via autodetect below; a pasted nui://… / CDN URL overrides it.
+  itemImgPath = 'itemImgPath',
   target    = 'target',
   interact  = 'interact',
   time      = 'time',
@@ -62,7 +65,6 @@ local bridgingMap = {
 
 local advancedMap = {
   primaryIdentifier = 'primaryIdentifier',
-  debug             = 'debug',
 }
 
 -- groups.* — nested group, snapshot key is `groups`
@@ -70,10 +72,12 @@ local groupsKey = 'groups'
 
 local watchedKeys = {}
 for _, settingsKey in pairs(appearanceMap) do watchedKeys[#watchedKeys + 1] = settingsKey end
-for _, settingsKey in pairs(localizationMap) do watchedKeys[#watchedKeys + 1] = settingsKey end
-for _, settingsKey in pairs(brandingMap) do watchedKeys[#watchedKeys + 1] = settingsKey end
+for _, settingsKey in pairs(basicMap) do watchedKeys[#watchedKeys + 1] = settingsKey end
 for _, settingsKey in pairs(bridgingMap) do watchedKeys[#watchedKeys + 1] = settingsKey end
 for _, settingsKey in pairs(advancedMap) do watchedKeys[#watchedKeys + 1] = settingsKey end
+-- `logo` is a static default (not in any schema section) but must stay in the
+-- snapshot so consumers reading lib.settings.logo still receive it.
+watchedKeys[#watchedKeys + 1] = 'logo'
 watchedKeys[#watchedKeys + 1] = groupsKey
 
 local function collectGroup(group, keyMap, out)
@@ -90,8 +94,7 @@ local function buildOverlaySnapshot(cfg)
   local snapshot = {}
   if type(cfg) ~= 'table' then return snapshot end
   collectGroup(cfg.appearance, appearanceMap, snapshot)
-  collectGroup(cfg.localization, localizationMap, snapshot)
-  collectGroup(cfg.branding, brandingMap, snapshot)
+  collectGroup(cfg.basic, basicMap, snapshot)
   collectGroup(cfg.bridging, bridgingMap, snapshot)
   collectGroup(cfg.advanced, advancedMap, snapshot)
 

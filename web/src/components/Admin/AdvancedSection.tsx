@@ -1,4 +1,4 @@
-import { Flex, Select, Switch, Text, useMantineTheme } from "@mantine/core";
+import { Flex, Select, Text, useMantineTheme } from "@mantine/core";
 import { AdminPageTitle, locale, useFormActions, useFormField } from "dirk-cfx-react";
 import { Wrench } from "lucide-react";
 import type { AdvancedSettings, ScriptConfig } from "../../stores/useScriptConfig";
@@ -42,15 +42,6 @@ export default function AdvancedSection() {
         data={IDENTIFIER_OPTIONS}
         allowDeselect={false}
         onChange={(v) => v && set("primaryIdentifier", v)}
-      />
-
-      <GroupLabel label={locale("dirk_lib_advanced_diag_group")} />
-      <Switch
-        label={locale("dirk_lib_advanced_debug_label")}
-        size="md"
-        checked={config.debug}
-        onChange={(e) => set("debug", e.currentTarget.checked)}
-        styles={{ label: { fontFamily: "Akrobat Bold", fontSize: "0.65em", letterSpacing: "0.06em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)" } }}
       />
     </Flex>
   );

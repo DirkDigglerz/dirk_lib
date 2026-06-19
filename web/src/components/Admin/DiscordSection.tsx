@@ -1,7 +1,7 @@
-import { Box, Collapse, Flex, Loader, PasswordInput, Text, TextInput, alpha, useMantineTheme } from "@mantine/core";
+import { Box, Flex, Loader, PasswordInput, Text, TextInput, alpha, useMantineTheme } from "@mantine/core";
 import { AdminPageTitle, fetchNui, locale, useFormActions, useFormField } from "dirk-cfx-react";
 import { motion } from "framer-motion";
-import { CheckCircle2, ChevronDown, ChevronUp, ExternalLink, MessageCircle, PlugZap, XCircle } from "lucide-react";
+import { CheckCircle2, ExternalLink, Eye, EyeOff, MessageCircle, PlugZap, XCircle } from "lucide-react";
 import { useState } from "react";
 import type { DiscordSettings, ScriptConfig } from "../../stores/useScriptConfig";
 import { useScriptConfig } from "../../stores/useScriptConfig";
@@ -82,17 +82,17 @@ function GuideStep({ index, title, body, link }: { index: number; title: string;
               display: "inline-flex",
               alignItems: "center",
               gap: "0.4vh",
-              marginTop: "0.3vh",
+              marginTop: "0.4vh",
               color: pc[5],
               fontFamily: "Akrobat Bold",
-              fontSize: "0.95vh",
+              fontSize: "1.3vh",
               textTransform: "uppercase",
               letterSpacing: "0.05em",
               textDecoration: "none",
             }}
           >
             {link.label}
-            <ExternalLink size="1vh" />
+            <ExternalLink size="1.3vh" />
           </a>
         )}
       </Flex>
@@ -116,7 +116,6 @@ export default function DiscordSection() {
 
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<DiagnoseResult | null>(null);
-  const [guideOpen, setGuideOpen] = useState(false);
 
   const runTest = async () => {
     if (testing) return;
@@ -158,6 +157,10 @@ export default function DiscordSection() {
         value={config.botToken}
         onChange={(e) => set("botToken", e.currentTarget.value)}
         placeholder="Bot Token"
+        visibilityToggleIcon={({ reveal }) =>
+          reveal ? <EyeOff size="2vh" color="rgba(255,255,255,0.7)" /> : <Eye size="2vh" color="rgba(255,255,255,0.7)" />
+        }
+        styles={{ visibilityToggle: { marginRight: "0.6vh" } }}
       />
       <TextInput
         label={<InfoLabel label={locale("dirk_lib_discord_guild_label")} tooltip={locale("dirk_lib_discord_guild_tooltip")} />}
@@ -220,63 +223,39 @@ export default function DiscordSection() {
       )}
 
       <GroupLabel label={locale("dirk_lib_discord_guide_group")} />
-      <motion.button
-        onClick={() => setGuideOpen((o) => !o)}
-        whileHover={{ background: alpha(theme.colors.dark[5], 0.5) }}
-        whileTap={{ scale: 0.99 }}
-        style={{
-          background: alpha(theme.colors.dark[5], 0.3),
-          border: "0.1vh solid rgba(255,255,255,0.05)",
-          borderRadius: theme.radius.xs,
-          padding: theme.spacing.xs,
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "0.6vh",
-        }}
-      >
-        <Text ff="Akrobat Bold" size="xs" tt="uppercase" lts="0.07em" c="rgba(255,255,255,0.6)">
-          {locale("dirk_lib_discord_guide_toggle")}
-        </Text>
-        {guideOpen ? <ChevronUp size="1.4vh" color="rgba(255,255,255,0.4)" /> : <ChevronDown size="1.4vh" color="rgba(255,255,255,0.4)" />}
-      </motion.button>
-
-      <Collapse in={guideOpen}>
-        <Flex direction="column" gap="xs" p="sm" style={{ background: alpha(theme.colors.dark[5], 0.25), borderRadius: theme.radius.xs }}>
-          <GuideStep
-            index={1}
-            title={locale("dirk_lib_discord_guide_step1_title")}
-            body={locale("dirk_lib_discord_guide_step1_body")}
-            link={{ href: "https://discord.com/developers/applications", label: locale("dirk_lib_discord_guide_step1_link") }}
-          />
-          <GuideStep
-            index={2}
-            title={locale("dirk_lib_discord_guide_step2_title")}
-            body={locale("dirk_lib_discord_guide_step2_body")}
-          />
-          <GuideStep
-            index={3}
-            title={locale("dirk_lib_discord_guide_step3_title")}
-            body={locale("dirk_lib_discord_guide_step3_body")}
-          />
-          <GuideStep
-            index={4}
-            title={locale("dirk_lib_discord_guide_step4_title")}
-            body={locale("dirk_lib_discord_guide_step4_body")}
-          />
-          <GuideStep
-            index={5}
-            title={locale("dirk_lib_discord_guide_step5_title")}
-            body={locale("dirk_lib_discord_guide_step5_body")}
-          />
-          <GuideStep
-            index={6}
-            title={locale("dirk_lib_discord_guide_step6_title")}
-            body={locale("dirk_lib_discord_guide_step6_body")}
-          />
-        </Flex>
-      </Collapse>
+      <Flex direction="column" gap="xs" p="sm" style={{ background: alpha(theme.colors.dark[5], 0.25), borderRadius: theme.radius.xs }}>
+        <GuideStep
+          index={1}
+          title={locale("dirk_lib_discord_guide_step1_title")}
+          body={locale("dirk_lib_discord_guide_step1_body")}
+          link={{ href: "https://discord.com/developers/applications", label: locale("dirk_lib_discord_guide_step1_link") }}
+        />
+        <GuideStep
+          index={2}
+          title={locale("dirk_lib_discord_guide_step2_title")}
+          body={locale("dirk_lib_discord_guide_step2_body")}
+        />
+        <GuideStep
+          index={3}
+          title={locale("dirk_lib_discord_guide_step3_title")}
+          body={locale("dirk_lib_discord_guide_step3_body")}
+        />
+        <GuideStep
+          index={4}
+          title={locale("dirk_lib_discord_guide_step4_title")}
+          body={locale("dirk_lib_discord_guide_step4_body")}
+        />
+        <GuideStep
+          index={5}
+          title={locale("dirk_lib_discord_guide_step5_title")}
+          body={locale("dirk_lib_discord_guide_step5_body")}
+        />
+        <GuideStep
+          index={6}
+          title={locale("dirk_lib_discord_guide_step6_title")}
+          body={locale("dirk_lib_discord_guide_step6_body")}
+        />
+      </Flex>
     </Flex>
   );
 }

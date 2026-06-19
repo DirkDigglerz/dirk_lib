@@ -7,13 +7,11 @@ export type AppearanceSettings = {
   customTheme: string[];
 };
 
-export type LocalizationSettings = {
+export type BasicSettings = {
+  serverName: string;
   language: string;
   currency: string;
-};
-
-export type BrandingSettings = {
-  serverName: string;
+  debug: boolean;
 };
 
 export type BridgingSettings = {
@@ -58,7 +56,6 @@ export type DiscordSettings = {
 
 export type AdvancedSettings = {
   primaryIdentifier: string;
-  debug: boolean;
 };
 
 export type ScriptConfigOverride = {
@@ -72,9 +69,8 @@ export type ScriptConfigSettings = {
 };
 
 export type ScriptConfig = {
+  basic:        BasicSettings;
   appearance:   AppearanceSettings;
-  localization: LocalizationSettings;
-  branding:     BrandingSettings;
   bridging:     BridgingSettings;
   groups:       GroupsSettings;
   scriptConfig: ScriptConfigSettings;
@@ -83,6 +79,12 @@ export type ScriptConfig = {
 };
 
 export const defaultScriptConfig: ScriptConfig = {
+  basic: {
+    serverName: "DirkRP",
+    language: "en",
+    currency: "$",
+    debug: false,
+  },
   appearance: {
     primaryColor: "dirk",
     primaryShade: 9,
@@ -98,13 +100,6 @@ export const defaultScriptConfig: ScriptConfig = {
       "#692d9d",
       "#5c258b",
     ],
-  },
-  localization: {
-    language: "en",
-    currency: "$",
-  },
-  branding: {
-    serverName: "DirkRP",
   },
   bridging: {
     notify:      "ox_lib",
@@ -146,7 +141,6 @@ export const defaultScriptConfig: ScriptConfig = {
   },
   advanced: {
     primaryIdentifier: "license",
-    debug: false,
   },
 };
 

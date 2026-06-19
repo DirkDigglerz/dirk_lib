@@ -4,6 +4,37 @@
   "description": "dirk_lib library-level settings. Controls global theming, localization, and other shared defaults used by every resource that depends on dirk_lib.",
   "properties": {
 
+    "basic": {
+      "type": "object",
+      "description": "Core dirk_lib settings — server identity, language/currency, and debug.",
+      "properties": {
+        "serverName": {
+          "type": "string",
+          "default": "DirkRP",
+          "x-renamedFrom": "branding.serverName",
+          "description": "Server branding string displayed in NUIs that surface a server name."
+        },
+        "language": {
+          "type": "string",
+          "default": "en",
+          "x-renamedFrom": "localization.language",
+          "description": "Locale code used when resolving strings from /locales."
+        },
+        "currency": {
+          "type": "string",
+          "default": "$",
+          "x-renamedFrom": "localization.currency",
+          "description": "Currency symbol prefixed to money values rendered by dirk_lib UIs."
+        },
+        "debug": {
+          "type": "boolean",
+          "default": false,
+          "x-renamedFrom": "advanced.debug",
+          "description": "Enables verbose dirk_lib debug logging and the opt-in SQL/hitch diagnostics (writes dirk_lib/diag_report.json). Leave off in production; turn it on and restart dirk_lib to capture a report when investigating a performance issue."
+        }
+      }
+    },
+
     "appearance": {
       "type": "object",
       "description": "Global UI theme and branding shared across every dirk_lib-powered NUI.",
@@ -35,23 +66,6 @@
             "#692d9d",
             "#5c258b"
           ]
-        }
-      }
-    },
-
-    "localization": {
-      "type": "object",
-      "description": "Language and currency defaults used by every dirk_lib consumer.",
-      "properties": {
-        "language": {
-          "type": "string",
-          "default": "en",
-          "description": "Locale code used when resolving strings from /locales."
-        },
-        "currency": {
-          "type": "string",
-          "default": "$",
-          "description": "Currency symbol prefixed to money values rendered by dirk_lib UIs."
         }
       }
     },
@@ -203,19 +217,6 @@
       }
     },
 
-    "branding": {
-      "type": "object",
-      "description": "Server identity strings shown across dirk_lib-powered UIs.",
-      "properties": {
-        "serverName": {
-          "type": "string",
-          "default": "DirkRP",
-          "x-renamedFrom": "appearance.serverName",
-          "description": "Server branding string displayed in NUIs that surface a server name."
-        }
-      }
-    },
-
     "groups": {
       "type": "object",
       "description": "Defaults for the dirk_groups system (party invites, max members, log-off kicks).",
@@ -310,11 +311,6 @@
           "default": "license",
           "enum": ["license", "license2", "steam", "discord", "fivem", "ip"],
           "description": "Which player identifier dirk_lib uses as the primary lookup key. Default 'license' works for the vast majority of servers — only change if your framework or txAdmin setup uses a different identifier."
-        },
-        "debug": {
-          "type": "boolean",
-          "default": false,
-          "description": "Enable verbose dirk_lib debug logging."
         }
       }
     }

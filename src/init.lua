@@ -201,12 +201,20 @@ end
 
 --## SERVER
 
---## SQL DIAGNOSTICS (convar-gated, default OFF)
--- Wraps this VM's oxmysql MySQL methods to capture SQL errors/hitches when the
--- `dirk_diag` convar is 'true'. INERT otherwise — lib.diag.instrument() returns
--- immediately before touching anything. MySQL.lua loads first in server_scripts,
--- so the global exists by now. pcall'd so it can never break dirk_lib startup.
-pcall(function() lib.diag.instrument() end)
+--## SQL DIAGNOSTICS (opt-in via scriptConfig basic.debug, default OFF)
+-- Wraps this VM's oxmysql MySQL methods to capture SQL errors/hitches, but ONLY
+-- when dirk_lib's scriptConfig `basic.debug` flag is on. scriptConfig loads
+-- asynchronously, so we arm via a watcher that fires on load + on change;
+-- instrument() is idempotent. Off by default = never armed = zero overhead.
+-- pcall'd so it can never break dirk_lib startup.
+pcall(function()
+  if not (lib.scriptConfig and lib.scriptConfig.on) then return end
+  lib.scriptConfig.on('basic.debug', function(enabled)
+    if enabled == true then
+      pcall(function() lib.diag.instrument() end)
+    end
+  end)
+end)
 
 if not LoadResourceFile(lib.name, 'web/build/index.html') then
   CreateThread(function()

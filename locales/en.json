@@ -21,6 +21,7 @@
   "script_config_global_settings": "Global library settings",
   "script_config_no_scripts": "No Scripts Registered",
 
+  "dirk_lib_nav_basic":        "Basic",
   "dirk_lib_nav_appearance":   "Appearance",
   "dirk_lib_nav_branding":     "Branding",
   "dirk_lib_nav_localization": "Localization",
@@ -80,6 +81,7 @@
   "dirk_lib_appearance_base_tooltip":   "Generates the full 10-shade palette. Click any shade below to fine-tune.",
   "dirk_lib_appearance_swatch_title":   "Shade %s: %s",
 
+  "dirk_lib_basic_title":              "Basic",
   "dirk_lib_branding_title":           "Branding",
   "dirk_lib_branding_identity_group":  "Server Identity",
   "dirk_lib_branding_name_label":      "Server Name",
@@ -165,7 +167,8 @@
   "dirk_lib_advanced_diag_group":       "Diagnostics",
   "dirk_lib_advanced_primary_label":    "Primary Identifier",
   "dirk_lib_advanced_primary_tooltip":  "Player identifier used as the primary lookup key. Default 'license' works for the vast majority of servers.",
-  "dirk_lib_advanced_debug_label":      "Debug Logging",
+  "dirk_lib_advanced_debug_label":      "Debug",
+  "dirk_lib_advanced_debug_desc":       "Enables verbose dirk_lib logging and opt-in SQL/hitch diagnostics. Leave off in production.",
 
   "script_config_section_title": "Script Config",
   "script_config_section_master_label": "Master Group",

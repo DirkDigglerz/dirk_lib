@@ -1,5 +1,5 @@
 -- ── lib.diag ───────────────────────────────────────────────────────────────
--- A convar-gated, behaviour-preserving SQL diagnostics layer.
+-- An opt-in, behaviour-preserving SQL diagnostics layer.
 --
 -- WHY: a live qb-core server hitches/hangs with SQL errors when dirk resources
 -- run, and the errors could not be captured from a *separate* resource. So we
@@ -9,10 +9,13 @@
 -- consumer VM that calls lib.diag.instrument() gets its own private copy that
 -- operates on its own MySQL global + its own diag_report.json.
 --
--- SAFETY (this ships to ALL customers):
---   * DEFAULT OFF. The whole layer is INERT unless `dirk_diag` convar == 'true'.
---     When off, instrument() returns immediately — no wrap, no threads, no
---     command, zero behaviour change and zero overhead.
+-- OPT-IN (this ships to ALL customers):
+--   * The CONSUMER gates the call. instrument() wraps unconditionally, so callers
+--     only call it when their scriptConfig `debug` flag is on (both dirk_fishing
+--     and dirk_lib use basic.debug). When debug is off, instrument() is
+--     never called — no wrap, no threads, no command, zero overhead and zero
+--     behaviour change. See the gated call-sites in dirk_lib/src/init.lua and
+--     dirk_fishing/src/server/diag.lua.
 --   * BEHAVIOUR-PRESERVING. When on, the wrap returns the EXACT same values and
 --     propagates errors EXACTLY as before. Every original call is made through
 --     pcall so a diag-internal bug can never break or swallow a real query
@@ -25,12 +28,6 @@
 if lib.context ~= 'server' then
   return { instrument = function() end, record = function() end, dump = function() end, enabled = false }
 end
-
--- ── TEMPORARY DEBUG BUILD ─────────────────────────────────────────────────────
--- Diagnostics run UNCONDITIONALLY here (no convar) — this is a throwaway build to
--- chase the live SQL/hitch issue. REMOVE the diag module + its two
--- instrument() call-sites (dirk_lib src/init.lua, dirk_fishing src/server/diag.lua)
--- once the investigation is done.
 
 local resourceName = GetCurrentResourceName()
 local startTime    = os.time()              -- coarse wall-clock start (seconds)
