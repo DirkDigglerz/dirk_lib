@@ -1,3 +1,28 @@
+# UPDATE 1.2.58 | 19/06/2026
+
+Config menu cleanup, a complete Spanish translation, and the diagnostics layer is now opt-in.
+
+### Config menu — new "Basic" tab
+- **Server name, language, currency, and a debug toggle now live in one "Basic" tab** at the top of `/dirk_lib`, replacing the separate Branding and Localization tabs. Existing values carry over automatically on first boot — nothing to re-enter.
+- **Advanced** now holds just the primary-identifier setting.
+- The inventory image path stays under Bridging (next to the inventory picker), and a custom URL there now properly overrides the auto-detected one.
+
+### Diagnostics are now opt-in
+- **The SQL/hitch diagnostics layer only runs when you enable Basic → Debug** (off by default). It was previously always-on; now it's zero-overhead unless you flip the toggle to capture a report.
+
+### Discord settings page
+- Bigger, easier show/hide toggle on the bot-token field, with proper spacing from the edge.
+- The "how to create a bot" guide is shown inline instead of behind a dropdown, and the developer-portal link is more readable.
+
+### Localization
+- **Spanish (es) is now fully translated** — a large batch of strings that previously fell back to English have been completed.
+- The config menu's left-hand tab labels now update instantly when you switch language (no restart needed).
+
+### Under the hood (recent)
+- Lighter startup: the script-config system skips its boot-time database write on a clean restart, and the shared config table is schema-checked once per boot instead of by every dirk resource.
+
+---
+
 # UPDATE 1.2.47 | 12/05/2026
 
 ### Hotfix — ox_inventory bridge `getItems` cleanup
