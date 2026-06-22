@@ -1,5 +1,18 @@
+-- qs-inventory exposes per-item metadata under `info`; dirk_lib's contract is
+-- `.metadata`. Mirror it on the way out so the client bridge matches the server
+-- bridge and consumers only ever read `.metadata`.
+local function withMetadata(items)
+  if type(items) ~= 'table' then return {} end
+  for _, it in pairs(items) do
+    if type(it) == 'table' and it.metadata == nil then
+      it.metadata = it.info or {}
+    end
+  end
+  return items
+end
+
 return {
-  ---@function lib.inventory.displayMetadata 
+  ---@function lib.inventory.displayMetadata
   ---@description # Display metadata of an item with the specific key
   ---@param labels table | string # table of metadata to display the string of the metadata key
   ---@param value? string # value of the metadata key
@@ -33,6 +46,6 @@ return {
   end,
 
   getItems = function()
-    return exports['qs-inventory']:getUserInventory()
+    return withMetadata(exports['qs-inventory']:getUserInventory() or {})
   end,
 }

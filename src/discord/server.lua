@@ -297,6 +297,41 @@ local function diagnose(overrideToken, overrideGuildId)
 end
 
 -- ─────────────────────────────────────────────────────────────────────────
+-- Webhook sender. Unlike the bot-token API above, the webhook URL is the
+-- CALLER's own config (passed per-call), not a dirk_lib secret — this just
+-- centralises the POST + 429 retry so every consumer shares one code path.
+-- `payload` is sent verbatim as the Discord webhook JSON body, so it's fully
+-- customizable: content / username / avatar_url / embeds / tts /
+-- allowed_mentions, etc. Fire-and-forget; warns on a non-2xx response.
+-- ─────────────────────────────────────────────────────────────────────────
+local function sendWebhook(url, payload)
+  if type(url) ~= 'string' or url == '' then return false, 'NoUrl' end
+  if type(payload) ~= 'table' then return false, 'BadPayload' end
+
+  local body = json.encode(payload)
+
+  local function post(attempt)
+    PerformHttpRequest(url, function(status, respBody)
+      -- Discord returns 204 on success. On 429 respect retry_after a couple of
+      -- times, then give up so a bad webhook can't retry forever.
+      if status == 429 and attempt < 3 then
+        local parsed = respBody and json.decode(respBody) or nil
+        local retry = (parsed and parsed.retry_after) or 1
+        SetTimeout(math.ceil(retry * 1000) + 100, function() post(attempt + 1) end)
+      elseif not status or status < 200 or status >= 300 then
+        lib.print.warn(('[lib.discord] webhook POST failed (HTTP %s)'):format(tostring(status)))
+      end
+    end, 'POST', body, {
+      ['Content-Type'] = 'application/json',
+      ['User-Agent']   = USER_AGENT,
+    })
+  end
+
+  post(1)
+  return true
+end
+
+-- ─────────────────────────────────────────────────────────────────────────
 -- Cross-resource exports (consumer-facing). The modules/discord/server.lua
 -- proxy reaches these. Sync from the consumer's POV — FiveM dispatches
 -- exports inline within the same process.
@@ -311,6 +346,7 @@ exports('discord_userHasRole',   function(userId, roleId, gid)   return userHasR
 exports('discord_userHasAnyRole',function(userId, roleIds, gid)  return userHasAnyRole(userId, roleIds, gid) end)
 exports('discord_clearCache',    function(guildId)               clearCache(guildId) end)
 exports('discord_diagnose',      function(token, guildId)        return diagnose(token, guildId) end)
+exports('discord_sendWebhook',   function(url, payload)          return sendWebhook(url, payload) end)
 
 -- Admin-gated NUI/callback for the /dirk_lib panel "Test Connection"
 -- button. Lives here so it's registered at boot — previously sat inside

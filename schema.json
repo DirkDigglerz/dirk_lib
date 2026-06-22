@@ -84,7 +84,7 @@
         "inventory": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "dirk_inventory", "ox_inventory", "qb-inventory", "qs-inventory", "codem-inventory", "tgiann-inventory", "mf-inventory", "core_inventory", "ak47_inventory"],
+          "enum": ["auto", "dirk_inventory", "one_inventory", "ox_inventory", "qb-inventory", "qs-inventory", "codem-inventory", "tgiann-inventory", "mf-inventory", "core_inventory", "ak47_inventory"],
           "description": "Inventory system used for item lookups, give/remove, and image paths."
         },
         "itemImgPath": {

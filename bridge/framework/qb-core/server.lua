@@ -104,8 +104,15 @@ local bridge = {
   getCharacters = function(src)
     local license = lib.player.getIdentifierType(src, lib.settings.primaryIdentifier or 'license')
     local toRet = {}
+    -- On a relog the identifier can momentarily be unavailable. Bail to an empty
+    -- list rather than querying with a nil param (returns nothing / errors) — and
+    -- warn so a real "no identifier" cause is visible in the console.
+    if not license then
+      lib.print.warn(('[getCharacters] no %s identifier for src %s — returning no characters'):format(lib.settings.primaryIdentifier or 'license', tostring(src)))
+      return toRet
+    end
     local result = exports.oxmysql:query_async('SELECT * FROM players WHERE license = ?', {license})
-    for k,v in pairs(result) do
+    for k,v in pairs(result or {}) do
       local charInfo = json.decode(v.charinfo)
       local lastPos = json.decode(v.position)
       table.insert(toRet, {

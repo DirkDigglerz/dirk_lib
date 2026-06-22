@@ -46,6 +46,14 @@ function discord.clearCache(guildId)
   exports.dirk_lib:discord_clearCache(guildId)
 end
 
+-- Post a fully-customizable payload to a Discord webhook URL. `payload` is the
+-- raw webhook JSON body (content / username / avatar_url / embeds / …). The URL
+-- is the consumer's own config, passed through so the POST + rate-limit handling
+-- live in dirk_lib's VM. Fire-and-forget — returns true once queued.
+function discord.sendWebhook(url, payload)
+  return exports.dirk_lib:discord_sendWebhook(url, payload)
+end
+
 -- Kept consumer-local — pulls identifiers off the player object via the
 -- runtime, which is identical in every server VM and doesn't need the
 -- bot token, so no benefit to bouncing through an export.

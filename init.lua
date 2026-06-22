@@ -123,10 +123,17 @@ local cache = setmetatable({
 
 --## FRAMEWORK/SETTINGS
 local frameworkBridge = lib.loadBridge('framework', settings.framework, 'shared')
+-- Resolve the framework core object ONCE (lazily, on first access) and cache it.
+-- Every lib.FW.<x> access — and lib.player.* through it — used to call
+-- frameworkBridge.getObject() afresh, which re-fetches the core object via a
+-- cross-resource export. It's a long-lived singleton, so one resolution serves
+-- the whole server lifetime. A nil result isn't cached, so it self-heals if
+-- something touches lib.FW before the framework is ready.
+local fwObj
 lib.FW = setmetatable({}, {
 	__index = function(self, index)
-		local fwObj = frameworkBridge.getObject()
-		return fwObj[index]
+		fwObj = fwObj or frameworkBridge.getObject()
+		return fwObj and fwObj[index]
 	end
 })
 

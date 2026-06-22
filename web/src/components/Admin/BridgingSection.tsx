@@ -44,7 +44,7 @@ const GROUPS: FieldGroup[] = [
   {
     labelKey: "dirk_lib_bridging_group_inventory",
     fields: [
-      { key: "inventory", labelKey: "dirk_lib_bridging_inventory_label", tooltipKey: "dirk_lib_bridging_inventory_tooltip", options: withAuto(["dirk_inventory", "ox_inventory", "qb-inventory", "qs-inventory", "codem-inventory", "tgiann-inventory", "mf-inventory", "core_inventory", "ak47_inventory"]) },
+      { key: "inventory", labelKey: "dirk_lib_bridging_inventory_label", tooltipKey: "dirk_lib_bridging_inventory_tooltip", options: withAuto(["dirk_inventory", "one_inventory", "ox_inventory", "qb-inventory", "qs-inventory", "codem-inventory", "tgiann-inventory", "mf-inventory", "core_inventory", "ak47_inventory"]) },
       { key: "target",    labelKey: "dirk_lib_bridging_target_label",    tooltipKey: "dirk_lib_bridging_target_tooltip",    options: withAuto(["ox_target", "qb-target", "q-target", "bt-target"]) },
       { key: "interact",  labelKey: "dirk_lib_bridging_interact_label",  tooltipKey: "dirk_lib_bridging_interact_tooltip",  options: withAuto(["redm-uiprompt", "sleepless_interact", "interact"]) },
     ],

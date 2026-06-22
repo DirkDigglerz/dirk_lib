@@ -1,6 +1,11 @@
 local supportedResources = {
   framework         = {'es_extended', 'qbx_core', 'qb-core', 'nd-framework'},
-  inventory         = {'dirk_inventory', 'ox_inventory', 'qb-inventory', 'qs-inventory', 'codem-inventory', 'tgiann-inventory', 'mf-inventory', 'core_inventory', 'ak47_inventory'},
+  -- Order matters. Real drop-in inventories are listed BEFORE the generic
+  -- framework names they impersonate via `provide` (ox_inventory / qb-inventory),
+  -- so e.g. qs-inventory (which declares `provide 'qb-inventory'`) wins over the
+  -- qb-inventory it shadows. The two provided/generic names go LAST so they only
+  -- win on a server that genuinely runs them with no drop-in present.
+  inventory         = {'dirk_inventory', 'one_inventory', 'qs-inventory', 'codem-inventory', 'tgiann-inventory', 'mf-inventory', 'core_inventory', 'ak47_inventory', 'ox_inventory', 'qb-inventory'},
   target            = {'ox_target', 'qb-target', 'q-target', 'bt-target'},
   interact          = {'redm-uiprompt', 'sleepless_interact', 'interact'},
   time              = {'av_weather', 'cd_easytime', 'qb-weathersync', 'Renewed-Weathersync', 'vSync', 'wasabi_wheather'},
@@ -19,6 +24,7 @@ local supportedResources = {
 
 local imagePaths = {
   ['dirk_inventory'] = 'nui://dirk_inventory/web/images/',
+  ['one_inventory']  = 'nui://one_inventory/web/images/',
   ['ox_inventory']   = 'nui://ox_inventory/web/images/',
   ['qb-inventory'] = 'nui://qb-inventory/html/images/',
   ['qs-inventory'] = 'nui://qs-inventory/html/images/',
@@ -33,8 +39,12 @@ local autodetected = {}
 
 for system, resources in pairs(supportedResources) do 
   for _, resource in ipairs(resources) do 
-    local resourceState = GetResourceState(resource) 
-    if resourceState == 'starting' or resourceState == 'started' or resourceState ~= 'missing' then
+    local resourceState = GetResourceState(resource)
+    -- Only count a resource that's actually (re)starting or started. The old
+    -- `or resourceState ~= 'missing'` also matched 'stopped'/disabled resources
+    -- (e.g. a qb-inventory left in _disabled, or one shadowed by a `provide`),
+    -- which caused false picks. Started/starting only.
+    if resourceState == 'starting' or resourceState == 'started' then
       autodetected[system] = resource 
 
       if system == 'inventory' then

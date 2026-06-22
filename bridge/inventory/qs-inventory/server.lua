@@ -5,6 +5,22 @@ local cachedItems
 -- isn't in scope inside its own initializer, so the self-references would
 -- resolve to a nil global.
 local bridge
+
+-- qs-inventory stores per-item metadata under `info` (qb-core convention).
+-- dirk_lib's contract is that every item exposes `.metadata`, so we normalise
+-- on the way out: mirror `info` onto `metadata` for every item the bridge
+-- returns. Writes go back through SetItemMetadata (qs persists them as `info`),
+-- so the round-trip stays consistent and consumers only ever touch `.metadata`.
+local function withMetadata(items)
+  if type(items) ~= 'table' then return {} end
+  for _, it in pairs(items) do
+    if type(it) == 'table' and it.metadata == nil then
+      it.metadata = it.info or {}
+    end
+  end
+  return items
+end
+
 bridge = {
   --- Add Item to inventory either playerid or invId
   ---@param invId string | number Inventory ID or Player ID
@@ -48,9 +64,9 @@ bridge = {
   hasItem = function(invId, item, count, md, slot) 
     local items = {}
     if type(invId) ~= 'number' then 
-      items = exports['qs-inventory']:GetStashItems(invId)
-    else 
-      items = exports['qs-inventory']:GetInventory(invId)
+      items = withMetadata(exports['qs-inventory']:GetStashItems(invId))
+    else
+      items = withMetadata(exports['qs-inventory']:GetInventory(invId))
     end
     if not items then return false end
     for k,v in pairs(items) do 
@@ -70,9 +86,9 @@ bridge = {
   --- Slot-indexed snapshot of every item in the inventory (player or stash).
   getItems = function(invId)
     if type(invId) ~= 'number' and not tonumber(invId) then
-      return exports['qs-inventory']:GetStashItems(invId) or {}
+      return withMetadata(exports['qs-inventory']:GetStashItems(invId) or {})
     end
-    return exports['qs-inventory']:GetInventory(invId) or {}
+    return withMetadata(exports['qs-inventory']:GetInventory(invId) or {})
   end,
 
   --- Single slot lookup. qs has no direct per-slot export, so walk the snapshot.

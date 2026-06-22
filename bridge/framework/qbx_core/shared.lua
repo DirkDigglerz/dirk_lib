@@ -1,6 +1,6 @@
 return {
   getObject = function()
-    return exports['qb-core']:GetCoreObject() 
+    return exports['qb-core']:GetCoreObject()
   end,
 
 

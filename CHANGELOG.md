@@ -1,3 +1,11 @@
+# UPDATE 1.2.59 | 21/06/2026
+
+### New inventory support — one_inventory
+- **one_inventory (OneStudios) is now a supported inventory.** It's autodetected like every other system — no config needed — or you can pick it explicitly under Bridging in `/dirk_lib`. Item give/remove, stacking with metadata, slot lookups, item images, and per-slot metadata writes all work through it, so any dirk script that uses the inventory bridge (fishing included) runs on one_inventory out of the box.
+- Usable items keep working via your framework's normal registration, and the item image path is detected automatically (override it under Bridging if you serve images from a CDN).
+
+---
+
 # UPDATE 1.2.58 | 19/06/2026
 
 Config menu cleanup, a complete Spanish translation, and the diagnostics layer is now opt-in.

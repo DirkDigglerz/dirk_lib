@@ -1,0 +1,125 @@
+{
+    "hitches": [
+        {
+            "gapMs": 109,
+            "atSeconds": 438
+        },
+        {
+            "gapMs": 154,
+            "atSeconds": 3575
+        },
+        {
+            "gapMs": 102,
+            "atSeconds": 4411
+        },
+        {
+            "gapMs": 113,
+            "atSeconds": 9220
+        },
+        {
+            "gapMs": 100,
+            "atSeconds": 9220
+        },
+        {
+            "gapMs": 112,
+            "atSeconds": 9221
+        },
+        {
+            "gapMs": 105,
+            "atSeconds": 10483
+        },
+        {
+            "gapMs": 118,
+            "atSeconds": 13519
+        },
+        {
+            "gapMs": 158,
+            "atSeconds": 13521
+        },
+        {
+            "gapMs": 182,
+            "atSeconds": 22853
+        },
+        {
+            "gapMs": 121,
+            "atSeconds": 22907
+        },
+        {
+            "gapMs": 103,
+            "atSeconds": 22907
+        },
+        {
+            "gapMs": 113,
+            "atSeconds": 24078
+        },
+        {
+            "gapMs": 121,
+            "atSeconds": 24085
+        },
+        {
+            "gapMs": 122,
+            "atSeconds": 24148
+        },
+        {
+            "gapMs": 288,
+            "atSeconds": 24189
+        },
+        {
+            "gapMs": 169,
+            "atSeconds": 24196
+        },
+        {
+            "gapMs": 2245,
+            "atSeconds": 24201
+        },
+        {
+            "gapMs": 105,
+            "atSeconds": 24223
+        },
+        {
+            "gapMs": 189,
+            "atSeconds": 24248
+        },
+        {
+            "gapMs": 566,
+            "atSeconds": 24268
+        },
+        {
+            "gapMs": 411,
+            "atSeconds": 24279
+        },
+        {
+            "gapMs": 883,
+            "atSeconds": 24283
+        },
+        {
+            "gapMs": 398,
+            "atSeconds": 24284
+        },
+        {
+            "gapMs": 126,
+            "atSeconds": 24334
+        },
+        {
+            "gapMs": 102,
+            "atSeconds": 67065
+        },
+        {
+            "gapMs": 106,
+            "atSeconds": 67125
+        },
+        {
+            "gapMs": 102,
+            "atSeconds": 67546
+        }
+    ],
+    "byMethod": [],
+    "errorSamples": [],
+    "resource": "dirk_lib",
+    "generatedAt": "2026-06-19 10:12:01",
+    "queryStorm": {
+        "total": 0,
+        "inFirst15s": 0
+    },
+    "uptimeSecs": 70650
+}
