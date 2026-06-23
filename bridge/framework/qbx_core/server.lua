@@ -46,25 +46,25 @@ local bridge = {
   identifier = function(src)
     
     local ply = lib.player.get(src)
-    assert(ply, 'Player does not exist')
+    if not ply then return nil end
     return ply.PlayerData.citizenid
   end, 
 
   name = function(src)
     local ply = lib.player.get(src)
-    assert(ply, 'Player does not exist')
+    if not ply then return nil end
     return ply.PlayerData.charinfo.firstname, ply.PlayerData.charinfo.lastname
   end,
 
   phoneNumber = function(src)
     local ply = lib.player.get(src)
-    assert(ply, 'Player does not exist')
+    if not ply then return nil end
     return ply.PlayerData.charinfo.phone
   end, 
 
   gender = function(src)
     local ply = lib.player.get(src)
-    assert(ply, 'Player does not exist')
+    if not ply then return nil end
     return ply.PlayerData.charinfo.gender or 'unknown'
   end, 
  

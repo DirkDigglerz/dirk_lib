@@ -1,3 +1,14 @@
+# UPDATE 1.2.60 | 23/06/2026
+
+### Fixes
+- **Framework bridge player accessors now fail safe.** `lib.player.identifier` / `.name` / `.gender` / `.phoneNumber` (and the other player getters) used to `assert` "Player does not exist" the moment they were called for a connecting / not-yet-loaded source. If that landed in a server callback during early join, the throw left the client's `lib.callback.await` hanging — which on some setups blocked op-multicharacter (new players couldn't create a character) and could crash an admin panel mid-join. They now return `nil` and let the caller degrade gracefully. Applied across the **qb-core, qbx_core and es_extended** bridges. **Any dirk script benefits — updating is recommended.**
+
+- **ESX + tgiann-inventory: using a fishing rod (or any usable item) no longer throws a server error.** When tgiann fires a use event without an ESX-shaped item record, the bridge now bails gracefully (with a warning) instead of handing `nil` to the consumer.
+- **qb-inventory: item metadata now persists per slot.** The bridge had no per-slot `setMetadata` (writes fell through to *player* metadata) and read item metadata from the wrong field — so fitted rod parts (reel/line/hook) silently failed to save. Both fixed; any dirk script storing item metadata on qb-inventory benefits.
+- **`formatImagePath` no longer errors on a nameless item.** A nil/empty item name (e.g. surfacing in a FETCH_ALL_ITEMS lookup) now returns safely instead of crashing the item-list load.
+
+---
+
 # UPDATE 1.2.59 | 21/06/2026
 
 ### New inventory support — one_inventory

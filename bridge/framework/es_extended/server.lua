@@ -65,12 +65,25 @@ local bridge = {
   end,
 
   canUseItem = function(item)
-    return lib.FW.UsableItemsCallbacks[item]
+    -- UsableItemsCallbacks is only populated by ESX's native usable-item
+    -- registry. Inventories that replace it (e.g. tgiann-inventory) leave the
+    -- table nil, so indexing it directly crashed the use path. Guard it.
+    local callbacks = lib.FW.UsableItemsCallbacks
+    if type(callbacks) ~= 'table' then return nil end
+    return callbacks[item]
   end,
 
   useableItem = function(item, cb)
-    return lib.FW.RegisterUsableItem(item, function(src, name, item)
-      cb(src, item)
+    -- Inventories layered over ESX (e.g. tgiann-inventory) fire the registered
+    -- callback without an ESX-shaped item record, so `item` can arrive nil.
+    -- Bail gracefully instead of handing nil to the consumer (which then
+    -- indexes item.slot and throws a server error).
+    return lib.FW.RegisterUsableItem(item, function(src, name, itemData)
+      if itemData == nil then
+        lib.print.warn(('es_extended bridge: usable item "%s" fired without an item record (inventory did not supply one); skipping use'):format(tostring(item)))
+        return
+      end
+      cb(src, itemData)
     end)
   end,
 
@@ -84,13 +97,13 @@ local bridge = {
 
   identifier = function(src)
     local ply = lib.player.get(src)
-    assert(ply, 'Player does not exist')
+    if not ply then return nil end
     return ply.identifier
   end, 
 
   name = function(src)
     local ply = lib.player.get(src)
-    assert(ply, 'Player does not exist')
+    if not ply then return nil end
     local raw = ply.getName() or ''
     local firstName, lastName = raw:match("^(%S+)%s+(.+)$")
     if not firstName then firstName = raw end
@@ -99,14 +112,14 @@ local bridge = {
 
   phoneNumber = function(src)
     local ply = lib.player.get(src)
-    assert(ply, 'Player does not exist')
+    if not ply then return nil end
     local result = exports.oxmysql:query_async("SELECT phone_number FROM users WHERE identifier = @identifier", {['@identifier'] = ply.identifier})
     return result[1] or "No Number"
   end, 
 
   gender = function(src)
     local ply = lib.player.get(src)
-    assert(ply, 'Player does not exist')
+    if not ply then return nil end
     return ply.PlayerData.charinfo.gender or 'unknown'
   end, 
 
@@ -215,38 +228,38 @@ local bridge = {
 
   setJob = function(src, name, rank)
     local ply = lib.player.get(src)
-    assert(ply, 'Player does not exist')
+    if not ply then return nil end
     ply.setJob(name, rank)
   end,
   
   setDuty = function(src, duty)
     local ply = lib.player.get(src)
-    assert(ply, 'Player does not exist')
+    if not ply then return nil end
     ply.setJobDuty(duty)
   end,
 
   setPlayerData = function(src, _key, data)
     local ply = lib.player.get(src)
-    assert(ply, 'Player does not exist')
+    if not ply then return nil end
     ply.Functions.SetPlayerData(_key, data)
   end,
 
   getPlayerData = function(src, _key)
     local ply = lib.player.get(src)
-    assert(ply, 'Player does not exist')
+    if not ply then return nil end
     return ply.PlayerData
   end,
 
   setMetadata = function(src, _key, data)
     local ply = lib.player.get(src)
-    assert(ply, 'Player does not exist')
+    if not ply then return nil end
     assert(ply.setMeta, 'Player does not have setMeta function')
     return ply.setMeta(_key, data)
   end,
 
   getMetadata = function(src, _key)
     local ply = lib.player.get(src)
-    assert(ply, 'Player does not exist')
+    if not ply then return nil end
     assert(ply.getMeta, 'Player does not have getMeta function')
     return ply.getMeta(_key)
   end,
@@ -257,21 +270,21 @@ local bridge = {
 
   getMoney = function(src, acc)
     local ply = lib.player.get(src)
-    assert(ply, 'Player does not exist')
+    if not ply then return nil end
     local account = ply.getAccount(resolveAccount(ply, acc))
     return account and account.money or 0
   end,
 
   addMoney = function(src, acc, count, reason)
     local ply = lib.player.get(src)
-    assert(ply, 'Player does not exist')
+    if not ply then return nil end
     ply.addAccountMoney(resolveAccount(ply, acc), count)
     return true
   end,
 
   removeMoney = function(src, acc, count, reason, force)
     local ply = lib.player.get(src)
-    assert(ply, 'Player does not exist')
+    if not ply then return nil end
     local account = ply.getAccount(resolveAccount(ply, acc))
     if not account then return false, 'NoAccount' end
     if not force and (account.money < count) then return false, 'NotEnoughMoney' end
@@ -281,7 +294,7 @@ local bridge = {
 
   setMoney = function(src, acc, count)
     local ply = lib.player.get(src)
-    assert(ply, 'Player does not exist')
+    if not ply then return nil end
     ply.setAccountMoney(resolveAccount(ply, acc), count)
     return true
   end,

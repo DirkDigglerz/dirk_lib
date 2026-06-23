@@ -65,9 +65,41 @@ return {
     if not item then return false, 'NoItem' end
     return {
       name     = item.name,
+      slot     = item.slot or slot,
       count    = item.count or item.amount,
-      metadata = item.metadata,
+      -- qb-inventory stores per-item metadata under `info` (qb-core
+      -- convention). dirk_lib's contract exposes it as `metadata`, so mirror
+      -- `info` onto `metadata` on the way out. Without this, rod parts written
+      -- via setMetadata read back blank. (Mirrors the qs-inventory fix.)
+      metadata = item.metadata or item.info,
     }
+  end,
+
+  --- Set metadata of an item at a specific slot. qb-inventory has no native
+  --- setMetadata; the write previously fell through to the framework bridge,
+  --- whose setMetadata targets *player* metadata and ignores the slot, so the
+  --- write never persisted to the item (rod reel/line/hook vanished on
+  --- re-read). SetItemData(source, itemName, key, val, slot) writes back into
+  --- the item's `info` field, which is qb-inventory's metadata store.
+  ---@param invId number Player ID (qb-inventory metadata is player-scoped)
+  ---@param slot number
+  ---@param metadata table
+  ---@return boolean
+  setMetadata = function(invId, slot, metadata)
+    if type(invId) == 'string' then
+      lib.print.warn('qb-inventory bridge: setMetadata on stash inventories is not supported')
+      return false
+    end
+    local item = exports['qb-inventory']:GetItemBySlot(invId, slot)
+    if not item or not item.name then return false end
+    return exports['qb-inventory']:SetItemData(invId, item.name, 'info', metadata, slot)
+  end,
+
+  --- editMetadata is an alias for setMetadata.
+  editMetadata = function(invId, slot, metadata)
+    local item = exports['qb-inventory']:GetItemBySlot(invId, slot)
+    if not item or not item.name then return false end
+    return exports['qb-inventory']:SetItemData(invId, item.name, 'info', metadata, slot)
   end,
 
   getItemLabel = function(item)
