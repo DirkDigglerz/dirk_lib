@@ -46,7 +46,17 @@ CreateThread(function()
   local wait_time = 100
   while true do
     local ped = PlayerPedId()
-    cache:set('ped', ped)
+    -- Only promote a genuinely valid ped into the cache. PlayerPedId() can hand
+    -- back 0 or a transitioning/destroyed handle during early load, respawn, or
+    -- a ped-model swap (custom peds / multicharacter) — caching that put a dead
+    -- handle in cache.ped and crashed consumers that ran entity natives on it
+    -- during join. Promote only when valid (or to seed the very first value), so
+    -- once cache.ped is a real ped it never reverts to an invalid one; the poll
+    -- catches the new ped within wait_time. (Consumers should still treat the
+    -- first frames of a fresh session defensively.)
+    if (ped ~= 0 and DoesEntityExist(ped)) or cache.ped == nil then
+      cache:set('ped', ped)
+    end
 
     local vehicle = GetVehiclePedIsIn(ped, false)
     if vehicle > 0 then
