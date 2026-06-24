@@ -31,7 +31,7 @@ local imagePaths = {
   ['codem-inventory'] = 'nui://codem-inventory/html/images/',
   ['tgiann-inventory'] = 'nui://tgiann-inventory/html/images/',
   ['mf-inventory'] = 'nui://mf-inventory/html/images/',
-  ['core_inventory'] = 'nui://core_inventory/html/images/',
+  ['core_inventory'] = 'nui://core_inventory/html/img/',
   ['ak47_inventory'] = 'nui://ak47_inventory/html/images/',
 }
 

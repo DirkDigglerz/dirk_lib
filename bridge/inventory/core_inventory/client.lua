@@ -27,11 +27,26 @@ local bridge = {
   end,
 
   ---@function lib.inventory.getItems
-  ---@description # The local player's inventory contents.
+  ---@description # The local player's inventory contents, normalised to ox's
+  --- shape. core_inventory keys its inventory BY SLOT (`content[slot] = item`)
+  --- and does NOT stamp a `.slot` field on the item itself — unlike ox, whose
+  --- items each carry `.slot`. Consumers that find an item by `item.slot` and
+  --- read its `.metadata` entirely client-side (e.g. the fishing rod loadout)
+  --- otherwise never match on core. We keep the slot key AND stamp it onto the
+  --- item; per-item `metadata` already travels on the entry client-side.
   ---@return table
   getItems = function()
     local inv = exports['core_inventory']:getInventory()
-    return (inv and (inv.content or inv.items)) or {}
+    local content = inv and (inv.content or inv.items)
+    if not content then return {} end
+    local items = {}
+    for slot, item in pairs(content) do
+      if type(item) == 'table' then
+        item.slot = item.slot or slot
+        items[slot] = item
+      end
+    end
+    return items
   end,
 
   ---@function lib.inventory.openStash
