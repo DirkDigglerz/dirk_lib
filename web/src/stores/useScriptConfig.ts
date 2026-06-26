@@ -54,6 +54,26 @@ export type DiscordSettings = {
   guildId:  string;
 };
 
+export type LoggerService = "off" | "datadog" | "loki" | "fivemanage";
+
+export type LoggerSettings = {
+  service:  LoggerService;
+  hostname: string;
+  loki: {
+    endpoint: string;
+    user:     string;
+    password: string;
+    tenant:   string;
+  };
+  datadog: {
+    apiKey: string;
+    site:   string;
+  };
+  fivemanage: {
+    apiKey: string;
+  };
+};
+
 export type AdvancedSettings = {
   primaryIdentifier: string;
 };
@@ -75,6 +95,7 @@ export type ScriptConfig = {
   groups:       GroupsSettings;
   scriptConfig: ScriptConfigSettings;
   discord:      DiscordSettings;
+  logger:       LoggerSettings;
   advanced:     AdvancedSettings;
 };
 
@@ -138,6 +159,23 @@ export const defaultScriptConfig: ScriptConfig = {
   discord: {
     botToken: "",
     guildId:  "",
+  },
+  logger: {
+    service:  "off",
+    hostname: "",
+    loki: {
+      endpoint: "",
+      user:     "",
+      password: "",
+      tenant:   "",
+    },
+    datadog: {
+      apiKey: "",
+      site:   "datadoghq.com",
+    },
+    fivemanage: {
+      apiKey: "",
+    },
   },
   advanced: {
     primaryIdentifier: "license",

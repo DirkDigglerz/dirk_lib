@@ -1,5 +1,5 @@
 import { ConfigPanel, locale, localeStore, useNuiEvent } from "dirk-cfx-react";
-import { MessageCircle, Palette, Plug, ShieldCheck, SlidersHorizontal, Users, Wrench } from "lucide-react";
+import { MessageCircle, Palette, Plug, ScrollText, ShieldCheck, SlidersHorizontal, Users, Wrench } from "lucide-react";
 import { useMemo, useState } from "react";
 import { defaultScriptConfig, type ScriptConfig } from "../../stores/useScriptConfig";
 import AdvancedSection from "./AdvancedSection";
@@ -8,7 +8,8 @@ import BasicSection from "./BasicSection";
 import BridgingSection from "./BridgingSection";
 import DiscordSection from "./DiscordSection";
 import GroupsSection from "./GroupsSection";
-import ScriptConfigSection from "./ScriptConfigSection";
+import LoggerSection from "./LoggerSection";
+import AccessSection from "./AccessSection";
 
 export default function AdminSection() {
   const [open, setOpen] = useState(false);
@@ -27,7 +28,8 @@ export default function AdminSection() {
     { id: "bridging",     icon: Plug,           label: locale("dirk_lib_nav_bridging")      },
     { id: "groups",       icon: Users,          label: locale("dirk_lib_nav_groups")        },
     { id: "discord",      icon: MessageCircle,  label: locale("dirk_lib_nav_discord")       },
-    { id: "scriptConfig", icon: ShieldCheck,    label: locale("dirk_lib_nav_script_config") },
+    { id: "logger",       icon: ScrollText,     label: locale("dirk_lib_nav_logger")        },
+    { id: "access",       icon: ShieldCheck,    label: locale("dirk_lib_nav_access")        },
     { id: "advanced",     icon: Wrench,         label: locale("dirk_lib_nav_advanced")      },
   ] as const, [locales]);
 
@@ -49,7 +51,8 @@ export default function AdminSection() {
           {tab === "bridging"     && <BridgingSection />}
           {tab === "groups"       && <GroupsSection />}
           {tab === "discord"      && <DiscordSection />}
-          {tab === "scriptConfig" && <ScriptConfigSection />}
+          {tab === "logger"       && <LoggerSection />}
+          {tab === "access"       && <AccessSection />}
           {tab === "advanced"     && <AdvancedSection />}
         </>
       )}

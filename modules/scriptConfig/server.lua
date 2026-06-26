@@ -45,6 +45,41 @@ local function filterByVisibility(data, basePath, allowServerOnly)
   return out
 end
 
+-- INVERSE of filterByVisibility(data, _, false): returns ONLY the
+-- server-only/locked subtree, stripping every client-visible leaf. This is the
+-- "sliver" the admin editor tops up onto its already-cached client-visible
+-- view to reconstruct the full config without re-fetching the whole thing.
+--
+-- A key is KEPT when its path is server-only (the whole subtree below it is
+-- locked, so it passes through verbatim) OR when a nested descendant is
+-- server-only (recurse; keep only if the filtered child is non-empty). A leaf
+-- whose own path is NOT server-only is dropped — that's the client-visible data
+-- the editor already holds, and it must never be duplicated here.
+local function filterServerOnly(data, basePath)
+  if type(data) ~= 'table' then return {} end
+
+  local out = {}
+
+  for key, value in pairs(data) do
+    local path = basePath and (basePath .. '.' .. key) or key
+
+    if isPathServerOnly(path) then
+      -- This path (and everything under it) is locked → include as-is.
+      out[key] = value
+    elseif type(value) == 'table' then
+      -- Not locked itself, but may contain a locked descendant — recurse and
+      -- keep only if the filtered subtree retained anything.
+      local sub = filterServerOnly(value, path)
+      if next(sub) ~= nil then
+        out[key] = sub
+      end
+    end
+    -- else: a client-visible leaf — intentionally dropped from the sliver.
+  end
+
+  return out
+end
+
 -- --------------------------------------------------
 -- VERSION HELPERS
 -- --------------------------------------------------
@@ -314,6 +349,20 @@ local function isEqualValue(a, b)
   return lib.table.compare(a, b) and lib.table.compare(b, a)
 end
 
+-- Records every leaf under a removed subtree as {path, old, new=nil}. Used by
+-- collectChangedLeaves' removal pass below. Empty tables record the container
+-- path itself so a cleared-to-empty list still registers as a change.
+local function collectRemovedLeaves(oldValue, path, out)
+  if type(oldValue) ~= 'table' or next(oldValue) == nil then
+    out[#out + 1] = { path = path, old = oldValue, new = nil }
+    return out
+  end
+  for key, v in pairs(oldValue) do
+    collectRemovedLeaves(v, path .. '.' .. key, out)
+  end
+  return out
+end
+
 local function collectChangedLeaves(partial, previous, path, out)
   if type(partial) ~= 'table' then return out end
   out = out or {}
@@ -334,6 +383,19 @@ local function collectChangedLeaves(partial, previous, path, out)
           old = oldValue,
           new = value,
         }
+      end
+    end
+  end
+
+  -- Removal-aware pass: a key/element present in `previous` but absent from the
+  -- new config is a deletion. Without this a pure removal (e.g. clearing the
+  -- last item of a list) yields zero changed leaves and is silently dropped by
+  -- setScriptConfig's no-change early-return — never persisted/broadcast/logged,
+  -- so it reverts on restart.
+  if type(previous) == 'table' then
+    for key, oldValue in pairs(previous) do
+      if partial[key] == nil then
+        collectRemovedLeaves(oldValue, path and (path .. '.' .. key) or key, out)
       end
     end
   end
@@ -456,6 +518,51 @@ local scriptConfigWatchers = {}
 local nextScriptConfigWatcherId = 0
 local CHANGE_LOG_MAX = 100
 local lastPersistedHash = 0
+-- Cached client-visible view: filterByVisibility(scriptConfig, nil, false).
+-- This full filtered tree only changes when scriptConfig changes (boot +
+-- setScriptConfig), so we cache it instead of re-walking the tree on every
+-- hydrating client. Refreshed UNCONDITIONALLY after any config change.
+local clientVisibleView = nil
+
+-- --------------------------------------------------
+-- PER-SCRIPT ACCESS OVERRIDES (push to dirk_lib)
+-- --------------------------------------------------
+-- A consumer can declare an `access` block in its own schema.json
+-- ({ groups = string[], identifiers = string[] }). We PUSH the current value
+-- to dirk_lib so its access check (canEditScriptConfig) can grant edit rights
+-- to those groups/identifiers WITHOUT any manual wiring in the consumer beyond
+-- declaring the block. This module runs in the consumer's VM, so
+-- GetCurrentResourceName() is the consumer.
+--
+-- This now includes dirk_lib's OWN config: with the central overrides removed,
+-- dirk_lib is gated like any other resource (master + its own pushed `access`
+-- block), so it pushes its access block too.
+local EMPTY_ACCESS = { groups = {}, identifiers = {} }
+
+local function pushAccessOverrides()
+  local access = (type(scriptConfig) == 'table' and type(scriptConfig.access) == 'table')
+    and scriptConfig.access or EMPTY_ACCESS
+
+  -- pcall: dirk_lib's export may not exist yet at first boot (resource order),
+  -- or dirk_lib may be reloading. A failed push is retried by the caller.
+  local ok = pcall(function()
+    exports.dirk_lib:registerScriptConfigOverrides(scriptName, access)
+  end)
+  return ok
+end
+
+-- Push, retrying briefly if dirk_lib's export isn't ready yet. Fire-and-forget
+-- thread so callers (config load / change) never block on it.
+local function pushAccessOverridesWithRetry()
+  if scriptName == 'dirk_lib' then return end
+  CreateThread(function()
+    for _ = 1, 20 do
+      if pushAccessOverrides() then return end
+      Wait(500)
+    end
+    debugLog('failed to push access overrides to dirk_lib after retries')
+  end)
+end
 
 local function persistPayloadHash()
   return hashSettings({
@@ -746,6 +853,9 @@ local function registerScriptConfig(schema, canEditFn, rules)
   -- so a manual DB reset or resource restart never causes drift.
   local fullClientView = filterByVisibility(scriptConfig, nil, false)
   client_version = hashSettings(fullClientView)
+  -- Seed the client-visible cache with the freshly-filtered view (same object
+  -- we just hashed) so the first hydrating clients don't each re-walk the tree.
+  clientVisibleView = fullClientView
 
   -- Only persist when the merge / migration / version bump actually changed
   -- something vs what we loaded. On a clean restart (same version, no schema
@@ -761,6 +871,11 @@ local function registerScriptConfig(schema, canEditFn, rules)
   end
   lastPersistedHash = bootHash
   dispatchScriptConfigWatchers(scriptConfig, nil, nil, 'load', true)
+
+  -- Push this consumer's `access` block (if any) to dirk_lib so its access
+  -- check honours per-script overrides. Retries because dirk_lib's export may
+  -- not be ready this early in boot.
+  pushAccessOverridesWithRetry()
 
   -- Generate INSTALLATION/itemsToAdd/{ox,qb,esx} from any x-installItem /
   -- x-installItemList annotations in this consumer's schema. Same
@@ -828,7 +943,16 @@ end
 
 local function setScriptConfig(data, forceVers, ctx)
   local previous = lib.table.deepClone(scriptConfig)
-  if ctx and ctx.fullReplace then
+  if ctx and ctx.sectionReplace then
+    -- Section-delta apply: WHOLESALE overwrite each supplied top-level key,
+    -- leaving every other section untouched. Distinct from fullReplace (which
+    -- clones the entire `data`) and from the deep-merge branch — a wholesale
+    -- per-section overwrite expresses deletions inside a section (e.g. a
+    -- removed store), which lib.table.merge cannot (it never truncates arrays).
+    for k, v in pairs(data) do
+      scriptConfig[k] = lib.table.deepClone(v)
+    end
+  elseif ctx and ctx.fullReplace then
     scriptConfig = lib.table.deepClone(data)
   else
     scriptConfig = lib.table.merge(scriptConfig, data, false)
@@ -837,6 +961,15 @@ local function setScriptConfig(data, forceVers, ctx)
   -- Compare actual state change (post-merge vs pre-merge) to avoid phantom
   -- changelog entries from stale or redundant UI data.
   local changedLeaves = collectChangedLeaves(scriptConfig, previous, nil, {})
+
+  -- Re-push the (possibly changed) access block to dirk_lib BEFORE the
+  -- no-change early-return below. collectChangedLeaves walks the NEW config's
+  -- leaves, so it can MISS a leaf that was removed (e.g. clearing
+  -- access.identifiers back to []) and report zero changes — gating the push on
+  -- it would then leave dirk_lib's overridesByResource stale and keep granting
+  -- access that was just revoked. scriptConfig is already merged here, and
+  -- pushAccessOverrides is cheap + idempotent + pcall-guarded.
+  pushAccessOverrides()
 
   -- Nothing actually changed and no forced version — skip persist/broadcast entirely.
   if #changedLeaves == 0 and not forceVers then
@@ -848,11 +981,18 @@ local function setScriptConfig(data, forceVers, ctx)
   end
 
   -- Recompute client version from full client-visible state.
+  -- IMPORTANT: the clientVisibleView cache must be refreshed on BOTH branches.
+  -- The forceVers branch skips the filter/hash, so refreshing only in the else
+  -- branch would leave the cache stale after a forced-version write. We refresh
+  -- it UNCONDITIONALLY below, reusing the freshly-filtered view in the else
+  -- branch and filtering once in the forceVers branch.
   if forceVers then
     client_version = forceVers
+    clientVisibleView = filterByVisibility(scriptConfig, nil, false)
   else
     local fullClientView = filterByVisibility(scriptConfig, nil, false)
     client_version = hashSettings(fullClientView)
+    clientVisibleView = fullClientView
   end
 
   local editor = buildEditorMeta(ctx and ctx.src)
@@ -884,10 +1024,24 @@ local function setScriptConfig(data, forceVers, ctx)
     lastPersistedHash = payloadHash
   end
 
-  -- Only send shared paths to clients
+  -- Only send shared paths to clients. For a section-delta this is the
+  -- visibility-filtered changed sections only — not the whole config — which
+  -- is the entire point of the optimisation.
   local clientData = filterByVisibility(data, nil, false)
   if next(clientData) then
-    TriggerClientEvent(('%s:updateScriptConfig'):format(scriptName), -1, clientData, client_version, ctx and ctx.fullReplace or false)
+    -- Broadcast apply-mode args (kept additive — old clients ignore the 4th):
+    --   fullReplace  (3rd): client replaces its ENTIRE config with `clientData`
+    --   sectionReplace (4th): client WHOLESALE-overwrites just the supplied
+    --                         top-level keys, leaving other sections intact.
+    -- Neither set ⇒ legacy deep-merge.
+    TriggerClientEvent(
+      ('%s:updateScriptConfig'):format(scriptName),
+      -1,
+      clientData,
+      client_version,
+      ctx and ctx.fullReplace or false,
+      ctx and ctx.sectionReplace or false
+    )
   end
 
   dispatchScriptConfigWatchers(scriptConfig, previous, changedLeaves, 'update', false)
@@ -1029,7 +1183,10 @@ lib.callback.register(('%s:getScriptConfig'):format(scriptName), function(src, c
   if client_ver == client_version then return nil end
   return {
     client_version = client_version,
-    data = filterByVisibility(scriptConfig, nil, false),
+    -- Served from the cached client-visible view (refreshed on every config
+    -- change) so a mass reconnect doesn't trigger N back-to-back tree walks.
+    -- Fallback to a live filter on the (unexpected) chance the cache is unset.
+    data = clientVisibleView or filterByVisibility(scriptConfig, nil, false),
   }
 end)
 
@@ -1037,6 +1194,28 @@ lib.callback.register(('%s:getFullScriptConfig'):format(scriptName), function(sr
   if not scriptConfig then return nil, 'NotReady' end
   if not canEditScript(src) then return nil, 'NoPermission' end
   return true, nil, { config = scriptConfig, clientVersion = client_version }
+end)
+
+-- Server-only "sliver" for the admin editor. Returns ONLY the locked
+-- (x-serverOnly) subtree — the inverse of the client-visible view the NUI
+-- already holds (pushed by Lua + cached in KVP). The editor MERGES this onto
+-- that cached view to reconstruct the full config without ever re-fetching the
+-- whole thing.
+--
+-- SECURITY: gated by canEditScript (the SAME permission gate as
+-- getFullScriptConfig), so server-only fields never reach a non-admin. The
+-- sliver is computed fresh per request and returned in-memory only — it is
+-- never written to the client KVP cache (which holds client-visible data
+-- exclusively). When the schema declares no server-only paths the sliver is an
+-- empty object, which json.encode renders as `{}` (the NUI merges it as a
+-- no-op).
+lib.callback.register(('%s:getServerOnlyScriptConfig'):format(scriptName), function(src)
+  if not scriptConfig then return nil, 'NotReady' end
+  if not canEditScript(src) then return nil, 'NoPermission' end
+  return true, nil, {
+    serverOnly = filterServerOnly(scriptConfig, nil),
+    clientVersion = client_version,
+  }
 end)
 
 -- Missing-items audit. Walks the schema's x-installItem / x-installItemList
@@ -1096,10 +1275,17 @@ lib.callback.register(('%s:updateScriptConfig'):format(scriptName), function(src
 
   local newSettings = payload
   local expectedVersion = nil
+  -- Section-delta save: the NUI sends only the changed top-level sections
+  -- (each as its full current value) plus sectionReplace=true. We then
+  -- WHOLESALE-overwrite just those keys (see setScriptConfig's sectionReplace
+  -- branch) so deletions inside a section propagate. Absent the flag we keep
+  -- the legacy full-replace behaviour for older NUI builds.
+  local sectionReplace = false
 
   if type(payload) == 'table' and payload.data ~= nil then
     newSettings = payload.data
     expectedVersion = payload.expectedVersion
+    sectionReplace = payload.sectionReplace == true
   end
 
   if type(newSettings) ~= 'table' then
@@ -1110,14 +1296,19 @@ lib.callback.register(('%s:updateScriptConfig'):format(scriptName), function(src
     return false, 'VersionConflict', {
       latestVersion = client_version,
       lastEditor = lastEditorMeta,
-      latestData = filterByVisibility(scriptConfig, nil, false),
+      -- Same full client-visible view as getScriptConfig — served from cache.
+      latestData = clientVisibleView or filterByVisibility(scriptConfig, nil, false),
     }
   end
 
   local meta = setScriptConfig(newSettings, nil, {
     src = src,
     expectedVersion = expectedVersion,
-    fullReplace = true,
+    -- sectionReplace and fullReplace are mutually exclusive apply modes.
+    -- A section-delta replaces only the supplied top-level keys; a full
+    -- save still replaces the entire config.
+    fullReplace = not sectionReplace,
+    sectionReplace = sectionReplace,
   })
 
   return true, nil, meta
@@ -1147,6 +1338,15 @@ local toRet = {
   end,
 
   on = onScriptConfig,
+
+  -- Authorize a consumer's own config-related callbacks with the SAME access
+  -- model as the panel (master ACE convar + per-resource overrides + console).
+  -- This module runs in the CONSUMER's VM, so GetCurrentResourceName() resolves
+  -- to the calling resource — exactly the resource whose edit-access we want to
+  -- check. canEditScriptConfig handles src == 0 / console → true.
+  hasPerm = function(src)
+    return exports.dirk_lib:canEditScriptConfig(src, GetCurrentResourceName())
+  end,
 
   reset = function()
     lib.print.warn(('[scriptConfig:%s] reset() called — all settings reverted to defaults'):format(scriptName))
@@ -1181,9 +1381,30 @@ CreateThread(function()
     return
   end
 
-  registerScriptConfig(schema, function(src)
-    return IsPlayerAceAllowed(src, 'admin')
-  end, {})
+  -- No default canEditFn: auto-registered configs are gated PURELY by the
+  -- master ACE convar (dirk_lib_master_group) + per-resource overrides, via
+  -- dirk_lib's canEditScriptConfig export. Injecting a bare
+  -- IsPlayerAceAllowed(src,'admin') here would let any 'admin'-ACE player edit
+  -- configs even when an operator deliberately set the master group to EXCLUDE
+  -- 'admin' — and canEditScript falls through to this fn whenever the export
+  -- denies or is briefly unavailable, so it would silently undermine the master
+  -- gate (and fail OPEN during a dirk_lib restart). A resource that wants extra
+  -- additive access still passes an explicit canEditFn via
+  -- lib.scriptConfig(schema, canEditFn, rules).
+  registerScriptConfig(schema, nil, {})
+end)
+
+-- Clear this consumer's pushed access overrides from dirk_lib's map when this
+-- resource stops, so a stale block can't keep granting access after the
+-- resource is gone. (dirk_lib's own onResourceStop also clears the entry as a
+-- backstop — whichever fires first wins, both are idempotent.) Guard on the
+-- resource name: onResourceStop fires for every resource, but we only care
+-- about our own.
+AddEventHandler('onResourceStop', function(stopped)
+  if stopped ~= scriptName then return end
+  pcall(function()
+    exports.dirk_lib:unregisterScriptConfigOverrides(scriptName)
+  end)
 end)
 
 -- Admin-tool server-side counterparts now live under dirk_lib's own

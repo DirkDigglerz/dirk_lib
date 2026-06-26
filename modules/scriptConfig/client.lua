@@ -55,6 +55,19 @@ local function pathsOverlap(watchPath, changedPath)
     or changedPath:sub(1, #watchPath + 1) == watchPath .. '.'
 end
 
+-- Records every leaf under a removed subtree as {path, old, new=nil}. Used by
+-- collectChangedLeaves' removal pass below. Mirrors the server copy.
+local function collectRemovedLeaves(oldValue, path, out)
+  if type(oldValue) ~= 'table' or next(oldValue) == nil then
+    out[#out + 1] = { path = path, old = oldValue, new = nil }
+    return out
+  end
+  for key, v in pairs(oldValue) do
+    collectRemovedLeaves(v, path .. '.' .. key, out)
+  end
+  return out
+end
+
 local function collectChangedLeaves(partial, previous, path, out)
   if type(partial) ~= 'table' then return out end
   out = out or {}
@@ -72,6 +85,17 @@ local function collectChangedLeaves(partial, previous, path, out)
           old = oldValue,
           new = value,
         }
+      end
+    end
+  end
+
+  -- Removal-aware pass (mirrors server): a key/element present in `previous`
+  -- but absent from the new config is a deletion. Without this, client-side
+  -- watchers never fire on a pure removal.
+  if type(previous) == 'table' then
+    for key, oldValue in pairs(previous) do
+      if partial[key] == nil then
+        collectRemovedLeaves(oldValue, path and (path .. '.' .. key) or key, out)
       end
     end
   end
@@ -336,6 +360,14 @@ if hasUI then
     -- on the iframe being mounted (e.g. server-driven push events that fire
     -- during resource start, before React has rendered).
     TriggerEvent('dirk_lib:nuiReady')
+    -- Re-push the current config on every NUI (re)mount. The one-shot init
+    -- thread pushes once on first load (it waits on this flag), but a NUI
+    -- remount WITHOUT a resource restart would otherwise land on an empty
+    -- store now that DirkProvider no longer does a proactive full fetch.
+    -- sendSettingsToNui self-guards on scriptConfig and SendNuiMessage is
+    -- local (no net/KVP cost); UPDATE_SCRIPT_CONFIG is idempotent, so the
+    -- extra push that overlaps the init thread's first-load push is harmless.
+    sendSettingsToNui()
     cb({})
   end)
 
@@ -407,6 +439,19 @@ if hasUI then
     local success, _error, data = lib.callback.await(('%s:getFullScriptConfig'):format(scriptName))
     cb({ success = success, _error = _error, data = data })
   end)
+
+  -- Server-only "sliver" bridge for the admin editor. Mirrors the
+  -- GET_FULL_SCRIPT_CONFIG handler above but hits the new server callback that
+  -- returns ONLY the locked (x-serverOnly) subtree. The editor fetches this
+  -- once on panel open and MERGES it onto the already-cached client-visible
+  -- config (pushed via UPDATE_SCRIPT_CONFIG) to form the full editor view —
+  -- never re-fetching the whole config. Permission is enforced server-side
+  -- (canEditScript); a non-admin gets {success=false,_error='NoPermission'}.
+  -- The sliver is in-memory only — it is NOT written to KVP.
+  RegisterNuiCallback('GET_SERVER_ONLY_SCRIPT_CONFIG', function(_, cb)
+    local success, _error, data = lib.callback.await(('%s:getServerOnlyScriptConfig'):format(scriptName))
+    cb({ success = success, _error = _error, data = data })
+  end)
 end
 
 -- ──────────────────────────────────────
@@ -421,16 +466,30 @@ end)
 -- ──────────────────────────────────────
 -- UPDATE / HISTORY / RESET
 -- ──────────────────────────────────────
-local updateScriptConfig = function(data, expectedVersion)
+local updateScriptConfig = function(data, expectedVersion, sectionReplace)
   return lib.callback.await(('%s:updateScriptConfig'):format(scriptName), {
     data = data,
     expectedVersion = expectedVersion or clientVersion,
+    -- Carry the section-delta flag through to the server. Without this the
+    -- server sees no flag, defaults to fullReplace=true, and a partial (delta)
+    -- payload wipes every unsent section. nil (not false) when off so the
+    -- server's `payload.sectionReplace == true` gate reads cleanly.
+    sectionReplace = sectionReplace == true or nil,
   })
 end
 
-RegisterNetEvent(('%s:updateScriptConfig'):format(scriptName), function(data, new_version, fullReplace)
+RegisterNetEvent(('%s:updateScriptConfig'):format(scriptName), function(data, new_version, fullReplace, sectionReplace)
   local previousSettings = cloneValue(scriptConfig)
-  if fullReplace then
+  if sectionReplace then
+    -- Section-delta: `data` holds only the changed top-level sections, each as
+    -- its full value. WHOLESALE-overwrite those keys (leaving other sections
+    -- intact) so deletions inside a section propagate — lib.table.merge would
+    -- deep-recurse and never truncate an array, leaving e.g. a deleted store
+    -- alive on the client.
+    for k, v in pairs(data) do
+      scriptConfig[k] = v
+    end
+  elseif fullReplace then
     scriptConfig = data
   else
     scriptConfig = lib.table.merge(scriptConfig, data, false)
@@ -443,13 +502,28 @@ RegisterNetEvent(('%s:updateScriptConfig'):format(scriptName), function(data, ne
     data = scriptConfig,
   }))
   if hasUI then
-    SendNuiMessage(json.encode({
-      action = 'UPDATE_SCRIPT_CONFIG',
-      data = {
-        config = scriptConfig,
-        clientVersion = clientVersion,
-      },
-    }))
+    if sectionReplace then
+      -- Forward only the received delta (the changed sections) to the NUI
+      -- instead of re-serializing the WHOLE config — the NUI applies the same
+      -- wholesale-per-section overwrite. Full config posts are reserved for
+      -- initial load / fullReplace below.
+      SendNuiMessage(json.encode({
+        action = 'UPDATE_SCRIPT_CONFIG',
+        data = {
+          config = data,
+          clientVersion = clientVersion,
+          sectionReplace = true,
+        },
+      }))
+    else
+      SendNuiMessage(json.encode({
+        action = 'UPDATE_SCRIPT_CONFIG',
+        data = {
+          config = scriptConfig,
+          clientVersion = clientVersion,
+        },
+      }))
+    end
   end
   dispatchScriptConfigWatchers(scriptConfig, previousSettings, changedLeaves, 'update', false)
 end)
@@ -458,9 +532,11 @@ if hasUI then
   RegisterNuiCallback('UPDATE_SCRIPT_CONFIG', function(data, cb)
     local payload = data
     local expectedVersion = clientVersion
+    local sectionReplace = false
     if type(data) == 'table' and data.data ~= nil then
       payload = data.data
       expectedVersion = data.expectedVersion or clientVersion
+      sectionReplace = data.sectionReplace == true
     end
 
     -- Defensive fallback for stale UI builds that still send expectedVersion=0.
@@ -468,7 +544,7 @@ if hasUI then
       expectedVersion = clientVersion
     end
 
-    local success, _error, meta = updateScriptConfig(payload, expectedVersion)
+    local success, _error, meta = updateScriptConfig(payload, expectedVersion, sectionReplace)
     if type(meta) == 'table' and meta.client_version then
       clientVersion = meta.client_version
     end

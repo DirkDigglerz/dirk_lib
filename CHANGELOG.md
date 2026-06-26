@@ -1,3 +1,32 @@
+# UPDATE 1.2.63 | 26/06/2026
+
+Logging backends beyond Discord, per-resource access control, and a lighter config panel.
+
+### New features
+- **Send logs to Grafana, Datadog or Fivemanage.** A new Logger tab in `/dirk_config` lets you pick a logging service (Loki / Grafana, Datadog or Fivemanage); any dirk script that logs — fishing included — then routes through it. Discord webhooks still work exactly as before, this sits alongside them. Service credentials are server-only and never sent to clients.
+- **Per-resource access control.** Each script — and dirk_lib itself — now has its own Access tab controlling who, beyond server admins, can open and edit its live config, granted by job / gang / ACE group or by individual player. The old central override list has been removed in favour of this. Master admins (the `dirk_lib_master_group` convar, default `group.admin`) always have access and can't be locked out.
+
+### Improvements
+- **The Appearance tab is now "Theme"** — same settings, clearer name (matches the per-script theme tabs).
+- **Lighter config-panel load.** The panel now hydrates from a single cached fetch handed to the interface, and admins pull only the server-only fields when they actually open it — less network traffic, and secrets never leave the server.
+- **English fallback for untranslated strings.** A config label with no translation in the active language now falls back to English instead of showing the raw key.
+
+---
+
+# UPDATE 1.2.62 | 25/06/2026
+
+### Fixes
+- **Destroyed ped handles are never served from cache.** A cached ped handle is now validated before reuse, preventing a class of nil-ped errors after respawns or model swaps.
+
+---
+
+# UPDATE 1.2.61 | 24/06/2026
+
+### Fixes
+- **core_inventory: item images + fitted rod parts fixed.** The image path for core_inventory is now detected correctly (shop and loadout icons were blank) and item metadata is read from the right place client-side, so fitted rod parts (reel / line / hook) save properly. Any dirk script running on core_inventory benefits.
+
+---
+
 # UPDATE 1.2.60 | 23/06/2026
 
 ### Fixes

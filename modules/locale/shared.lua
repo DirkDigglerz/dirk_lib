@@ -88,6 +88,28 @@ end
 
 local table = lib.table
 
+-- A "stub" locale entry — value == its own key, e.g. "OpenStore":"OpenStore" —
+-- is an UNTRANSLATED placeholder, not a real translation. When merging the
+-- active language over the en base we SKIP stubs so the string falls back to the
+-- English value instead of rendering the raw key to players. Devs can still spot
+-- what's untranslated: set `setr dirk_lib:locale:rawStubs true` to keep stubs
+-- raw, OR `setr dirk_lib:collectMissingLocales true` to collect them.
+local rawStubs = GetConvar('dirk_lib:locale:rawStubs', 'false') == 'true'
+
+local function mergeLocaleFallback(base, override)
+    for k, v in pairs(override) do
+        if type(v) == 'table' then
+            if type(base[k]) ~= 'table' then base[k] = {} end
+            mergeLocaleFallback(base[k], v)
+        elseif type(v) == 'string' and v == k and not rawStubs and base[k] ~= nil then
+            -- stub → keep the English (base) value as the fallback
+        else
+            base[k] = v
+        end
+    end
+    return base
+end
+
 ---Loads the ox_lib locale module. Prefer using fxmanifest instead (see [docs](https://overextended.dev/ox_lib#usage)).
 ---@param key? string
 function lib.locale(key)
@@ -95,7 +117,7 @@ function lib.locale(key)
     local locales = loadLocale('en')
 
     if lang ~= 'en' then
-        table.merge(locales, loadLocale(lang))
+        mergeLocaleFallback(locales, loadLocale(lang))
     end
 
     table.wipe(dict)

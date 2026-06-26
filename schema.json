@@ -252,34 +252,23 @@
       }
     },
 
-    "scriptConfig": {
+    "access": {
       "type": "object",
-      "description": "Per-resource access control for /dirk_config. The master group is configured via the `dirk_lib_master_group` server convar (defaults to `group.admin`) and can always edit any registered scriptConfig. Use `overrides` to grant additional access to specific resources for non-master ACE groups or specific player identifiers — purely additive, you cannot remove access from the master.",
+      "x-serverOnly": true,
+      "description": "Who (besides master admins) can open & edit dirk_lib's OWN config — additive on top of the dirk_lib_master_group convar, never removes master. WARNING: dirk_lib's config holds secrets (Discord bot token, logger credentials); anyone granted here can see/edit them and grant others (but can NEVER make themselves master). Grant trusted co-admins only. x-serverOnly so the grant list never leaves the server.",
+      "default": { "groups": [], "identifiers": [] },
       "properties": {
-        "overrides": {
+        "groups": {
           "type": "array",
           "default": [],
-          "x-arrayKey": "resource",
-          "description": "Per-resource extra access grants. Each entry lets the listed ACE groups or player identifiers edit that resource's scriptConfig in addition to the master. x-arrayKey merges DB entries by `resource` against any defaults — currently no defaults are seeded, so this is effectively user-managed.",
-          "items": {
-            "type": "object",
-            "properties": {
-              "resource":    { "type": "string", "description": "Resource name (e.g. dirk_druglabsv2)." },
-              "groups":      {
-                "type": "array",
-                "default": [],
-                "description": "ACE permissions checked via IsPlayerAceAllowed (e.g. group.mod, dirkscripts.command.druglabs).",
-                "items": { "type": "string" }
-              },
-              "identifiers": {
-                "type": "array",
-                "default": [],
-                "description": "Player identifiers (license:..., steam:..., discord:..., etc.) granted edit access regardless of group membership.",
-                "items": { "type": "string" }
-              }
-            },
-            "required": ["resource"]
-          }
+          "description": "ACE group names granted dirk_lib config access (checked via IsPlayerAceAllowed).",
+          "items": { "type": "string" }
+        },
+        "identifiers": {
+          "type": "array",
+          "default": [],
+          "description": "Specific players granted access — framework persistent id (citizenid on qb/qbx, license on esx), or a raw FiveM identifier (license:/discord:/...).",
+          "items": { "type": "string" }
         }
       }
     },
@@ -298,6 +287,80 @@
           "type": "string",
           "default": "",
           "description": "Guild (Discord server) ID lib.discord targets by default. Used for role lists, member lookups, etc."
+        }
+      }
+    },
+
+    "logger": {
+      "type": "object",
+      "description": "External log backend used by lib.logger across every dirk_lib consumer. Runs entirely inside dirk_lib's own VM — consumers emit through an export, so backend secrets never enter a consumer's memory image. Set service to 'off' to disable external logging (resources still fire their own Discord webhooks independently). Legacy `dirk:logger` + per-backend convars still work as a fallback when service is 'off'/unset.",
+      "properties": {
+        "service": {
+          "type": "string",
+          "enum": ["off", "datadog", "loki", "fivemanage"],
+          "default": "off",
+          "description": "External log backend. off = Discord webhooks only (per-resource)."
+        },
+        "hostname": {
+          "type": "string",
+          "default": "",
+          "description": "Optional hostname label (defaults to sv_projectName)."
+        },
+        "loki": {
+          "type": "object",
+          "description": "Grafana Loki push credentials. Only used when service = loki.",
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "default": "",
+              "description": "Loki base URL (https:// is assumed if no scheme). The /loki/api/v1/push path is appended automatically."
+            },
+            "user": {
+              "type": "string",
+              "default": "",
+              "description": "Basic-auth username. Leave blank for an unauthenticated push endpoint."
+            },
+            "password": {
+              "type": "string",
+              "default": "",
+              "x-serverOnly": true,
+              "description": "Basic-auth password / API key. Server-side only — never sent to clients."
+            },
+            "tenant": {
+              "type": "string",
+              "default": "",
+              "description": "Optional X-Scope-OrgID tenant header for multi-tenant Loki."
+            }
+          }
+        },
+        "datadog": {
+          "type": "object",
+          "description": "Datadog logs intake credentials. Only used when service = datadog.",
+          "properties": {
+            "apiKey": {
+              "type": "string",
+              "default": "",
+              "x-serverOnly": true,
+              "description": "Datadog API key (DD-API-KEY). Server-side only — never sent to clients."
+            },
+            "site": {
+              "type": "string",
+              "default": "datadoghq.com",
+              "description": "Datadog site (e.g. datadoghq.com, datadoghq.eu, us5.datadoghq.com)."
+            }
+          }
+        },
+        "fivemanage": {
+          "type": "object",
+          "description": "Fivemanage logs credentials. Only used when service = fivemanage.",
+          "properties": {
+            "apiKey": {
+              "type": "string",
+              "default": "",
+              "x-serverOnly": true,
+              "description": "Fivemanage API key (Authorization). Server-side only — never sent to clients."
+            }
+          }
         }
       }
     },

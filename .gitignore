@@ -1,0 +1,11 @@
+# Internal planning / analysis docs + runtime diagnostics dump (never ship)
+PERFORMANCE_MAP.md
+STARTUP_FIXES_REVIEW.md
+VIDEO_PLAN.md
+videoplan.md
+diag_report.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp

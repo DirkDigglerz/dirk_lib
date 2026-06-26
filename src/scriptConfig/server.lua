@@ -28,17 +28,18 @@ end
 
 -- Master access is gated by a comma-separated list of values passed to
 -- IsPlayerAceAllowed. ANY value that returns true grants master access.
--- Default `group.admin,admin,command` covers the three permissions most
+-- Default `group.admin,admin` covers the two permissions most
 -- server.cfgs grant to admins:
 --   • `group.admin`  — principal membership (works when the cfg has
 --                      `add_ace group.admin group.admin allow`)
 --   • `admin`        — bare permission (works when the cfg has
 --                      `add_ace group.admin admin allow`)
---   • `command`      — built-in admin permission (granted by default in
---                      most txAdmin/QB/QBX/ESX cfgs)
+-- `command` is deliberately NOT in the default: admins already inherit it
+-- via group.admin, and it's the one token an operator might grant to a
+-- non-admin — including it would silently widen master access.
 -- A server owner who locks down one of these can override via the
 -- `dirk_lib_master_group` server convar with their own value(s).
-local DEFAULT_MASTER = 'group.admin,admin,command'
+local DEFAULT_MASTER = 'group.admin,admin'
 
 local function getMasterGroup()
   local cv = GetConvar('dirk_lib_master_group', DEFAULT_MASTER)
@@ -56,22 +57,110 @@ local function isMasterEditor(src)
   return false
 end
 
-local function getOverrideForResource(resourceName)
-  local cfg = (lib.scriptConfig and lib.scriptConfig.get and lib.scriptConfig.get('scriptConfig')) or {}
-  local overrides = cfg.overrides
-  if type(overrides) ~= 'table' then return nil end
-  for i = 1, #overrides do
-    local o = overrides[i]
-    if type(o) == 'table' and o.resource == resourceName then return o end
-  end
-  return nil
+-- (The central `scriptConfig.overrides` list was removed — config access is now
+-- purely per-resource: each consumer ships its own `access` block and pushes it
+-- via registerScriptConfigOverrides. Master access is unchanged.)
+
+-- Resolve a player's match context ONCE per access check (or once per chooser
+-- sweep — see collectRegisteredConfigs): their framework persistent id
+-- (citizenid on qb/qbx, license on esx — what the PlayerSelect editor stores,
+-- so grants made while a player was OFFLINE enforce the moment they join) plus
+-- their raw FiveM identifiers (license:/discord:/steam:/… — what the legacy
+-- central overrides UI stores). Resolving once avoids re-hitting the framework
+-- + the native per resource when a single src is tested against many resources.
+local function resolveMatchCtx(src)
+  local citizenId
+  local okId, resolved = pcall(function() return lib.player.identifier(src) end)
+  if okId and type(resolved) == 'string' and resolved ~= '' then citizenId = resolved end
+  return { citizenId = citizenId, ids = GetPlayerIdentifiers(src) or {} }
 end
 
-local function playerHasIdentifier(src, wanted)
+-- Does the stored access entry `wanted` match this player? Honours both the
+-- framework persistent id and any raw FiveM identifier. `ctx` is from
+-- resolveMatchCtx — the caller resolves it once and passes it in.
+local function playerHasIdentifier(wanted, ctx)
   if type(wanted) ~= 'string' or wanted == '' then return false end
-  local ids = GetPlayerIdentifiers(src) or {}
+  if ctx.citizenId and wanted == ctx.citizenId then return true end
+  local ids = ctx.ids
   for i = 1, #ids do
     if ids[i] == wanted then return true end
+  end
+  return false
+end
+
+-- ── Per-script PUSH overrides ─────────────────────────────────────────────
+-- In addition to the central `overrides` array (which lives in dirk_lib's own
+-- scriptConfig and is curated from the admin UI), each consumer resource can
+-- declare an `access` block in ITS OWN schema.json. The consumer's
+-- scriptConfig module (which runs in the consumer's VM) PUSHES that block to
+-- us via registerScriptConfigOverrides. We store it keyed by resource name and
+-- read it during canEditResource. This is a one-way push model: dirk_lib only
+-- ever READS this map — it never calls back into a consumer, so there is no
+-- re-entrancy. Entries are cleared on the consumer's stop (and defensively in
+-- our own onResourceStop below, should we ever observe the stop first).
+local overridesByResource = {}
+
+-- accessBlock shape: { groups = string[], identifiers = string[] }. Validated
+-- defensively — anything non-string / empty is dropped so a malformed schema
+-- can't widen access in surprising ways.
+exports('registerScriptConfigOverrides', function(resourceName, accessBlock)
+  if type(resourceName) ~= 'string' or resourceName == '' then return false end
+  accessBlock = type(accessBlock) == 'table' and accessBlock or {}
+
+  local groups = {}
+  if type(accessBlock.groups) == 'table' then
+    for i = 1, #accessBlock.groups do
+      local g = accessBlock.groups[i]
+      if type(g) == 'string' and g ~= '' then groups[#groups + 1] = g end
+    end
+  end
+
+  local identifiers = {}
+  if type(accessBlock.identifiers) == 'table' then
+    for i = 1, #accessBlock.identifiers do
+      local id = accessBlock.identifiers[i]
+      if type(id) == 'string' and id ~= '' then identifiers[#identifiers + 1] = id end
+    end
+  end
+
+  overridesByResource[resourceName] = { groups = groups, identifiers = identifiers }
+  return true
+end)
+
+exports('unregisterScriptConfigOverrides', function(resourceName)
+  if type(resourceName) ~= 'string' or resourceName == '' then return false end
+  overridesByResource[resourceName] = nil
+  return true
+end)
+
+-- Defensive cleanup in dirk_lib's own VM. The consumer also unregisters from
+-- its own onResourceStop (modules/scriptConfig/server.lua); whichever fires is
+-- harmless — both just nil out the same map entry.
+AddEventHandler('onResourceStop', function(stopped)
+  if type(stopped) == 'string' then
+    overridesByResource[stopped] = nil
+  end
+end)
+
+-- Does the pushed per-script access block for this resource grant src access?
+-- Read-only against the map — never calls back into the consumer.
+local function pushedOverrideAllows(src, resourceName, ctx)
+  local o = overridesByResource[resourceName]
+  if type(o) ~= 'table' then return false end
+  local groups = o.groups
+  if type(groups) == 'table' then
+    for i = 1, #groups do
+      local g = groups[i]
+      if type(g) == 'string' and g ~= '' and IsPlayerAceAllowed(src, g) then
+        return true
+      end
+    end
+  end
+  local identifiers = o.identifiers
+  if type(identifiers) == 'table' then
+    for i = 1, #identifiers do
+      if playerHasIdentifier(identifiers[i], ctx) then return true end
+    end
   end
   return false
 end
@@ -82,25 +171,25 @@ end
 -- src=0 (server console) always returns true.
 function CanEditScriptConfigResource(src, resourceName) end -- forward decl
 
-local function canEditResource(src, resourceName)
+local function canEditResource(src, resourceName, ctx)
   if not src or src == 0 then return true end
   if isMasterEditor(src) then return true end
-  if resourceName == GetCurrentResourceName() then return false end
-  local o = getOverrideForResource(resourceName)
-  if not o then return false end
-  if type(o.groups) == 'table' then
-    for i = 1, #o.groups do
-      local g = o.groups[i]
-      if type(g) == 'string' and g ~= '' and IsPlayerAceAllowed(src, g) then
-        return true
-      end
-    end
-  end
-  if type(o.identifiers) == 'table' then
-    for i = 1, #o.identifiers do
-      if playerHasIdentifier(src, o.identifiers[i]) then return true end
-    end
-  end
+  -- dirk_lib's own config used to be hard-denied to non-masters (its scriptConfig
+  -- WAS the access model). With the central overrides removed it's no longer an
+  -- escalation vector — master is the dirk_lib_master_group convar, not config —
+  -- so dirk_lib is gated like any resource: master (above) + its own pushed access.
+
+  -- Resolve the player's match context once (citizenid/license + raw FiveM
+  -- identifiers). The caller may pass a precomputed ctx — the chooser resolves
+  -- it ONCE for the whole resource sweep — otherwise resolve lazily here. Done
+  -- after the master short-circuit so admins never pay for it.
+  ctx = ctx or resolveMatchCtx(src)
+
+  -- Per-script PUSH: the access block the consumer declared in its
+  -- own schema.json and pushed via registerScriptConfigOverrides. Additive —
+  -- it can only GRANT access, never remove it.
+  if pushedOverrideAllows(src, resourceName, ctx) then return true end
+
   return false
 end
 
@@ -120,10 +209,18 @@ local function collectRegisteredConfigs(src)
   local list = {}
   local total = GetNumResources()
 
+  -- Resolve the player's match context ONCE for the whole sweep — a single src
+  -- is tested against every registered resource. Masters short-circuit inside
+  -- canEditResource before ctx is touched, so skip the lookup for them.
+  local ctx
+  if src and src ~= 0 and not isMasterEditor(src) then
+    ctx = resolveMatchCtx(src)
+  end
+
   for i = 0, total - 1 do
     local name = GetResourceByFindIndex(i)
     if name and GetResourceState(name) == 'started' and hasScriptConfigTag(name) then
-      if not src or canEditResource(src, name) then
+      if not src or canEditResource(src, name, ctx) then
         local rawSchema = LoadResourceFile(name, 'schema.json')
         if rawSchema then
           local ok = pcall(json.decode, rawSchema)
