@@ -48,8 +48,13 @@ for system, resources in pairs(supportedResources) do
       autodetected[system] = resource 
 
       if system == 'inventory' then
-        -- Check ox_inventory's own convar first (users may set a CDN url via setr inventory:imagepath)
-        local oxConvar = GetConvar('inventory:imagepath', '')
+        -- `inventory:imagepath` is ox_inventory's OWN convar (CDN override). Only honour it
+        -- when the detected inventory is actually ox_inventory — applying it to other
+        -- inventories used to override their correct nui:// image path with an ox/CDN value
+        -- that doesn't apply, breaking item images (reported on core_inventory by 62i).
+        -- Every other inventory uses its known image path; users wanting a CDN can still set
+        -- the dirk_lib `itemImgPath` setting directly.
+        local oxConvar = resource == 'ox_inventory' and GetConvar('inventory:imagepath', '') or ''
         if oxConvar ~= '' then
           -- Ensure trailing slash
           if oxConvar:sub(-1) ~= '/' then oxConvar = oxConvar .. '/' end
@@ -57,7 +62,7 @@ for system, resources in pairs(supportedResources) do
         else
           autodetected.itemImgPath = imagePaths[resource] or 'nui://dirk_inventory/web/images/'
         end
-      end 
+      end
       goto continue
     end
   end 

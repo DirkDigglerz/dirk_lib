@@ -37,13 +37,19 @@ local bridge = {
   ---@return table
   getItems = function()
     local inv = exports['core_inventory']:getInventory()
-    local content = inv and (inv.content or inv.items)
-    if not content then return {} end
+    if type(inv) ~= 'table' then return {} end
+    -- core_inventory returns its contents as a flat ARRAY of item objects (each
+    -- carrying its own .slot / .id / .metadata); some shapes nest it under
+    -- .content / .items. The old `inv.content or inv.items` came back nil for the
+    -- bare-array shape, so getItems returned EMPTY and consumers couldn't find the
+    -- item ("No item found in slot N when trying to take out rod"). Normalise all
+    -- three shapes, and key the result by each item's real slot.
+    local content = inv.content or inv.items or inv
     local items = {}
-    for slot, item in pairs(content) do
+    for key, item in pairs(content) do
       if type(item) == 'table' then
-        item.slot = item.slot or slot
-        items[slot] = item
+        item.slot = item.slot or key
+        items[item.slot] = item
       end
     end
     return items

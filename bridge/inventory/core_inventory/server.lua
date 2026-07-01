@@ -63,7 +63,20 @@ bridge = {
   ---@return table  slot-indexed contents
   getItems = function(invId)
     local inv = exports['core_inventory']:getInventory(invId)
-    return (inv and (inv.content or inv.items)) or {}
+    if type(inv) ~= 'table' then return {} end
+    -- core_inventory returns contents as a flat ARRAY (some shapes nest under
+    -- .content / .items). The old `inv.content or inv.items` returned nil for the
+    -- bare-array shape, leaving getItems EMPTY — normalise all three and key by the
+    -- item's real slot so consumers can scan/match on .slot.
+    local content = inv.content or inv.items or inv
+    local items = {}
+    for key, item in pairs(content) do
+      if type(item) == 'table' then
+        item.slot = item.slot or key
+        items[item.slot] = item
+      end
+    end
+    return items
   end,
 
   ---@param invId string | number

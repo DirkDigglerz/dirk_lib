@@ -12,6 +12,8 @@ const LANGUAGE_OPTIONS = [
   { value: "de", label: "Deutsch (de)" },
   { value: "pt", label: "Português (pt)" },
   { value: "nl", label: "Nederlands (nl)" },
+  { value: "zh-CN", label: "简体中文 (zh-CN)" },
+  { value: "zh-TW", label: "繁體中文 (zh-TW)" },
 ];
 
 function GroupLabel({ label }: { label: string }) {

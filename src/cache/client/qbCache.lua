@@ -82,6 +82,22 @@ AddEventHandler('onResourceStart', function(resourceName)
 end)
 
 
+-- QB/qbx fire OnPlayerLoaded once. If job.name isn't resolved at that instant
+-- (character select / custom ped / multicharacter race), parsePlayerCache
+-- early-returns and `playerLoaded` never flips for the whole session — hanging
+-- any consumer that gates on cache.playerLoaded. ESX self-heals with a poll (see
+-- esxCache); QB had no equivalent. Mirror it. Idempotent: cache:set only fires
+-- the change event when the value actually changes, so this is safe alongside
+-- the OnPlayerLoaded / onResourceStart paths.
+CreateThread(function()
+  if lib.settings.framework ~= 'qb-core' and lib.settings.framework ~= 'qbx_core' then return end
+  while not lib.FW do Wait(500) end
+  while not lib.FW.Functions.GetPlayerData() do Wait(500) end
+  while not lib.FW.Functions.GetPlayerData().job?.name do Wait(500) end
+  parsePlayerCache()
+end)
+
+
 if lib.settings.framework ~= 'qbx_core' then return end
 
 AddStateBagChangeHandler('isLoggedIn', ('player:%s'):format(cache.serverId), function(_, _, value)
