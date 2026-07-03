@@ -1,3 +1,16 @@
+# UPDATE 1.2.65 | 03/07/2026
+
+Inventory-bridge fixes for tgiann, a new devix_inventory bridge, and a Traditional Chinese locale.
+
+## Fixes
+- **tgiann-inventory: usable items (e.g. fishing rods) now fire.** On inventories layered over ESX that don't hand ESX an item record, a used item arrived without its data and the use was silently skipped — so the item appeared to "do nothing". The ESX bridge now resolves the missing record through the active inventory bridge instead of bailing, so the use goes through. Kept generic — no hardcoded inventory in the framework layer.
+
+## New
+- **devix_inventory bridge.** Initial compatibility layer for devix_inventory (grid-based). Handles add/remove/read, resolves grid slots, and writes item metadata through devix's serial-keyed update path. devix is closed-source, so a couple of record-shape details still need confirming on a live install — treat this first pass accordingly.
+- **Traditional Chinese (zh-TW) locale.**
+
+---
+
 # UPDATE 1.2.63 | 26/06/2026
 
 Logging backends beyond Discord, per-resource access control, and a lighter config panel.

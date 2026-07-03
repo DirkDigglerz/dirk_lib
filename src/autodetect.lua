@@ -5,7 +5,10 @@ local supportedResources = {
   -- so e.g. qs-inventory (which declares `provide 'qb-inventory'`) wins over the
   -- qb-inventory it shadows. The two provided/generic names go LAST so they only
   -- win on a server that genuinely runs them with no drop-in present.
-  inventory         = {'dirk_inventory', 'one_inventory', 'qs-inventory', 'codem-inventory', 'tgiann-inventory', 'mf-inventory', 'core_inventory', 'ak47_inventory', 'ox_inventory', 'qb-inventory'},
+  -- devix-inventory ships an ox_inventory compat STUB (only AddItem/RemoveItem/
+  -- GetItemCount), so it must be detected BEFORE ox_inventory or dirk_lib would
+  -- pick the stub instead of the real devix bridge.
+  inventory         = {'dirk_inventory', 'one_inventory', 'qs-inventory', 'codem-inventory', 'tgiann-inventory', 'devix-inventory', 'mf-inventory', 'core_inventory', 'ak47_inventory', 'ox_inventory', 'qb-inventory'},
   target            = {'ox_target', 'qb-target', 'q-target', 'bt-target'},
   interact          = {'redm-uiprompt', 'sleepless_interact', 'interact'},
   time              = {'av_weather', 'cd_easytime', 'qb-weathersync', 'Renewed-Weathersync', 'vSync', 'wasabi_wheather'},
@@ -33,6 +36,11 @@ local imagePaths = {
   ['mf-inventory'] = 'nui://mf-inventory/html/images/',
   ['core_inventory'] = 'nui://core_inventory/html/img/',
   ['ak47_inventory'] = 'nui://ak47_inventory/html/images/',
+  -- UNCONFIRMED folder — html/images is the common convention (matches qs/tgiann/
+  -- codem); devix may use html/img or a web/ dir. If devix icons come up blank
+  -- this is why — override via the dirk_lib itemImgPath setting, or confirm the
+  -- real path with a devix user.
+  ['devix-inventory'] = 'nui://devix-inventory/html/images/',
 }
 
 local autodetected = {}

@@ -75,13 +75,21 @@ local bridge = {
 
   useableItem = function(item, cb)
     -- Inventories layered over ESX (e.g. tgiann-inventory) fire the registered
-    -- callback without an ESX-shaped item record, so `item` can arrive nil.
-    -- Bail gracefully instead of handing nil to the consumer (which then
-    -- indexes item.slot and throws a server error).
+    -- callback WITHOUT an ESX-shaped item record, so `itemData` arrives nil and
+    -- handing that straight to the consumer throws (it indexes item.slot). Rather
+    -- than bail (which left the item unusable on those inventories — the tgiann
+    -- "rod won't equip" report), resolve the record through the INVENTORY bridge,
+    -- which speaks this inventory's own API (tgiann's GetItemByName, etc.). Keeps
+    -- the framework bridge inventory-agnostic — no hardcoded tgiann exports here.
     return lib.FW.RegisterUsableItem(item, function(src, name, itemData)
       if itemData == nil then
-        lib.print.warn(('es_extended bridge: usable item "%s" fired without an item record (inventory did not supply one); skipping use'):format(tostring(item)))
-        return
+        if lib.inventory and lib.inventory.getItemByName then
+          itemData = lib.inventory.getItemByName(src, item)
+        end
+        if itemData == nil then
+          lib.print.warn(('es_extended bridge: usable item "%s" fired without an item record and the inventory bridge could not resolve one; skipping use'):format(tostring(item)))
+          return
+        end
       end
       cb(src, itemData)
     end)
