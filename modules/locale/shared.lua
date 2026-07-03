@@ -23,35 +23,15 @@ end
 
 
 
--- Dev-only missing-translation collection. When a key isn't in the dict we used
--- to echo it back (client → server event → disk write) so a dev could fill it in
--- later. On a live server with partial locales that fires once per missing key on
--- boot — hundreds of server round-trips, each rewriting an ever-growing JSON to
--- disk — which showed up as a startup hitch. Off by default; set
--- `setr dirk_lib:collectMissingLocales true` on a dev server to restore it.
-local collectMissingLocales = GetConvar('dirk_lib:collectMissingLocales', 'false') == 'true'
-
--- Adds a missing key to the dict + (in dev mode) saves it back to disk so devs
--- can fill in the translation later. Only fires for keys not already in the dict —
--- without that guard a stale dict (e.g. before lib.locale() runs) would
--- overwrite good translations with key=key when the NUI reports them as
--- missing on cold start.
-local addNeededTranslation = function(str)
-  if dict[str] ~= nil then return end
-  -- Cache the key as its own fallback regardless of mode, so locale() keeps
-  -- returning the key string and we only ever evaluate a given miss once.
-  dict[str] = str
-  if not collectMissingLocales then return end
-
-  lib.print.info(('Adding missing translation for: %s'):format(str))
-  if not IsDuplicityVersion() then
-    TriggerServerEvent('dirk_lib:addNeededTranslation', cache.resource, str)
-    return
-  end
-  local data = json.encode(dict, {indent = true, level = 2})
-  lib.print.info(('Saving missing translation %s to %s'):format(str, ('locales/%s.json'):format(lib.getLocaleKey())))
-  SaveResourceFile(cache.resource, ('locales/%s.json'):format(lib.getLocaleKey()), data, -1)
-end
+-- Missing keys fall back to the key string itself. We deliberately do NOT write
+-- them back to disk. An earlier "collect missing translations" mode echoed every
+-- miss (client → server event → SaveResourceFile), which:
+--   (a) rewrote each consumer's locale JSON on boot — churning files, racing
+--       manual edits, and adding a startup hitch of hundreds of round-trips; and
+--   (b) baked `"Key":"Key"` stubs into shipped locale files, which then render
+--       as raw keys / block the English fallback for anyone downstream.
+-- Missing translations are now filled in by editing the locale JSON by hand.
+-- To audit gaps offline, diff en.json against a target language — never at runtime.
 
 ---@param str string
 ---@param ... string | number
@@ -61,13 +41,11 @@ function locale(str, ...)
 
     if lstr then
       if ... then
-        return lstr and lstr:format(...)
+        return lstr:format(...)
       end
 
       return lstr
     end
-
-    addNeededTranslation(str)
 
     return str
 end
@@ -91,9 +69,9 @@ local table = lib.table
 -- A "stub" locale entry — value == its own key, e.g. "OpenStore":"OpenStore" —
 -- is an UNTRANSLATED placeholder, not a real translation. When merging the
 -- active language over the en base we SKIP stubs so the string falls back to the
--- English value instead of rendering the raw key to players. Devs can still spot
--- what's untranslated: set `setr dirk_lib:locale:rawStubs true` to keep stubs
--- raw, OR `setr dirk_lib:collectMissingLocales true` to collect them.
+-- English value instead of rendering the raw key to players. Devs who want to
+-- spot what's untranslated can set `setr dirk_lib:locale:rawStubs true` to keep
+-- stubs raw.
 local rawStubs = GetConvar('dirk_lib:locale:rawStubs', 'false') == 'true'
 
 local function mergeLocaleFallback(base, override)
@@ -224,31 +202,13 @@ end
 
 
 if not IsDuplicityVersion() then
-  -- React-side `localeStore.locale(key)` calls miss the dictionary silently —
-  -- this NUI callback lets the NUI report missing keys back to the consumer
-  -- resource's server, which writes them through the same flow Lua uses.
-  RegisterNuiCallback('REPORT_MISSING_LOCALE', function(data, cb)
+  -- The React locale helper (dirk-cfx-react) still pings this callback when a key
+  -- is absent from its store. We ACK and do nothing on purpose: runtime NEVER
+  -- writes translations back to disk. Missing keys are filled in by editing the
+  -- locale JSON. Kept registered (rather than removed) so the NUI's fetchNui
+  -- resolves cleanly instead of 404-ing on every cold-start miss.
+  RegisterNuiCallback('REPORT_MISSING_LOCALE', function(_, cb)
     cb('ok')
-    if not collectMissingLocales then return end
-    if type(data) ~= 'table' or type(data.key) ~= 'string' or data.key == '' then return end
-    TriggerServerEvent('dirk_lib:addNeededTranslation', cache.resource, data.key)
-  end)
-end
-
-if IsDuplicityVersion() then
-  RegisterNetEvent('dirk_lib:addNeededTranslation', function(resource, str)
-    if not collectMissingLocales then return end
-    if cache.resource ~= resource then return end
-    local dict = loadLocale(lib.getLocaleKey())
-    -- Skip if the key already has a translation on disk — same guard as the
-    -- shared-side fn above, but this handler fires from the NUI's missing-
-    -- locale report which is genuinely "I never saw it in the dict", so a
-    -- stale React store could otherwise stomp a newly added translation.
-    if dict[str] ~= nil then return end
-    dict[str] = str
-    local data = json.encode(dict, {indent = true, level = 2})
-    lib.print.info(('Saving missing translation %s on the server side to %s'):format(str, ('locales/%s.json'):format(lib.getLocaleKey())))
-    SaveResourceFile(resource, ('locales/%s.json'):format(lib.getLocaleKey()), data, -1)
   end)
 end
 

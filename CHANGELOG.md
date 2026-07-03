@@ -1,3 +1,12 @@
+# UPDATE 1.2.66 | 03/07/2026
+
+Localisation hardening.
+
+## Fixes
+- **Missing translations are no longer written back into locale files at runtime.** A dev-only "collect missing translations" mode could echo any untranslated key back to disk — churning locale files on boot and leaving `"Key": "Key"` placeholders baked into shipped translations, which then showed as raw-looking labels or blocked the English fallback. It's been removed entirely: a missing key now simply falls back to English, and locale files are only ever edited by hand.
+
+---
+
 # UPDATE 1.2.65 | 03/07/2026
 
 Inventory-bridge fixes for tgiann, a new devix_inventory bridge, and a Traditional Chinese locale.
