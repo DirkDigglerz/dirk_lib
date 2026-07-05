@@ -147,4 +147,60 @@ if lib.context == 'server' then
       TriggerEvent('dirk_lib:settingsChanged', snapshot)
     end)
   end
+
+  -- ── Post-boot inventory re-detection ────────────────────────────────────
+  -- `lib.require` memoizes src.autodetect, so the boot snapshot freezes whatever
+  -- resource states existed the instant dirk_lib started. An inventory that
+  -- starts AFTER dirk_lib (libraries are ensured early in server.cfg) would
+  -- otherwise leave the inventory pick / itemImgPath on the boot fallback until
+  -- a manual dirk_lib restart — reported by 62i (core_inventory): fish-store
+  -- images blank on boot, only appearing after restarting lib + the script.
+  --
+  -- We recompute once the inventory is actually up and re-broadcast the overlay.
+  -- Going through buildOverlaySnapshot means 'auto' values resolve against the
+  -- FRESH detection while an explicit admin override (a pasted nui://…/CDN
+  -- itemImgPath, e.g. edmondio's separate tgiann image resource) is left
+  -- untouched, and every consumer's onSettings('itemImgPath') fires so cached
+  -- item images rebuild — no restart needed.
+  local function reapplyOverlay()
+    local cfg = (lib.scriptConfig and lib.scriptConfig.get and lib.scriptConfig.get()) or {}
+    local snapshot = buildOverlaySnapshot(cfg)
+    if next(snapshot) == nil then return false end -- scriptConfig not loaded yet
+    TriggerClientEvent('dirk_lib:settingsChanged', -1, snapshot)
+    TriggerEvent('dirk_lib:settingsChanged', snapshot)
+    return true
+  end
+
+  CreateThread(function()
+    local boot = lib.autodetected or require 'src.autodetect' -- frozen boot snapshot
+    for _ = 1, 45 do
+      Wait(1000)
+      if type(lib.detectResources) ~= 'function' then return end
+      local fresh = lib.detectResources()
+      lib.autodetected = fresh
+      local inv = fresh.inventory
+      if inv and inv ~= 'NOT FOUND' then
+        -- Boot detection already matched reality → nothing to recover.
+        if inv == boot.inventory and fresh.itemImgPath == boot.itemImgPath then return end
+        -- Detection changed since boot; broadcast once scriptConfig is ready so
+        -- 'auto' resolves against the fresh values. Keep retrying until it is.
+        if reapplyOverlay() then return end
+      end
+    end
+  end)
+
+  -- Also catch an inventory that starts (or is restarted) later — e.g. an admin
+  -- reloads their inventory resource at runtime. Cheap: detect() is a handful of
+  -- GetResourceState calls, and we only re-broadcast when something changed.
+  AddEventHandler('onResourceStart', function(res)
+    if type(res) ~= 'string' or type(lib.detectResources) ~= 'function' then return end
+    SetTimeout(1000, function()
+      local prev = lib.autodetected
+      local fresh = lib.detectResources()
+      lib.autodetected = fresh
+      if not prev or fresh.inventory ~= prev.inventory or fresh.itemImgPath ~= prev.itemImgPath then
+        reapplyOverlay()
+      end
+    end)
+  end)
 end

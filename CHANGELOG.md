@@ -1,3 +1,16 @@
+# UPDATE 1.2.68 | 05/07/2026
+
+Item icons now resolve on a cold boot without a restart, and devix / older tgiann installs get the right image path automatically.
+
+## Fixes
+- **Item icons no longer need a resource restart to appear.** On a cold server start, if your inventory resource finished starting *after* dirk_lib (common — libraries are ensured early), the item image path was left on a fallback and stayed wrong until you manually restarted dirk_lib and the script using it — reported on core_inventory (fish-store icons blank until a restart). dirk_lib now re-checks once the inventory is actually up and pushes the corrected path to every script live, so icons resolve on first boot. An image path you've set yourself in `/dirk_config` is never overwritten by this.
+- **devix_inventory icons.** The devix image path now points at `devix-inventory/html/img` (where devix keeps its icons) instead of the previous `html/images` guess, so devix item images load.
+
+## Improvements
+- **Older tgiann-inventory icons work out of the box.** Some tgiann builds keep their icons in a separate `inventory_images` resource rather than inside tgiann-inventory itself. dirk_lib now detects that resource and points item images at it automatically — no manual image-path override needed. (Newer tgiann is unaffected.)
+
+---
+
 # UPDATE 1.2.67 | 05/07/2026
 
 ## Improvements
