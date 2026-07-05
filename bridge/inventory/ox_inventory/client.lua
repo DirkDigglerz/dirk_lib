@@ -39,7 +39,7 @@ local bridge = {
 
   ---@function lib.inventory.items
   ---@description # Get all items registered on the server. Cached per resource lifetime.
-  ---@return table<string, { name: string, label: string, weight: number, image: string }>
+  ---@return table<string, { name: string, label: string, weight: number, image: string, description?: string }>
   items = function()
     if cachedItems then return cachedItems end
     local allItems = exports.ox_inventory:Items()
@@ -48,10 +48,13 @@ local bridge = {
     for k, v in pairs(allItems) do
       local img = (v.client and v.client.image) or v.name or k
       formatted[k] = {
-        name   = v.name or k,
-        label  = v.label or v.name or k,
-        weight = v.weight or 0,
-        image  = lib.formatImagePath(img),
+        name        = v.name or k,
+        label       = v.label or v.name or k,
+        weight      = v.weight or 0,
+        image       = lib.formatImagePath(img),
+        -- Surfaced so scripts can source item descriptions from the inventory
+        -- (translate once there) rather than re-storing them in their config.
+        description = v.description,
       }
     end
     cachedItems = formatted

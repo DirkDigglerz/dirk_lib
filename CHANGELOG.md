@@ -1,3 +1,10 @@
+# UPDATE 1.2.67 | 05/07/2026
+
+## Improvements
+- **Item descriptions are now surfaced to script NUIs.** The shared item list (used by config panels + item pickers) now includes each item's inventory `description` alongside its label, weight and image — so scripts can source item descriptions from your inventory instead of re-storing them in their own config. (ox_inventory.)
+
+---
+
 # UPDATE 1.2.66 | 03/07/2026
 
 Localisation hardening.
