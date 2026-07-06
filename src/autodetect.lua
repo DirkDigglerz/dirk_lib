@@ -15,7 +15,9 @@ local supportedResources = {
   keys              = {'cd_garage', 'MrNewbVehicleKeys', 't1ger_keys', 'okokGarage', 'qb-vehiclekeys', 'qbx_vehiclekeys', 'qs-vehiclekeys', 'Renewed-Vehiclekeys', 'vehicles_keys', 'wasabi_carlock', 'ludaro-keys'},
   fuel              = {'cdn-fuel', 'LegacyFuel', 'ox_fuel', 'ps-fuel', 'Renewed-Fuel', 'ti_fuel', 'x-fuel', 'wasabi_fuel', 'okokGasStation', 'qs-fuelstations'},
   phone             = {'lb-phone', 'qb-phone', 'gksphone', 'high-phone', 'npwd'},
-  garage            = {'qb-garages', 'wasabi_garage', 'renewed-garage'},
+  -- Real drop-in garages listed before the generic qb-garages they often layer
+  -- over. jg-advancedgarages ships under a couple of resource names in the wild.
+  garage            = {'jg-advancedgarages', 'jg-garages', 'cd_garage', 'okokGarage', 'esx_garage', 'loaf_garage', 'wasabi_garage', 'renewed-garage', 'qb-garages'},
   clothing          = {'esx_skin', 'qb-clothing', 'rcore_clothing', 'illenium-appearance', 'fivem-appearance', 'dirk_charCreator', 'tgiann-clothing'},
   ambulance         = {'qb-ambulancejob', 'wasabi_ambulance', 'core_ambulance'},
   prison            = {'qb-prison', 'rcore_prison', 'wasabi_jail'},

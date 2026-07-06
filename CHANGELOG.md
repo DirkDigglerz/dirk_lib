@@ -1,3 +1,13 @@
+# UPDATE 1.2.69 | 06/07/2026
+
+A garage bridge, so scripts can store vehicles into any garage system with one call.
+
+## New
+- **`lib.garage.addVehicle(src, opts)`** — store a completed / purchased vehicle in a player's garage with a single call, on any framework + garage system. dirk_lib routes it to the detected garage system's bridge (for systems with their own storage) or the framework's vehicle store, using a **schema-aware insert** that only writes columns your `owned_vehicles` / `player_vehicles` table actually has. This kills the class of `Unknown column 'garage'` errors on setups whose vehicle table doesn't match a hard-coded insert — e.g. **ESX + jg-advancedgarages**, whose `owned_vehicles` has no `garage` column.
+- **Garage auto-detection** now recognises `jg-advancedgarages`, `cd_garage`, `okokGarage`, `esx_garage` and `loaf_garage` alongside qb-garages / wasabi / renewed.
+
+---
+
 # UPDATE 1.2.68 | 05/07/2026
 
 Item icons now resolve on a cold boot without a restart, and devix / older tgiann installs get the right image path automatically.

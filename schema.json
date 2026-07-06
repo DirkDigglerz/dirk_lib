@@ -132,8 +132,8 @@
         "garage": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "qb-garages", "wasabi_garage", "renewed-garage"],
-          "description": "Garage / vehicle storage system."
+          "enum": ["auto", "jg-advancedgarages", "jg-garages", "cd_garage", "okokGarage", "esx_garage", "loaf_garage", "wasabi_garage", "renewed-garage", "qb-garages"],
+          "description": "Garage / vehicle storage system (used by lib.garage.addVehicle)."
         },
         "clothing": {
           "type": "string",

@@ -39,6 +39,26 @@ local bridge = {
     return exports.qbx_core:CreateUseableItem(item, cb)
   end,
 
+  --- Store a vehicle via Qbox's canonical vehicle API — it owns the
+  --- player_vehicles schema, so this works with any qbx-compatible garage
+  --- (jg-advancedgarages included). Backs lib.garage.addVehicle.
+  ---@param src number
+  ---@param opts { model: string, plate?: string, props?: table, garage?: string, owner?: string }
+  ---@return string|false plate on success, false + reason otherwise
+  addVehicle = function(src, opts)
+    opts = opts or {}
+    local citizenid = opts.owner or (src and lib.player.identifier(src))
+    if not citizenid then return false, 'MissingOwner' end
+    local vehicleId, errorResult = exports.qbx_vehicles:CreatePlayerVehicle({
+      model     = opts.model,
+      citizenid = citizenid,
+      garage    = opts.garage,
+      props     = opts.props,
+    })
+    if not vehicleId then return false, tostring(errorResult or 'CreateFailed') end
+    return opts.plate or true
+  end,
+
   get = function(src)
     return exports['qbx_core']:GetPlayer(src)
   end,

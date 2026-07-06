@@ -30,6 +30,28 @@ local function sourceItems()
   return nil
 end
 
+-- Cached owned_vehicles column set. ESX garage scripts disagree on which columns
+-- they add (`garage`, `type`, `stored`…); vanilla ESX + jg-advancedgarages have
+-- NO `garage` column, so blindly inserting it threw "Unknown column 'garage'"
+-- (reported by skrp on jg-garages). Detect the real columns once so lib.garage
+-- can insert only what exists.
+local ownedVehicleCols
+local function ownedVehicleColumns()
+  if ownedVehicleCols then return ownedVehicleCols end
+  ownedVehicleCols = {}
+  local ok, rows = pcall(function()
+    return exports.oxmysql:query_async(
+      "SELECT COLUMN_NAME AS c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'owned_vehicles'")
+  end)
+  if ok and type(rows) == 'table' then
+    for _, r in ipairs(rows) do
+      local col = r.c or r.COLUMN_NAME
+      if col then ownedVehicleCols[col] = true end
+    end
+  end
+  return ownedVehicleCols
+end
+
 local bridge = {
   ---@function lib.inventory.items
   ---@description # Get all items from ESX. Cached per resource lifetime.
@@ -97,6 +119,44 @@ local bridge = {
 
   getItemLabel = function(item)
     return lib.FW.GetItemLabel(item)
+  end,
+
+  --- Store a vehicle in the player's garage (ESX owned_vehicles). Schema-aware:
+  --- only writes columns the table actually has, so it can't die on a missing
+  --- `garage` column (jg-advancedgarages / vanilla ESX). Marks it stored so the
+  --- garage lists it. Backs lib.garage.addVehicle.
+  ---@param src number
+  ---@param opts { model?: string, plate: string, props?: table, garage?: string, owner?: string, vehicleType?: string }
+  ---@return string|false plate on success, false + reason otherwise
+  addVehicle = function(src, opts)
+    opts = opts or {}
+    local owner = opts.owner or (src and lib.player.identifier(src))
+    local plate = opts.plate
+    if not owner or not plate then return false, 'MissingOwnerOrPlate' end
+    local vehicle = type(opts.props) == 'table' and json.encode(opts.props)
+      or (type(opts.props) == 'string' and opts.props) or '{}'
+
+    local cols = ownedVehicleColumns()
+    local fields, holders, values = { 'owner', 'plate', 'vehicle' }, { '?', '?', '?' }, { owner, plate, vehicle }
+    local function maybe(col, val)
+      if cols[col] and val ~= nil then
+        fields[#fields + 1] = col
+        holders[#holders + 1] = '?'
+        values[#values + 1] = val
+      end
+    end
+    maybe('garage', opts.garage)
+    maybe('type', opts.vehicleType or 'car')
+    maybe('stored', 1)
+
+    local query = ('INSERT INTO owned_vehicles (%s) VALUES (%s)'):format(
+      table.concat(fields, ', '), table.concat(holders, ', '))
+    local ok, err = pcall(function() return exports.oxmysql:query_async(query, values) end)
+    if not ok then
+      lib.print.error(('lib.garage.addVehicle (esx): %s'):format(tostring(err)))
+      return false, 'InsertFailed'
+    end
+    return plate
   end,
 
   get = function(src)

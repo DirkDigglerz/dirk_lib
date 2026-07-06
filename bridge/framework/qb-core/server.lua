@@ -1,5 +1,25 @@
 local cachedItems
 
+-- Cached player_vehicles column set — QB forks differ on which columns exist
+-- (state / fuel / engine / body / drivingdistance…). lib.garage inserts only
+-- what's present so it can't die on a missing column across QB variants.
+local playerVehicleCols
+local function playerVehicleColumns()
+  if playerVehicleCols then return playerVehicleCols end
+  playerVehicleCols = {}
+  local ok, rows = pcall(function()
+    return exports.oxmysql:query_async(
+      "SELECT COLUMN_NAME AS c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'player_vehicles'")
+  end)
+  if ok and type(rows) == 'table' then
+    for _, r in ipairs(rows) do
+      local col = r.c or r.COLUMN_NAME
+      if col then playerVehicleCols[col] = true end
+    end
+  end
+  return playerVehicleCols
+end
+
 local bridge = {
   ---@function lib.inventory.items
   ---@description # Get all items from QBCore.Shared.Items. Cached per resource lifetime.
@@ -46,6 +66,50 @@ local bridge = {
 
   useableItem = function(item, cb)
     return lib.FW.Functions.CreateUseableItem(item,cb)
+  end,
+
+  --- Store a vehicle in the player's garage (QB player_vehicles). Schema-aware:
+  --- writes citizenid/plate/vehicle/hash/mods plus whichever of license/garage/
+  --- state/fuel/engine/body the table actually has. Marks state=1 (garaged).
+  --- Backs lib.garage.addVehicle.
+  ---@param src number
+  ---@param opts { model: string, plate: string, props?: table, garage?: string, owner?: string, license?: string }
+  ---@return string|false plate on success, false + reason otherwise
+  addVehicle = function(src, opts)
+    opts = opts or {}
+    local citizenid = opts.owner or (src and lib.player.identifier(src))
+    local plate = opts.plate
+    if not citizenid or not plate then return false, 'MissingOwnerOrPlate' end
+    local model = opts.model
+    local mods = type(opts.props) == 'table' and json.encode(opts.props)
+      or (type(opts.props) == 'string' and opts.props) or '{}'
+
+    local cols = playerVehicleColumns()
+    local fields  = { 'citizenid', 'plate', 'vehicle', 'hash', 'mods' }
+    local holders = { '?', '?', '?', '?', '?' }
+    local values  = { citizenid, plate, model, model and joaat(model) or 0, mods }
+    local function maybe(col, val)
+      if cols[col] and val ~= nil then
+        fields[#fields + 1] = col
+        holders[#holders + 1] = '?'
+        values[#values + 1] = val
+      end
+    end
+    maybe('license', opts.license)
+    maybe('garage', opts.garage)
+    maybe('state', 1)
+    maybe('fuel', 100)
+    maybe('engine', 1000.0)
+    maybe('body', 1000.0)
+
+    local query = ('INSERT INTO player_vehicles (%s) VALUES (%s)'):format(
+      table.concat(fields, ', '), table.concat(holders, ', '))
+    local ok, err = pcall(function() return exports.oxmysql:query_async(query, values) end)
+    if not ok then
+      lib.print.error(('lib.garage.addVehicle (qb): %s'):format(tostring(err)))
+      return false, 'InsertFailed'
+    end
+    return plate
   end,
 
   get = function(src)
