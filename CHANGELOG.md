@@ -1,3 +1,10 @@
+# UPDATE 1.2.70 | 08/07/2026
+
+## Fixes
+- **`lib.inventory.canCarryItem` now works on ox_inventory and qs-inventory.** These two bridges were missing the capacity check, so any script that pre-flights "can the player carry this?" before taking payment (e.g. store purchases) silently skipped it — a player with a full inventory could be **charged without receiving the item**. Both now implement it (ox `CanCarryItem`, qs `CanCarryItem`), so purchase flows across every dirk script correctly block when there's no room.
+
+---
+
 # UPDATE 1.2.69 | 06/07/2026
 
 A garage bridge, so scripts can store vehicles into any garage system with one call.

@@ -32,10 +32,22 @@ bridge = {
   addItem  = function(invId, item, count, md, slot)
     if type(invId) == 'number' or tonumber(invId) then
       return exports['qs-inventory']:AddItem(invId, item, count, slot, md)
-    else 
+    else
       return exports['qs-inventory']:AddItemIntoStash(invId, item, count, slot, md, nil, nil)
     end
-    return false 
+    return false
+  end,
+
+  --- Can the player carry `count` of `item`? Lets stores/purchases pre-flight
+  --- room BEFORE taking money (the "charged but no items" bug). Player-only —
+  --- qs has no stash-space check, so stashes return true.
+  ---@param invId string | number Inventory ID or Player ID
+  ---@param item string Item Name
+  ---@param count number [Optional] Item Count
+  ---@return boolean
+  canCarryItem = function(invId, item, count)
+    if not (type(invId) == 'number' or tonumber(invId)) then return true end
+    return exports['qs-inventory']:CanCarryItem(invId, item, count or 1)
   end,
 
   --- Remove Item from inventory either playerid or invId

@@ -24,6 +24,18 @@ local bridge = {
     return exports.ox_inventory:RemoveItem(invId, item, count or 1, md, slot)
   end,
 
+  --- Can the player carry `count` of `item`? Lets stores/purchases pre-flight
+  --- room BEFORE taking money (the "charged but no items" bug). Single-item —
+  --- ox has no native multi-item cart check.
+  ---@param invId string | number Inventory ID or Player ID
+  ---@param item string Item Name
+  ---@param count number [Optional] Item Count
+  ---@param md table [Optional] Item Metadata
+  ---@return boolean
+  canCarryItem = function(invId, item, count, md)
+    return exports.ox_inventory:CanCarryItem(invId, item, count or 1, md)
+  end,
+
   --- Check if player has item in inventory
   ---@param invId string | number Inventory ID or Player ID
   ---@param item string Item Name
