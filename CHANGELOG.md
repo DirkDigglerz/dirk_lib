@@ -1,3 +1,10 @@
+# UPDATE 1.2.71 | 09/07/2026
+
+## Fixes
+- **devix-inventory: client-side inventory reads now use the correct export.** The bridge was calling a guessed `GetInventory()` to read the local player's items (rod loadout, bait counts, `hasItem` checks) — an export devix doesn't provide, so on devix installs those reads came back empty. It now uses devix's actual **`GetPlayerItems()`** (confirmed with the devix developer), so client-side inventory checks work on devix.
+
+---
+
 # UPDATE 1.2.70 | 08/07/2026
 
 ## Fixes

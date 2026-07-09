@@ -54,14 +54,11 @@ local bridge = {
 
   ---@function lib.inventory.getItems
   ---@description # The local player's inventory contents, normalised (slot key
-  --- stamped onto each item, info→metadata, amount→count).
-  --- UNCONFIRMED: the client-side read export. GetInventory() with no source is
-  --- the best-effort guess (mirrors core_inventory's client read). If devix has
-  --- no client GetInventory, this is the first thing to swap (see NOTES.md).
+  --- stamped onto each item, info→metadata, amount→count). GetPlayerItems() is
+  --- devix's client-side inventory read, confirmed by the devix dev (2026-07).
   ---@return table
   getItems = function()
-    local inv = exports[DEVIX]:GetInventory()
-    return normalise(inv or {})
+    return normalise(exports[DEVIX]:GetPlayerItems() or {})
   end,
 
   ---@function lib.inventory.openStash
