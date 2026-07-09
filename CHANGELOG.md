@@ -1,3 +1,10 @@
+# UPDATE 1.2.72 | 09/07/2026
+
+## Fixes
+- **Custom item images (ox `client.image`) now display instead of breaking.** When an item's `client.image` was a fully-qualified reference — a URL, an `nui://` path, a data URI or an absolute path — `lib.formatImagePath` still prefixed the CDN base and appended `.png`, producing a mangled URL and a broken image. Those are now used as-is, so custom item art shows everywhere dirk UIs render inventory images (stores, markets, guidebook, loadout, admin item pickers). Bare item names still resolve against your configured image path as before.
+
+---
+
 # UPDATE 1.2.71 | 09/07/2026
 
 ## Fixes

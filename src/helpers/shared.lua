@@ -6,6 +6,14 @@
 -- just return '' so the consumer renders a blank image instead of erroring.
 lib.formatImagePath = function(name)
   if type(name) ~= 'string' or name == '' then return '' end
+  -- An ox item's `client.image` may already be a fully-qualified image
+  -- reference — a URL (http/https), an `nui://` path, a data URI, or an
+  -- absolute path. Use those verbatim instead of prefixing the CDN base and
+  -- `.png`, which would double-prefix and break the image. Bare item names
+  -- (the common case) still resolve against lib.settings.itemImgPath below.
+  if name:find('://', 1, true) or name:sub(1, 5) == 'data:' or name:sub(1, 1) == '/' then
+    return name
+  end
   local p = lib.settings.itemImgPath or ''
   local sep = (p == '' or p:sub(-1) == '/') and '' or '/'
   local ext = name:match('%.%w+$') and '' or '.png'
