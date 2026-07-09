@@ -12,6 +12,7 @@ const LANGUAGE_OPTIONS = [
   { value: "de", label: "Deutsch (de)" },
   { value: "pt", label: "Português (pt)" },
   { value: "nl", label: "Nederlands (nl)" },
+  { value: "no", label: "Norsk (no)" },
   { value: "zh-CN", label: "简体中文 (zh-CN)" },
   { value: "zh-TW", label: "繁體中文 (zh-TW)" },
 ];

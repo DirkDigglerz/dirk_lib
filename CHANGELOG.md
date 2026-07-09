@@ -1,3 +1,10 @@
+# UPDATE 1.2.73 | 09/07/2026
+
+## New
+- **Norwegian added to the language picker.** `/dirk_lib` → Basic → Language now lists **Norsk (no)** alongside the other languages, so you can select it from the panel instead of setting the convar by hand. Scripts that ship a `no` locale (e.g. dirk_fishing) then render in Norwegian.
+
+---
+
 # UPDATE 1.2.72 | 09/07/2026
 
 ## Fixes
