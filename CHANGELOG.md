@@ -1,3 +1,11 @@
+# UPDATE 1.2.74 | 09/07/2026
+
+## Fixes
+- **A fresh install could leave every dirk script's config permanently dead.** On a brand-new database all your dirk resources boot at once, and each one tries to create the shared `dirk_scriptConfig` table. That `CREATE TABLE` was neither `IF NOT EXISTS` nor error-guarded, so whichever resources lost the race threw *"table already exists"*, silently killed their own scriptConfig init, and every client callback then failed with a cryptic `Callback <resource>:getScriptConfig timed out` — no peds, shops or zones, and an admin panel that loads forever and never saves. Table creation and the column migrations are now idempotent and error-guarded, so any number of resources can boot together safely.
+- **If the table genuinely can't be created** (database user missing `CREATE` permission, unsupported DDL) **you now get a clear error saying exactly that**, naming the SQL problem and how to fix it — instead of silent death followed by timeout spam from every dirk script.
+
+---
+
 # UPDATE 1.2.73 | 09/07/2026
 
 ## New

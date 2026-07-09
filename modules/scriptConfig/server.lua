@@ -739,44 +739,63 @@ local function registerScriptConfig(schema, canEditFn, rules)
   -- resource, but the module runs in each consumer's VM — so without a guard all
   -- N consumers re-run these ~4 schema probes on boot. Gate behind a server-wide
   -- GlobalState flag: only the first consumer this boot checks/migrates the
-  -- schema, the rest skip straight to their own row. The probes/ALTERs are
-  -- idempotent, so a concurrent first-batch race is harmless.
+  -- schema, the rest skip straight to their own row.
+  --
+  -- Every statement below is BOTH idempotent (`IF NOT EXISTS`, probe-guarded
+  -- ALTERs) and pcall'd. The flag is only set once the migration finishes, so two
+  -- resources booting in the same batch can both enter this block. Previously the
+  -- bare `CREATE TABLE` was neither: the loser of that race — or ANY database
+  -- failure (no CREATE grant, unsupported DDL) — threw, silently killed this
+  -- resource's scriptConfig init, and left every consumer reporting a cryptic
+  -- "Callback <resource>:getScriptConfig timed out" instead of the real SQL error.
   if not GlobalState.dirk_scriptConfigSchemaReady then
-  local success = pcall(MySQL.scalar.await, 'SELECT 1 FROM dirk_scriptConfig LIMIT 1')
-  if not success then
-    lib.print.info('Creating dirk_scriptConfig table...')
-    MySQL.query.await([[
-      CREATE TABLE `dirk_scriptConfig` (
-        `script`           VARCHAR(50)  NOT NULL,
-        `data`             longtext     DEFAULT NULL,
-        `client_version`   INT          DEFAULT 0,
-        `resource_version` VARCHAR(20)  DEFAULT '0.0.0',
-        `change_log`       LONGTEXT     DEFAULT NULL,
-        `last_editor`      LONGTEXT     DEFAULT NULL,
-        `lastupdated`      timestamp    NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-        PRIMARY KEY (`script`)
-      )
-    ]])
-  else
-    -- Add resource_version column to pre-existing tables if missing
-    local hasCol = pcall(MySQL.scalar.await, 'SELECT resource_version FROM dirk_scriptConfig LIMIT 1')
-    if not hasCol then
-      MySQL.query.await("ALTER TABLE `dirk_scriptConfig` ADD COLUMN `resource_version` VARCHAR(20) DEFAULT '0.0.0'")
-      lib.print.info('Added resource_version column to dirk_scriptConfig.')
+    local tableExists = pcall(MySQL.scalar.await, 'SELECT 1 FROM dirk_scriptConfig LIMIT 1')
+
+    if not tableExists then
+      lib.print.info('Creating dirk_scriptConfig table...')
+      local _, createErr = pcall(MySQL.query.await, [[
+        CREATE TABLE IF NOT EXISTS `dirk_scriptConfig` (
+          `script`           VARCHAR(50)  NOT NULL,
+          `data`             longtext     DEFAULT NULL,
+          `client_version`   INT          DEFAULT 0,
+          `resource_version` VARCHAR(20)  DEFAULT '0.0.0',
+          `change_log`       LONGTEXT     DEFAULT NULL,
+          `last_editor`      LONGTEXT     DEFAULT NULL,
+          `lastupdated`      timestamp    NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+          PRIMARY KEY (`script`)
+        )
+      ]])
+
+      -- Re-probe rather than trusting the pcall result: a concurrent consumer may
+      -- have created the table a moment ago, which is a perfectly good outcome.
+      if not pcall(MySQL.scalar.await, 'SELECT 1 FROM dirk_scriptConfig LIMIT 1') then
+        lib.print.error(('could not create the `dirk_scriptConfig` table: %s'):format(tostring(createErr)))
+        lib.print.error('Every dirk script stores its config in this table. Without it configs cannot load or save, and clients report "Callback <resource>:getScriptConfig timed out".')
+        lib.print.error('Check your database user has CREATE permission, then restart. You can also create the table by hand from the CREATE TABLE statement in dirk_lib/modules/scriptConfig/server.lua.')
+        error(('scriptConfig [%s]: dirk_scriptConfig table unavailable — see the errors above.'):format(scriptName))
+      end
+    else
+      -- Add columns to pre-existing tables if missing. Probe-guarded AND pcall'd,
+      -- so a concurrent consumer running the same ALTER (duplicate column) can't
+      -- take this one down.
+      local function ensureColumn(column, ddl)
+        local probe = ('SELECT %s FROM dirk_scriptConfig LIMIT 1'):format(column)
+        if pcall(MySQL.scalar.await, probe) then return end
+
+        local ok, alterErr = pcall(MySQL.query.await, ddl)
+        if ok then
+          lib.print.info(('Added %s column to dirk_scriptConfig.'):format(column))
+        elseif not pcall(MySQL.scalar.await, probe) then
+          -- Still missing after the ALTER failed — a real problem, not a race.
+          lib.print.warn(('scriptConfig [%s]: could not add `%s` column: %s'):format(scriptName, column, tostring(alterErr)))
+        end
+      end
+
+      ensureColumn('resource_version', "ALTER TABLE `dirk_scriptConfig` ADD COLUMN `resource_version` VARCHAR(20) DEFAULT '0.0.0'")
+      ensureColumn('change_log',       "ALTER TABLE `dirk_scriptConfig` ADD COLUMN `change_log` LONGTEXT DEFAULT NULL")
+      ensureColumn('last_editor',      "ALTER TABLE `dirk_scriptConfig` ADD COLUMN `last_editor` LONGTEXT DEFAULT NULL")
     end
 
-    local hasChangeLog = pcall(MySQL.scalar.await, 'SELECT change_log FROM dirk_scriptConfig LIMIT 1')
-    if not hasChangeLog then
-      MySQL.query.await("ALTER TABLE `dirk_scriptConfig` ADD COLUMN `change_log` LONGTEXT DEFAULT NULL")
-      lib.print.info('Added change_log column to dirk_scriptConfig.')
-    end
-
-    local hasLastEditor = pcall(MySQL.scalar.await, 'SELECT last_editor FROM dirk_scriptConfig LIMIT 1')
-    if not hasLastEditor then
-      MySQL.query.await("ALTER TABLE `dirk_scriptConfig` ADD COLUMN `last_editor` LONGTEXT DEFAULT NULL")
-      lib.print.info('Added last_editor column to dirk_scriptConfig.')
-    end
-  end
     GlobalState.dirk_scriptConfigSchemaReady = true
   end
 
