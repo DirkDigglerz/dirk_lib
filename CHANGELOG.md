@@ -1,3 +1,10 @@
+# UPDATE 1.2.75 | 10/07/2026
+
+## New
+- **Lithuanian (`lt`) added.** `/dirk_lib` → Basic → Language now lists **Lietuvių (lt)**, and a Lithuanian `locales/lt.json` ships with the library. It's a solid first pass rather than a native polish — corrections are very welcome.
+
+---
+
 # UPDATE 1.2.74 | 09/07/2026
 
 ## Fixes
