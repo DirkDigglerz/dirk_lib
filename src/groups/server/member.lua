@@ -143,12 +143,20 @@ end)
 
 
 lib.callback.register('dirk_groups:playerLoaded', function(src)
+  -- Fires on EVERY character load. With no active groups (the common case)
+  -- there is nothing to reconnect — bail before lib.player.identifier(), whose
+  -- cross-resource lookup can stall while the joining player's framework
+  -- object is still settling. Profiled at up to 716ms per join on a 350-slot
+  -- server (reported by reyesmtv); this early-out makes the idle path free.
+  if not Group.hasAny() then return false end
+
   local identifier = lib.player.identifier(src)
+  if not identifier then return false end
   local group = Group.getGroupById(identifier)
-  if group then 
+  if group then
     group:loggedOn(src)
     Player(src).state.group = group:getClientData()
-  end 
+  end
   return false
 end)
 

@@ -1,3 +1,14 @@
+# UPDATE 1.2.76 | 15/07/2026
+
+## Fixes
+- **Big join-time hitch removed.** The groups module ran a player lookup on every character load — profiled at up to **700ms per join** on a busy (350-slot) server, stacking into visible server hitches. It now exits instantly when no groups are active (the overwhelmingly common case). (Profiled + reported by reyesmtv.)
+
+## Improvements
+- **Lithuanian translation polished by a native speaker** — 106 strings improved. Ačiū, snaiperiukas!
+- **Italiano (it) added to the language picker** — the `it` locale already shipped; now it's selectable from `/dirk_lib` → Basic → Language.
+
+---
+
 # UPDATE 1.2.75 | 10/07/2026
 
 ## New

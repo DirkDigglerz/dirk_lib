@@ -76,6 +76,14 @@ lib.callback.register('dirk_groups:registerGroup', function(src, data)
   return newGroup and newGroup.id or false, reason
 end)
 
+--- Cheap "any groups at all?" probe. Lets hot per-player-load paths (see
+--- member.lua's dirk_groups:playerLoaded) bail before doing identifier
+--- lookups when no group exists — `Groups` is file-local, so this is the
+--- only sanctioned way to ask from outside this file.
+Group.hasAny = function()
+  return next(Groups) ~= nil
+end
+
 ---@function Group.getGroupById || lib.getGroupById
 ---@description Gets a group by the owner's identifier
 ---@param memberId string | number
