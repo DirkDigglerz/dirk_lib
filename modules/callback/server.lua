@@ -37,12 +37,22 @@ local triggerClientCallback = function(_, event, playerId, cb, ...)
   end
 
 
-  if promise then 
-    SetTimeout(callback_timeout, function() promise:reject(('Callback %s timed out'):format(event)) end)
+  if promise then
+    -- Cancel this timer the instant the callback resolves normally. Previously it
+    -- was never cleared, so every await left a 5-minute closure (holding the
+    -- promise + event string) lingering in the scheduler — thousands rolling at
+    -- scale. On a genuine no-answer it also clears the awaiting entry, which the
+    -- old reject path never did (that entry leaked forever on any un-answered call).
+    local timer = SetTimeout(callback_timeout, function()
+      awaitingCallbacks[key] = nil
+      promise:reject(('Callback %s timed out'):format(event))
+    end)
 
-    return table.unpack(Citizen.Await(promise))
+    local response = Citizen.Await(promise)
+    ClearTimeout(timer)
+    return table.unpack(response)
   end
-end 
+end
 
 
 

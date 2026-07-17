@@ -212,6 +212,10 @@ pcall(function()
   lib.scriptConfig.on('basic.debug', function(enabled)
     if enabled == true then
       pcall(function() lib.diag.instrument() end)
+    else
+      -- Turn the diagnostics off when debug is disabled — previously the per-frame
+      -- hitch-monitor kept running until a full resource restart.
+      pcall(function() lib.diag.disarm() end)
     end
   end)
 end)

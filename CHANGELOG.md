@@ -1,3 +1,11 @@
+# UPDATE 1.2.77 | 17/07/2026
+
+## Fixes
+- **Callback timers no longer linger.** Every `lib.callback` request scheduled a 5-minute timeout that was never cancelled once the callback answered (normally within milliseconds), leaving a growing backlog of dead timers on a busy server — and a request that never got a reply also leaked its tracking entry. Both are now cleaned up the instant a callback resolves.
+- **SQL diagnostics fully stop when debug is turned off.** The debug hitch-monitor previously kept running until a full resource restart, even after `basic.debug` was switched back off. Its thread now exits completely the moment debug is disabled (and respawns if you turn it back on), so a server that isn't actively debugging has zero diagnostic threads. Only ever affected servers that had debug enabled.
+
+---
+
 # UPDATE 1.2.76 | 15/07/2026
 
 ## Fixes

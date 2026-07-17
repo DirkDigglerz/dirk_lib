@@ -3,9 +3,8 @@
 -- and is used under the same license.
 
 local awaitingCallbacks = {}
-local timers = {}
 local callback_event = '__dirk_cb_%s'
-local callback_timeout = 300000 
+local callback_timeout = 300000
 
 
 RegisterNetEvent(callback_event:format(cache.resource), function(key, ...)
@@ -35,12 +34,22 @@ local triggerServerCallback = function(_,event, cb, ...)
     end
   end
 
-  if promise then 
-    SetTimeout(callback_timeout, function() promise:reject(('Callback %s timed out'):format(event)) end)
+  if promise then
+    -- Cancel this timer the instant the callback resolves normally. Previously it
+    -- was never cleared, so every await left a 5-minute closure (holding the
+    -- promise + event string) lingering in the scheduler — thousands rolling at
+    -- scale. On a genuine no-answer it also clears the awaiting entry, which the
+    -- old reject path never did (that entry leaked forever on any un-answered call).
+    local timer = SetTimeout(callback_timeout, function()
+      awaitingCallbacks[key] = nil
+      promise:reject(('Callback %s timed out'):format(event))
+    end)
 
-    return table.unpack(Citizen.Await(promise))
+    local response = Citizen.Await(promise)
+    ClearTimeout(timer)
+    return table.unpack(response)
   end
-end 
+end
 
 
 lib.callback = setmetatable({}, {

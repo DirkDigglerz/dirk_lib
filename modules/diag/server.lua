@@ -26,7 +26,7 @@
 -- Server-only (oxmysql lives on the server). On any non-server VM, hand back an
 -- inert table so client-side `lib.diag.*` calls are safe no-ops.
 if lib.context ~= 'server' then
-  return { instrument = function() end, record = function() end, dump = function() end, enabled = false }
+  return { instrument = function() end, disarm = function() end, record = function() end, dump = function() end, enabled = false }
 end
 
 local resourceName = GetCurrentResourceName()
@@ -61,7 +61,10 @@ local diag = {
 local ERROR_SAMPLE_CAP = 50
 local HITCH_CAP        = 50
 
-local instrumented = false   -- idempotency guard
+local instrumented = false   -- idempotency guard (MySQL wrap + threads spawned once)
+local armed        = false   -- runtime gate: true while basic.debug is on. Lets the
+                             -- monitor threads park + recording stop when debug flips
+                             -- off, instead of grinding every frame until a restart.
 
 -- ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -97,6 +100,7 @@ end
 -- Record one completed query. Never throws — wrapped in pcall by the caller but
 -- defensive anyway since it touches shared tables.
 local function record(method, sql, ok, err, durationMs)
+  if not armed then return end   -- debug off → the MySQL wrap becomes a no-op
   local truncated = truncateQuery(sql)
   diag.lastQuery = truncated
 
@@ -253,36 +257,40 @@ end
 
 -- ── Threads + command ─────────────────────────────────────────────────────────
 
-local function startHitchMonitor()
+local monitorRunning = false
+
+-- Single monitor thread: the per-frame hitch sampler and the ~30s report dump,
+-- folded together so that when debug is turned OFF the thread exits completely —
+-- nothing parked, nothing idling. A server that isn't actively debugging (i.e.
+-- almost every server, almost always) has ZERO diag threads. instrument()
+-- respawns it if debug is switched back on.
+local function startMonitor()
+  if monitorRunning then return end
+  monitorRunning = true
   CreateThread(function()
-    -- Wait(0) each tick and measure os.clock() (CPU time) delta. A gap > 0.1s on
-    -- a Wait(0) loop means the VM busy-looped / hung WITHOUT yielding — exactly
-    -- the un-yielded CPU hang we're hunting. Tie it to the last query seen.
-    local last = os.clock()
-    while true do
+    -- Wait(0) each tick and measure os.clock() (CPU time) delta. A gap > 0.1s on a
+    -- Wait(0) loop means the VM busy-looped / hung WITHOUT yielding — the un-yielded
+    -- CPU hang we're hunting. Tie it to the last query seen.
+    local last     = os.clock()
+    local lastDump = os.time()
+    while armed do
       Wait(0)
       local now = os.clock()
       local gap = now - last
       last = now
-      if gap > 0.1 then
-        if #diag.hitches < HITCH_CAP then
-          diag.hitches[#diag.hitches + 1] = {
-            atSeconds = os.time() - startTime,
-            gapMs     = math.floor(gap * 1000 + 0.5),
-            lastQuery = diag.lastQuery,
-          }
-        end
+      if gap > 0.1 and #diag.hitches < HITCH_CAP then
+        diag.hitches[#diag.hitches + 1] = {
+          atSeconds = os.time() - startTime,
+          gapMs     = math.floor(gap * 1000 + 0.5),
+          lastQuery = diag.lastQuery,
+        }
+      end
+      if os.time() - lastDump >= 30 then   -- periodic report write (~every 30s)
+        lastDump = os.time()
+        dump()
       end
     end
-  end)
-end
-
-local function startPeriodicDump()
-  CreateThread(function()
-    while true do
-      Wait(30000)  -- dump every 30s while enabled
-      dump()
-    end
+    monitorRunning = false   -- thread fully exits the moment debug is turned off
   end)
 end
 
@@ -292,7 +300,9 @@ end
 -- Wraps THIS vm's MySQL, starts the timer + hitch thread, registers the dump
 -- command. Everything pcall-guarded so instrument() can never break startup.
 local function instrument()
-  if instrumented then return end
+  armed = true                     -- (re)arm every time debug flips on
+  pcall(startMonitor)              -- (re)spawn the monitor thread; no-op if running
+  if instrumented then return end  -- MySQL wrap + dump command registered only once
   instrumented = true
 
   -- MySQL must already exist (oxmysql's MySQL.lua loads first in server_scripts).
@@ -310,9 +320,6 @@ local function instrument()
     pcall(lib.print.warn, '[diag] MySQL global not found at instrument() time — queries will not be recorded')
   end
 
-  pcall(startHitchMonitor)
-  pcall(startPeriodicDump)
-
   -- Manual dump command. Registered once.
   pcall(RegisterCommand, 'dirkdiagdump', function()
     dump()
@@ -328,5 +335,9 @@ local function instrument()
   pcall(lib.print.info, ('[diag] enabled for %s — SQL instrumentation active'):format(resourceName))
 end
 diag.instrument = instrument
+-- Disarm: park the monitor threads + stop recording (called when basic.debug
+-- flips off). The threads/wrap stay in place but idle at ~zero cost; re-enabling
+-- debug calls instrument() again which just re-arms them.
+diag.disarm = function() armed = false end
 
 return diag
