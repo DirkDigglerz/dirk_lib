@@ -1,5 +1,18 @@
 local DEVIX = 'devix-inventory'
+local DEVIX_CORE = 'devix-core'
 local cachedItems
+
+-- devix-core exposes the runtime usable-item registrar (UsableItem) on the table
+-- returned by getObjects(). Resolve it lazily + once (false = unavailable, so we
+-- don't re-pcall every registration). Used by bridge.useableItem below.
+local devixCore
+local function getDevixCore()
+  if devixCore == nil then
+    local ok, obj = pcall(function() return exports[DEVIX_CORE]:getObjects() end)
+    devixCore = (ok and type(obj) == 'table' and obj) or false
+  end
+  return devixCore or nil
+end
 
 -- devix stores per-item metadata under `info` (qb-core convention) and quantity
 -- under `amount`. dirk_lib's contract is that every item exposes `.metadata`,
@@ -156,14 +169,24 @@ bridge = {
     return bridge.getItemByName(invId, item, md)
   end,
 
-  -- NOTE: useableItem is intentionally omitted (as on the tgiann bridge). devix
-  -- usable items are wired in the ITEM CONFIG, not registered at runtime:
-  --   server = { useExport = 'resource.fnName' }
-  -- and the target resource does `exports('fnName', function(src, itemData) end)`
-  -- where itemData = { name, amount, slot, info, ... }. There is no documented
-  -- runtime "register usable item" export to hook, so lib.inventory.useableItem
-  -- falls back to the framework bridge path (last-released behaviour) — not a
-  -- regression. See NOTES.md for the item-config wiring _i23 needs.
+  --- Register a usable item. devix-core has a runtime registrar, `UsableItem`
+  --- (from `exports['devix-core']:getObjects()`), which devix-inventory invokes
+  --- on use and hands `(source, itemData)` where itemData carries the **slot** +
+  --- **info/metadata** of the exact stack used. We register through it directly
+  --- rather than relying on the framework CreateUseableItem sync — that path
+  --- didn't reliably carry the slot, so consumers (dirk_fishing's rod) errored
+  --- with "cannot find slot on use" (reported by _i23). We normalise the payload
+  --- so the callback receives .slot/.metadata/.count like every other bridge.
+  useableItem = function(itemName, callback)
+    local core = getDevixCore()
+    if not core or type(core.UsableItem) ~= 'function' then
+      lib.print.warn(('devix bridge: devix-core UsableItem unavailable — usable item %s not registered'):format(tostring(itemName)))
+      return
+    end
+    core.UsableItem(itemName, function(source, itemData)
+      callback(source, normaliseItem(itemData or {}, itemData and itemData.slot))
+    end)
+  end,
 
   --- Set metadata of an item at a specific slot.
   --- devix has NO ox-style SetMetadata(slot, meta). Metadata writes go through
@@ -179,24 +202,13 @@ bridge = {
       lib.print.warn('devix bridge: setMetadata on stash inventories is not supported')
       return false
     end
-    local slotItem = exports[DEVIX]:GetItemBySlot(invId, slot)
-    if not slotItem or not slotItem.name then return false end
-
-    -- UNCONFIRMED: where `serie` lives on a devix item record. The AddItemStash
-    -- docs pass `{ serie = 'ABC123' }` as the info table, so it most likely sits
-    -- at info.serie; we also try a top-level .serie. Confirm with a live dump.
-    local serie = slotItem.serie or (slotItem.info and slotItem.info.serie)
-    if not serie then
-      lib.print.warn(('devix bridge: could not resolve serie for slot %s (%s) — metadata not written'):format(slot, slotItem.name))
-      return false
-    end
-
-    -- Preserve the serial inside the new info so a full-replace write can't strip
-    -- it (only matters if serie is stored in info; harmless otherwise).
-    metadata = metadata or {}
-    if metadata.serie == nil then metadata.serie = serie end
-
-    return exports[DEVIX]:UpdateItemInfoBySerie(invId, 'player', slotItem.name, serie, metadata)
+    -- devix exposes a direct slot-keyed metadata writer (confirmed in its docs):
+    --   UpdateSlotMetadata(source, slot, newInfo) — full-replace of the slot's
+    --   `info`, matching ox SetMetadata semantics.
+    -- The previous serie-based path only worked for WEAPONS — regular items like
+    -- the fishing rod carry no serie, so their metadata (e.g. attachments) never
+    -- saved on devix (reported by _i23). Slot works for every item type.
+    return exports[DEVIX]:UpdateSlotMetadata(invId, slot, metadata or {}) and true or false
   end,
 
   --- editMetadata is an alias for setMetadata (same slot-targeted write).

@@ -1,3 +1,11 @@
+# UPDATE 1.2.78 | 17/07/2026
+
+## Fixes — devix-inventory bridge
+- **Usable items now register through devix-core's `UsableItem`**, so the handler receives the exact **slot + metadata** of the item being used. Fixes fishing rods (and other usable items) erroring with "cannot find slot on use" on devix — the framework-sync path wasn't reliably carrying the slot. (Reported by _i23.)
+- **Item metadata now writes by slot** via devix's `UpdateSlotMetadata`, replacing the old serial-based write that only worked for weapons. Fixes item metadata/attachments (e.g. the fishing rod loadout) not persisting on devix.
+
+---
+
 # UPDATE 1.2.77 | 17/07/2026
 
 ## Fixes
