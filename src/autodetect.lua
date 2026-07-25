@@ -1,5 +1,5 @@
 local supportedResources = {
-  framework         = {'es_extended', 'qbx_core', 'qb-core', 'nd-framework'},
+  framework         = {'es_extended', 'qbx_core', 'qb-core', 'ND_Core'},
   -- Order matters. Real drop-in inventories are listed BEFORE the generic
   -- framework names they impersonate via `provide` (ox_inventory / qb-inventory),
   -- so e.g. qs-inventory (which declares `provide 'qb-inventory'`) wins over the
