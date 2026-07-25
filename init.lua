@@ -190,6 +190,8 @@ if context == 'client' and (GetNumResourceMetadata(cache.resource, 'ui_page') or
       customTheme     = s.customTheme,
       itemImgPath     = s.itemImgPath,
       resourceVersion = GetResourceMetadata(cache.resource, 'version', 0),
+      framework       = s.framework,
+      inventory       = s.inventory,
     })
   end)
 
@@ -205,6 +207,31 @@ if context == 'client' and (GetNumResourceMetadata(cache.resource, 'ui_page') or
         cb({ jobs = {}, gangs = {} })
       end
     end)
+  end)
+
+  -- Shared-vehicle list for cfx-react's useVehicles / VehicleSelect /
+  -- CategorySelect. QB/QBX only — those frameworks ship a categorised
+  -- vehicles.lua (exposed via lib.FW.Shared.Vehicles, readable client-side).
+  -- Normalises qb-core's array and qbx_core's model-keyed map to one flat
+  -- list of { model, name, brand, price, category }. ESX etc. get an empty
+  -- list, so any category/blueprint UI can gate itself off.
+  RegisterNuiCallback('GET_VEHICLES', function(_, cb)
+    local fw = lib.settings and lib.settings.framework
+    if fw ~= 'qb-core' and fw ~= 'qbx_core' then cb({}) return end
+    local raw = (lib.FW and lib.FW.Shared and lib.FW.Shared.Vehicles) or {}
+    local out = {}
+    for _, v in pairs(raw) do
+      if type(v) == 'table' and v.model then
+        out[#out + 1] = {
+          model    = v.model,
+          name     = v.name or v.model,
+          brand    = v.brand,
+          price    = v.price,
+          category = v.category,
+        }
+      end
+    end
+    cb(out)
   end)
 
   -- Online-player list for the dirk_lib Script Config tab's identifier

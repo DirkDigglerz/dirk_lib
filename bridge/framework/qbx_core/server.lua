@@ -216,6 +216,25 @@ local bridge = {
     return ply.Functions.GetMoney(acc)
   end,
 
+  ---@param src number
+  ---@return table<string, number> every account and its balance
+  getAccounts = function(src)
+    local ply = lib.player.get(src)
+    if not ply then return {} end
+    local out = {}
+    for name, amount in pairs(ply.PlayerData.money or {}) do
+      out[name] = amount or 0
+    end
+    return out
+  end,
+
+  ---@param identifier string citizenid
+  ---@return number|nil server id, or nil when they're offline
+  getSourceFromIdentifier = function(identifier)
+    local ply = exports['qbx_core']:GetPlayerByCitizenId(identifier)
+    return ply and ply.PlayerData and ply.PlayerData.source or nil
+  end,
+
   addMoney = function(src, acc, amount, reason)
     local ply = lib.player.get(src)
     if not ply then return end
