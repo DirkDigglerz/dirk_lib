@@ -12,9 +12,21 @@ end
 
 local serverOnlyPaths = {}
 
+--- Paths present in the DB but absent from the schema.
+---
+--- These are PRESERVED rather than deleted (see smartMerge), and withheld from
+--- clients: a key the schema doesn't declare has no declared visibility, and
+--- "don't broadcast" is the only safe reading of that.
+local undeclaredPaths = {}
+
 local function isPathServerOnly(path)
   for _, locked in ipairs(serverOnlyPaths) do
     if path == locked or path:sub(1, #locked + 1) == locked .. '.' then
+      return true
+    end
+  end
+  for _, unknown in ipairs(undeclaredPaths) do
+    if path == unknown or path:sub(1, #unknown + 1) == unknown .. '.' then
       return true
     end
   end
@@ -273,11 +285,22 @@ local function smartMerge(defaultData, dbData, schemaNode, _path)
   end
   local result = {}
 
-  -- Detect DB keys that will be PRUNED (not in defaults)
-  for k in pairs(dbData) do
+  -- DB keys the schema doesn't declare are KEPT, not dropped.
+  --
+  -- They used to be deleted on every load, which meant a schema that had
+  -- fallen behind silently destroyed real data — whole arrays gone on a
+  -- restart, with nothing but a debug line to say so. A stale key costs a few
+  -- bytes; a deleted one costs the data.
+  --
+  -- They're recorded so they can be withheld from clients: undeclared means no
+  -- declared visibility, and the safe reading of that is "server-side only".
+  -- If the schema regains the key later it simply starts being used again.
+  for k, dbVal in pairs(dbData) do
     if defaultData[k] == nil then
       local fullPath = _path ~= '' and (_path .. '.' .. k) or k
-      debugLog(('PRUNE key "%s" — exists in DB but not in schema defaults, dropping'):format(fullPath))
+      debugLog(('KEEP key "%s" — in DB but not in schema defaults; preserved, server-side only'):format(fullPath))
+      undeclaredPaths[#undeclaredPaths + 1] = fullPath
+      result[k] = dbVal
     end
   end
 
@@ -843,7 +866,10 @@ local function registerScriptConfig(schema, canEditFn, rules)
   -- 2. Run any code migrations (handles complex structural transforms)
   rawData = runMigrations(rawData, storedVer, currentVer, migrations)
 
-  -- 3. Smart merge: schema-driven, new keys filled from defaults, stale keys pruned, arrays by key
+  -- 3. Smart merge: schema-driven, new keys filled from defaults, undeclared keys
+  --    preserved (server-side only), arrays by key
+  -- Rebuilt per init, or a reload would keep paths from a previous schema.
+  undeclaredPaths = {}
   scriptConfig = smartMerge(defaultData, rawData, schema)
 
   -- Log a summary of values that changed from what was in DB. Only emits when
