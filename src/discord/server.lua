@@ -50,14 +50,23 @@ local function cacheWipe(prefix)
 end
 
 local lastSeenGuild = nil
+local lastSeenToken = nil
 CreateThread(function()
   Wait(0)
   if lib.scriptConfig and lib.scriptConfig.on then
+    -- Wipe the API-response cache whenever the guild OR the token changes.
+    -- The token matters too: rotating it (or setting it for the first time
+    -- via the shared bridge) must invalidate any responses fetched with the
+    -- old creds, otherwise stale role/member data could linger up to TTL.
+    -- This watcher runs in dirk_lib's VM where the full (server-only) token
+    -- is present, so reading new.botToken here is safe.
     lib.scriptConfig.on('discord', function(new)
       local g = new and new.guildId or nil
-      if g ~= lastSeenGuild then
+      local tk = new and new.botToken or nil
+      if g ~= lastSeenGuild or tk ~= lastSeenToken then
         cache = {}
         lastSeenGuild = g
+        lastSeenToken = tk
       end
     end)
   end
@@ -367,6 +376,116 @@ do
 
   lib.callback.register('dirk_lib:discord:diagnose', function(src, overrideToken, overrideGuildId)
     if not isMaster(src) then
+      return { ok = false, checks = { { id = 'acl', ok = false, message = 'Not authorised' } } }
+    end
+    return diagnose(overrideToken, overrideGuildId)
+  end)
+end
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- SHARED BOT-CONFIG BRIDGE (cross-resource)
+-- ─────────────────────────────────────────────────────────────────────────
+-- A consumer (e.g. dirk_multichar) can surface dirk_lib's Discord bot setup
+-- inside its OWN config panel without the operator ever opening /dirk_lib.
+-- The panel reads/writes THIS dirk_lib record — there is only ever one bot
+-- config, owned here. These exports run in dirk_lib's VM (so the bot token
+-- never enters the consumer's VM image) and are gated by the SAME access
+-- model that guards editing dirk_lib's own config:
+--   master ACE (dirk_lib_master_group convar) + dirk_lib's pushed `access`
+--   block — resolved via canEditScriptConfig(src, 'dirk_lib').
+-- A multichar admin therefore cannot bypass dirk_lib's access control.
+--
+-- SECURITY: the bot token is x-serverOnly and NEVER leaves the server.
+--   • bridgeGetStatus returns only { configured, guildId } — never the token.
+--   • bridgeSet writes the token only when a NEW non-empty value is supplied;
+--     an empty/absent token keeps the existing one (write-only field — the
+--     panel never reads the stored token back).
+do
+  -- Gate against dirk_lib's own config-edit access. Prefer the in-VM global
+  -- (src/scriptConfig/server.lua) so we don't bounce through our own export;
+  -- fall back to the export if the global hasn't loaded yet (resource order).
+  -- src == 0 (console) is allowed by canEditResource itself.
+  local function canEditLibConfig(src)
+    if type(CanEditScriptConfigResource) == 'function' then
+      local ok, allowed = pcall(CanEditScriptConfigResource, src, 'dirk_lib')
+      if ok then return allowed == true end
+    end
+    local ok, allowed = pcall(function()
+      return exports.dirk_lib:canEditScriptConfig(src, 'dirk_lib')
+    end)
+    return ok and allowed == true
+  end
+
+  -- Writes botToken (only when a new non-empty value is supplied) + guildId
+  -- into dirk_lib's scriptConfig `discord` block and persists/broadcasts via
+  -- the standard setter. Returns true on success. Runs in dirk_lib's VM so
+  -- lib.scriptConfig.set operates on dirk_lib's OWN config.
+  local function applyBridgeSet(src, newToken, newGuildId)
+    if not (lib.scriptConfig and lib.scriptConfig.set and lib.scriptConfig.get) then
+      return false, 'NotReady'
+    end
+
+    local current = lib.scriptConfig.get('discord') or {}
+
+    -- Keep the existing token unless a fresh, non-empty one is supplied. This
+    -- makes the panel's token field write-only: saving without typing a token
+    -- (the normal case once it's set once) preserves the stored secret.
+    local token = current.botToken or ''
+    if type(newToken) == 'string' and newToken ~= '' then
+      token = newToken
+    end
+
+    local guildId = type(newGuildId) == 'string' and newGuildId or (current.guildId or '')
+
+    -- sectionReplace: wholesale-overwrite just the `discord` section, leaving
+    -- every other dirk_lib section untouched. src is threaded through for the
+    -- change-log editor attribution + (defensively) the setter's own gate.
+    lib.scriptConfig.set(
+      { discord = { botToken = token, guildId = guildId } },
+      nil,
+      { src = src, sectionReplace = true }
+    )
+    return true
+  end
+
+  -- GET status — never returns the token. Gated.
+  exports('discord_bridgeGetStatus', function(src)
+    if not canEditLibConfig(src) then return { ok = false, _error = 'NoPermission' } end
+    local discord = (lib.scriptConfig and lib.scriptConfig.get and lib.scriptConfig.get('discord')) or {}
+    local token = discord.botToken
+    return {
+      ok = true,
+      configured = (type(token) == 'string' and token ~= '')
+        and (type(discord.guildId) == 'string' and discord.guildId ~= '') or false,
+      hasToken = type(token) == 'string' and token ~= '',
+      guildId = type(discord.guildId) == 'string' and discord.guildId or '',
+    }
+  end)
+
+  -- SET token (write-only) + guildId. Gated against dirk_lib's access list.
+  exports('discord_bridgeSet', function(src, payload)
+    if not canEditLibConfig(src) then return { ok = false, _error = 'NoPermission' } end
+    if type(payload) ~= 'table' then return { ok = false, _error = 'BadPayload' } end
+    local newToken = type(payload.botToken) == 'string' and payload.botToken or nil
+    local newGuild = type(payload.guildId) == 'string' and payload.guildId or nil
+    local ok, err = applyBridgeSet(src, newToken, newGuild)
+    if not ok then return { ok = false, _error = err or 'SetFailed' } end
+    -- Echo back the (token-free) status so the panel can update in place.
+    local discord = lib.scriptConfig.get('discord') or {}
+    return {
+      ok = true,
+      configured = (type(discord.botToken) == 'string' and discord.botToken ~= '')
+        and (type(discord.guildId) == 'string' and discord.guildId ~= '') or false,
+      hasToken = type(discord.botToken) == 'string' and discord.botToken ~= '',
+      guildId = type(discord.guildId) == 'string' and discord.guildId or '',
+    }
+  end)
+
+  -- DIAGNOSE against dirk_lib's access list (not just master) so a granted
+  -- co-admin editing from multichar can run the same test. Optional overrides
+  -- let the panel test a token the admin JUST typed (before save).
+  exports('discord_bridgeDiagnose', function(src, overrideToken, overrideGuildId)
+    if not canEditLibConfig(src) then
       return { ok = false, checks = { { id = 'acl', ok = false, message = 'Not authorised' } } }
     end
     return diagnose(overrideToken, overrideGuildId)

@@ -20,7 +20,7 @@
 --   • qbx_core:            `moneyTypes` lives in `config/server.lua` which
 --     is NOT in the manifest files{} block — can't be read by other
 --     resources. We fall back to the QBox default trio (cash/bank/crypto).
---   • nd-framework:        Hardcoded cash + bank only in player.lua; any
+--   • ND_Core:        Hardcoded cash + bank only in player.lua; any
 --     other account string is rejected. Return the fixed pair.
 --   • unknown / no framework: return an empty list with framework='unknown'
 --     so the picker shows "no accounts available, type manually".
@@ -49,9 +49,12 @@ local function detectFramework()
   local fw = lib.settings.framework
   if fw and fw ~= 'auto' and fw ~= '' then return fw end
   -- Probe started resources for the canonical names.
-  for _, name in ipairs({ 'es_extended', 'qbx_core', 'qb-core', 'ND_Core', 'nd-framework' }) do
+  -- ND's resource is called ND_Core. It used to be renamed to 'nd-framework'
+  -- here, which disagreed with autodetect and with the bridge folder name — and
+  -- since settings.framework IS the bridge folder name, ND could never load.
+  for _, name in ipairs({ 'es_extended', 'qbx_core', 'qb-core', 'ND_Core' }) do
     if GetResourceState(name) == 'started' then
-      return name == 'ND_Core' and 'nd-framework' or name
+      return name
     end
   end
   return 'unknown'
@@ -155,7 +158,7 @@ local function buildList()
     accounts = qbCoreAccounts()
   elseif framework == 'qbx_core' then
     accounts = qbxAccounts()
-  elseif framework == 'nd-framework' then
+  elseif framework == 'ND_Core' then
     accounts = ndAccounts()
   end
 

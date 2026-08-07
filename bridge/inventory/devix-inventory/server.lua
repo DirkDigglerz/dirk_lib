@@ -14,6 +14,21 @@ local function getDevixCore()
   return devixCore or nil
 end
 
+-- devix-core hands its whole API across the resource boundary as CALLABLE TABLES
+-- (FiveM reference-function wrappers carrying __call/__pack/__unpack), NOT raw
+-- functions. So `type(x) == 'function'` is false for EVERY entry, which silently
+-- disabled usable-item registration: the fishing rod and guidebook did nothing on
+-- use, with no console error, because the guard bailed before registering
+-- (reported by _i23). Verified against a live devix install — getObjects()
+-- returns 50 entries, all tables, every one with a working __call. So test for
+-- CALLABILITY, never the type.
+local function isCallable(v)
+  if type(v) == 'function' then return true end
+  if type(v) ~= 'table' then return false end
+  local mt = getmetatable(v)
+  return mt ~= nil and rawget(mt, '__call') ~= nil
+end
+
 -- devix stores per-item metadata under `info` (qb-core convention) and quantity
 -- under `amount`. dirk_lib's contract is that every item exposes `.metadata`,
 -- `.count` and `.slot`. We normalise on the way out: mirror `info`→`metadata`,
@@ -179,13 +194,16 @@ bridge = {
   --- so the callback receives .slot/.metadata/.count like every other bridge.
   useableItem = function(itemName, callback)
     local core = getDevixCore()
-    if not core or type(core.UsableItem) ~= 'function' then
+    if not core or not isCallable(core.UsableItem) then
       lib.print.warn(('devix bridge: devix-core UsableItem unavailable — usable item %s not registered'):format(tostring(itemName)))
       return
     end
-    core.UsableItem(itemName, function(source, itemData)
+    local ok, err = pcall(core.UsableItem, itemName, function(source, itemData)
       callback(source, normaliseItem(itemData or {}, itemData and itemData.slot))
     end)
+    if not ok then
+      lib.print.warn(('devix bridge: registering usable item %s failed — %s'):format(tostring(itemName), tostring(err)))
+    end
   end,
 
   --- Set metadata of an item at a specific slot.

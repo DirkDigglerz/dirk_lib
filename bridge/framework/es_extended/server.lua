@@ -188,7 +188,16 @@ local bridge = {
   gender = function(src)
     local ply = lib.player.get(src)
     if not ply then return nil end
-    return ply.PlayerData.charinfo.gender or 'unknown'
+    -- Another qb-core shape that was copied in: an ESX xPlayer has no
+    -- PlayerData.charinfo, so this always errored or returned nil. ESX keeps
+    -- sex in metadata on newer builds and in the users row on older ones, so
+    -- try both before giving up.
+    local sex = ply.getMeta and ply.getMeta('sex') or nil
+    if not sex then
+      local row = exports.oxmysql:single_async('SELECT sex FROM users WHERE identifier = ?', { ply.identifier })
+      sex = row and row.sex or nil
+    end
+    return sex or 'unknown'
   end, 
 
   deleteCharacter = function(src, citizenId)
@@ -309,13 +318,19 @@ local bridge = {
   setPlayerData = function(src, _key, data)
     local ply = lib.player.get(src)
     if not ply then return nil end
-    ply.Functions.SetPlayerData(_key, data)
+    -- ESX has no Functions table — that's a qb-core shape that was copied in
+    -- here, so this silently did nothing (or errored) on every ESX server.
+    return ply.set(_key, data)
   end,
 
   getPlayerData = function(src, _key)
     local ply = lib.player.get(src)
     if not ply then return nil end
-    return ply.PlayerData
+    -- Likewise `ply.PlayerData` does not exist on a modern ESX xPlayer, so this
+    -- always returned nil. The xPlayer IS the player data in ESX, so hand that
+    -- back; a specific key reads through to it.
+    if _key then return ply[_key] end
+    return ply
   end,
 
   setMetadata = function(src, _key, data)
@@ -341,6 +356,25 @@ local bridge = {
     if not ply then return nil end
     local account = ply.getAccount(resolveAccount(ply, acc))
     return account and account.money or 0
+  end,
+
+  ---@param src number
+  ---@return table<string, number> every account and its balance
+  getAccounts = function(src)
+    local ply = lib.player.get(src)
+    if not ply then return {} end
+    local out = {}
+    for _, account in pairs(ply.getAccounts() or {}) do
+      if account.name then out[account.name] = account.money or 0 end
+    end
+    return out
+  end,
+
+  ---@param identifier string
+  ---@return number|nil server id, or nil when they're offline
+  getSourceFromIdentifier = function(identifier)
+    local ply = lib.FW.GetPlayerFromIdentifier(identifier)
+    return ply and ply.source or nil
   end,
 
   addMoney = function(src, acc, count, reason)

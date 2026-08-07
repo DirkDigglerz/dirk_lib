@@ -1,5 +1,5 @@
 local supportedResources = {
-  framework         = {'es_extended', 'qbx_core', 'qb-core', 'nd-framework'},
+  framework         = {'es_extended', 'qbx_core', 'qb-core', 'ND_Core'},
   -- Order matters. Real drop-in inventories are listed BEFORE the generic
   -- framework names they impersonate via `provide` (ox_inventory / qb-inventory),
   -- so e.g. qs-inventory (which declares `provide 'qb-inventory'`) wins over the
@@ -8,7 +8,12 @@ local supportedResources = {
   -- devix-inventory ships an ox_inventory compat STUB (only AddItem/RemoveItem/
   -- GetItemCount), so it must be detected BEFORE ox_inventory or dirk_lib would
   -- pick the stub instead of the real devix bridge.
-  inventory         = {'dirk_inventory', 'one_inventory', 'qs-inventory', 'codem-inventory', 'tgiann-inventory', 'devix-inventory', 'mf-inventory', 'core_inventory', 'ak47_inventory', 'ox_inventory', 'qb-inventory'},
+  -- bp_inventory (0RESMON "0DAY BP INVENTORY") likewise declares `provide
+  -- 'ox_inventory'` and its ox exports work, so it must ALSO be listed before
+  -- ox_inventory — otherwise it'd be detected as ox and get ox's image path
+  -- instead of bp's own (nui://bp_inventory/web/images/). Its bridge is an
+  -- ox clone (see bridge/inventory/bp_inventory).
+  inventory         = {'dirk_inventory', 'one_inventory', 'qs-inventory', 'codem-inventory', 'tgiann-inventory', 'devix-inventory', 'bp_inventory', 'mf-inventory', 'core_inventory', 'ak47_inventory', 'ox_inventory', 'qb-inventory'},
   target            = {'ox_target', 'qb-target', 'q-target', 'bt-target'},
   interact          = {'redm-uiprompt', 'sleepless_interact', 'interact'},
   time              = {'av_weather', 'cd_easytime', 'qb-weathersync', 'Renewed-Weathersync', 'vSync', 'wasabi_wheather'},
@@ -38,6 +43,9 @@ local imagePaths = {
   ['mf-inventory'] = 'nui://mf-inventory/html/images/',
   ['core_inventory'] = 'nui://core_inventory/html/img/',
   ['ak47_inventory'] = 'nui://ak47_inventory/html/images/',
+  -- bp_inventory serves item icons from web/images (ox-style layout — bp is an
+  -- ox-compatible inventory). Confirmed by jayxjay2284 (a bp user).
+  ['bp_inventory'] = 'nui://bp_inventory/web/images/',
   -- devix stores item icons under html/img (confirmed by _i23, a devix user:
   -- "devix-inventory\html\img"). NOT the html/images convention the other
   -- inventories use. Override via the dirk_lib itemImgPath setting if a future

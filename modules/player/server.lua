@@ -140,6 +140,23 @@ return  {
   ---@param acc string
   ---@return number
   getMoney = bridge.getMoney,
+
+  ---@function lib.player.getAccounts
+  ---@description # Every money account a player has, and its balance
+  ---@description Saves looping getMoney over names you had to know in advance.
+  ---@description ESX reads xPlayer.getAccounts(); QB/QBX read PlayerData.money.
+  ---@param src number
+  ---@return table<string, number> e.g. { cash = 1200, bank = 54000 }
+  getAccounts = bridge.getAccounts,
+
+  ---@function lib.player.getSourceFromIdentifier
+  ---@description # Server id for an identifier, or nil if they're offline
+  ---@description The frameworks all have this natively. lib.player.checkOnline
+  ---@description is the only other route and it loops every player and hands
+  ---@description back a string index.
+  ---@param identifier string
+  ---@return number|nil
+  getSourceFromIdentifier = bridge.getSourceFromIdentifier,
   
   ---@function lib.player.setPlayerData
   ---@description # Sets the data of a player
