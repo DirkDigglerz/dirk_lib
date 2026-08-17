@@ -1257,8 +1257,19 @@ end)
 lib.callback.register(('%s:getServerOnlyScriptConfig'):format(scriptName), function(src)
   if not scriptConfig then return nil, 'NotReady' end
   if not canEditScript(src) then return nil, 'NoPermission' end
+  local sliver = filterServerOnly(scriptConfig, nil)
+
+  -- NIL, never an empty table. An empty Lua table crosses the NUI boundary as
+  -- a JSON ARRAY ([]), and the panel deep-merges the sliver over the whole
+  -- form config — merging an array replaces the object outright, so a script
+  -- with no server-only branches got its entire form wiped to [] the moment
+  -- the panel opened: every field read as undefined and no change ever
+  -- counted, which is why Save stayed disabled. The JS side already treats
+  -- nil as "nothing extra".
+  if next(sliver) == nil then sliver = nil end
+
   return true, nil, {
-    serverOnly = filterServerOnly(scriptConfig, nil),
+    serverOnly = sliver,
     clientVersion = client_version,
   }
 end)
