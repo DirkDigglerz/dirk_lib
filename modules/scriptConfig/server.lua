@@ -1225,7 +1225,12 @@ lib.callback.register(('%s:getScriptConfig'):format(scriptName), function(src, c
   if not scriptConfig then return nil, 'NotReady' end
   client_ver = tonumber(client_ver) or -1
   -- Use equality: hash ordering is meaningless, client is up-to-date iff hashes match.
-  if client_ver == client_version then return nil end
+  -- Explicit up-to-date marker instead of bare nil: the client can't tell a nil
+  -- "you're current" apart from the false/nil it gets when this handler (or the
+  -- transport) fails — and treating a failure as "current" left clients running
+  -- on schema DEFAULTS forever. Old clients see a table with no .data and keep
+  -- their config, identical to the old nil behaviour.
+  if client_ver == client_version then return { upToDate = true } end
   return {
     client_version = client_version,
     -- Served from the cached client-visible view (refreshed on every config

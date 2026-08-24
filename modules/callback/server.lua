@@ -74,12 +74,16 @@ lib.callback.await = function(event,playerId, ...)
 end
 
 
-local callbackResponse = function(success,result, ...)
-  if not success then 
-    if result then 
-      print(('^1SCRIPT ERROR: %s^0\n%s'):format(result,
-      Citizen.InvokeNative(`FORMAT_STACK_TRACE` & 0xFFFFFFFF, nil, 0, Citizen.ResultAsString()) or ''))
-    end 
+-- Name the failing callback in the error print. Without it a handler error
+-- surfaces as "SCRIPT ERROR: ?:-1: ..." with a wrapper-only trace — impossible
+-- to tell WHICH of a resource's dozens of callbacks blew up from a customer's
+-- console screenshot. debug.traceback(err) at pcall time captures the real
+-- error site, unlike FORMAT_STACK_TRACE at response time.
+local callbackResponse = function(name, success, result, ...)
+  if not success then
+    if result then
+      print(('^1SCRIPT ERROR in callback %s: %s^0'):format(name, result))
+    end
     return false  -- always return false on error, never nil
   end
 
@@ -87,11 +91,12 @@ local callbackResponse = function(success,result, ...)
 end
 
 
-local pcall = pcall 
+local pcall = pcall
 
 lib.callback.register = function(name,cb)
   RegisterNetEvent(callback_event:format(name), function(resource, key, ...)
-    TriggerClientEvent(callback_event:format(resource), source, key, callbackResponse(pcall(cb, source, ...)))
+    local src = source
+    TriggerClientEvent(callback_event:format(resource), src, key, callbackResponse(name, xpcall(cb, debug.traceback, src, ...)))
   end)
 end
 
