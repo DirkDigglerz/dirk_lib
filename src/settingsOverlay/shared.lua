@@ -168,7 +168,32 @@ if lib.context == 'server' then
     if next(snapshot) == nil then return false end -- scriptConfig not loaded yet
     TriggerClientEvent('dirk_lib:settingsChanged', -1, snapshot)
     TriggerEvent('dirk_lib:settingsChanged', snapshot)
+    lib.print.info(('post-boot re-detection applied: inventory=%s itemImgPath=%s'):format(
+      tostring(lib.autodetected and lib.autodetected.inventory),
+      tostring(lib.autodetected and lib.autodetected.itemImgPath)))
     return true
+  end
+
+  -- reapplyOverlay() returns false while dirk_lib's own scriptConfig is still
+  -- loading from the DB. Both recovery paths below used to give up in exactly
+  -- that window — the 45s poll expired and the onResourceStart hook fired once
+  -- and never retried — so on a slow cold boot (inventory up at ~10s, DB config
+  -- ready at ~60s+) the overlay never re-broadcast and item images stayed on
+  -- the boot fallback until a manual restart (62i, core_inventory). This waiter
+  -- keeps trying until the config is ready; `pending` collapses concurrent
+  -- requests from both paths into one thread.
+  local pending = false
+  local function reapplyOverlayWhenReady()
+    if pending then return end
+    pending = true
+    CreateThread(function()
+      for _ = 1, 300 do
+        if reapplyOverlay() then pending = false return end
+        Wait(1000)
+      end
+      pending = false
+      lib.print.warn('post-boot re-detection: gave up after 300s — scriptConfig never became ready')
+    end)
   end
 
   CreateThread(function()
@@ -182,9 +207,9 @@ if lib.context == 'server' then
       if inv and inv ~= 'NOT FOUND' then
         -- Boot detection already matched reality → nothing to recover.
         if inv == boot.inventory and fresh.itemImgPath == boot.itemImgPath then return end
-        -- Detection changed since boot; broadcast once scriptConfig is ready so
-        -- 'auto' resolves against the fresh values. Keep retrying until it is.
-        if reapplyOverlay() then return end
+        -- Detection changed since boot; hand off to the waiter, which applies
+        -- as soon as scriptConfig is ready (however long that takes).
+        return reapplyOverlayWhenReady()
       end
     end
   end)
@@ -199,7 +224,7 @@ if lib.context == 'server' then
       local fresh = lib.detectResources()
       lib.autodetected = fresh
       if not prev or fresh.inventory ~= prev.inventory or fresh.itemImgPath ~= prev.itemImgPath then
-        reapplyOverlay()
+        reapplyOverlayWhenReady()
       end
     end)
   end)
