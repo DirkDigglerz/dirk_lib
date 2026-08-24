@@ -216,9 +216,14 @@ if context == 'client' and (GetNumResourceMetadata(cache.resource, 'ui_page') or
   -- list of { model, name, brand, price, category }. ESX etc. get an empty
   -- list, so any category/blueprint UI can gate itself off.
   RegisterNuiCallback('GET_VEHICLES', function(_, cb)
-    local fw = lib.settings and lib.settings.framework
-    if fw ~= 'qb-core' and fw ~= 'qbx_core' then cb({}) return end
+    -- Ask the SHAPE, not the framework name. This used to gate on
+    -- `lib.settings.framework`, which holds the raw setting - "auto" on every
+    -- default install - so the check never matched 'qbx_core' and the list came
+    -- back empty on the very servers that have one. Whether a table of vehicles
+    -- exists is the only thing that actually matters here, and it answers for
+    -- any framework that provides one.
     local raw = (lib.FW and lib.FW.Shared and lib.FW.Shared.Vehicles) or {}
+    if type(raw) ~= 'table' then cb({}) return end
     local out = {}
     for _, v in pairs(raw) do
       if type(v) == 'table' and v.model then

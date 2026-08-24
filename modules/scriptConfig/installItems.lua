@@ -4,40 +4,50 @@
 -- Walks the consumer's schema for `x-installItem` (scalar fields holding a
 -- single item name) and `x-installItemList` (arrays where each entry IS an
 -- item record) annotations, builds a unified item-records list, and writes
--- ready-to-paste installation files into the consumer's resource folder:
+-- ready-to-paste installation files into the consumer's resource folder —
+-- ONE FILE PER SUPPORTED INVENTORY so a server owner just opens the file named
+-- after the inventory they run:
 --
---   INSTALLATION/itemsToAdd/ox.lua    — ox_inventory items table syntax
---   INSTALLATION/itemsToAdd/qb.lua    — qb-inventory items table syntax
---   INSTALLATION/itemsToAdd/esx.sql   — INSERT statements for ESX legacy items
+--   INSTALLATION/itemsToAdd/ox_inventory.lua, qb-inventory.lua, qs-inventory.lua,
+--   codem-inventory.lua, tgiann-inventory.lua, one_inventory.lua,
+--   ak47_inventory.lua, core_inventory.lua, devix-inventory.lua,
+--   dirk_inventory.lua, bp_inventory.lua, esx.sql
 --
 -- Auto-fires on every scriptConfig load + change, so editing labels in the
--- admin updates the install files automatically. Same annotations drive the
--- missing-items audit so consumers don't duplicate the item list anywhere.
+-- admin updates the install files automatically. The same annotations + the
+-- same per-inventory renderers drive the missing-items audit, so the admin
+-- panel's banner shows a ready block in the owner's exact inventory format —
+-- no translating between item schemas.
+--
+-- The one axis that actually differs between inventories is where the icon
+-- lives, captured by the INVENTORIES registry:
+--   * ox_inventory / bp_inventory → nested `client = { image = ... }`
+--   * qb / qs / codem / tgiann / one / devix / dirk / core → top-level `image`
+--   * ak47_inventory → NAME-BASED: no image field, the PNG is simply <item>.png
+--   * core_inventory additionally needs per-item grid `x` / `y` / `category`
+--   * ESX legacy items live in a DB table, not a Lua table (SQL insert)
+-- Name-based inventories can't share one icon across many items (e.g. auto
+-- blueprints) — each needs its own <item>.png. Flagged in each file header.
 --
 -- Annotation shapes:
 --
 --   "x-installItem": { label, weight?, description?, useable?, shouldClose?,
 --                      unique?, stack?, image? }
---     Goes on a string-typed schema field whose value IS the item name. The
---     annotation block carries the install metadata (label, weight, etc.).
+--     Goes on a string-typed schema field whose value IS the item name.
 --
 --   "x-installItemList": true | { nameField?, labelField?, descriptionField?,
---                                 weightField?, useable?, shouldClose?,
---                                 unique?, stack?, image? }
---     Goes on an array-typed schema field whose entries already carry their
---     own name/label/description/weight (e.g. fish[], equipment.rods[]).
---     Boolean `true` uses convention defaults (`name`, `label`, `description`,
---     `weight`); a table override lets you point to differently-named fields
---     and set per-format flags applied to every entry in the list.
+--                                 weightField?, namePrefix?, nameSuffix?,
+--                                 labelPrefix?, labelSuffix?, weight?,
+--                                 imageField?, image?, useable?, shouldClose?,
+--                                 unique?, stack? }
+--     Goes on an array-typed schema field whose entries carry their own
+--     name/label/etc. `namePrefix`/`nameSuffix` build a computed item id from a
+--     field (e.g. blueprints: namePrefix "blueprint_", nameField "model" →
+--     `blueprint_adder`); `labelPrefix`/`labelSuffix` do the same for the label
+--     (e.g. labelSuffix " Blueprint"). `image` sets one shared icon for every
+--     entry; `imageField` reads a per-entry icon; `weight` is a fixed fallback.
 
-local function clamp(v, lo, hi)
-  if v < lo then return lo end
-  if v > hi then return hi end
-  return v
-end
-
--- Lua-string render with backslash + quote escaping, mirrors what the old
--- install.lua produced via lib.table.convert (just done explicitly here).
+-- Lua-string render with backslash + quote escaping.
 local function luaString(s)
   if s == nil then return '""' end
   local str = tostring(s):gsub('\\', '\\\\'):gsub('"', '\\"'):gsub('\n', '\\n')
@@ -51,9 +61,6 @@ end
 
 -- ── Schema walker ────────────────────────────────────────────────────────────
 
--- Resolve a value from `data` at the dot-path corresponding to `pathParts`
--- (e.g. {"basic","fishGuttingItem"}). Used to read item names out of the
--- live scriptConfig at the same paths the schema walker is at.
 local function getAtPath(data, pathParts)
   local cur = data
   for i = 1, #pathParts do
@@ -64,7 +71,6 @@ local function getAtPath(data, pathParts)
 end
 
 -- Push a finalised item record into `out` if the name is a non-empty string.
--- `record` is the partial install metadata; `name` is the resolved item id.
 local function pushRecord(out, name, record)
   if type(name) ~= 'string' or name == '' then return end
   out[#out + 1] = {
@@ -76,12 +82,10 @@ local function pushRecord(out, name, record)
     shouldClose = record.shouldClose == true,
     unique      = record.unique == true,
     stack       = record.stack ~= false,  -- default true (stackable) unless explicitly false
-    image       = type(record.image) == 'string' and record.image or nil,
+    image       = type(record.image) == 'string' and record.image ~= '' and record.image or nil,
   }
 end
 
--- Resolve a "#/definitions/foo" JSON-Schema $ref against the root schema.
--- Returns the referenced node, or nil if the ref isn't resolvable.
 local function resolveRef(rootSchema, refPath)
   if type(refPath) ~= 'string' or refPath:sub(1, 2) ~= '#/' then return nil end
   local cur = rootSchema
@@ -95,22 +99,19 @@ end
 local function walk(schemaNode, data, pathParts, out, rootSchema)
   if type(schemaNode) ~= 'table' then return end
 
-  -- Resolve $ref before doing anything else — annotations inside the
-  -- referenced node (e.g. definitions/stage's requiredItems) should still
-  -- be reachable from any field that uses the ref.
   if type(schemaNode['$ref']) == 'string' then
     local resolved = resolveRef(rootSchema, schemaNode['$ref'])
     if resolved then schemaNode = resolved end
   end
 
-  -- Handle x-installItem on the current node (scalar single-item field)
+  -- x-installItem on the current node (scalar single-item field)
   local installItem = schemaNode['x-installItem']
   if type(installItem) == 'table' then
     local name = getAtPath(data, pathParts)
     pushRecord(out, name, installItem)
   end
 
-  -- Handle x-installItemList on the current node (array of item records)
+  -- x-installItemList on the current node (array of item records)
   local installList = schemaNode['x-installItemList']
   if installList ~= nil then
     local arr = getAtPath(data, pathParts)
@@ -120,26 +121,32 @@ local function walk(schemaNode, data, pathParts, out, rootSchema)
       local labelField       = cfg.labelField       or 'label'
       local descriptionField = cfg.descriptionField or 'description'
       local weightField      = cfg.weightField      or 'weight'
+      local namePrefix       = cfg.namePrefix       or ''
+      local nameSuffix       = cfg.nameSuffix       or ''
+      local labelPrefix      = cfg.labelPrefix      or ''
+      local labelSuffix      = cfg.labelSuffix      or ''
       for i = 1, #arr do
         local entry = arr[i]
         if type(entry) == 'table' then
-          -- weightField can resolve to a number (use directly), or a table —
-          -- if a table, treat as array and use the first element. Lets fish
-          -- entries point `weightField` at `weightLimits` (an array) and get
-          -- the species' min weight as the inventory-table default, mirroring
-          -- the old hand-rolled install.lua.
-          local rawWeight = entry[weightField]
-          if type(rawWeight) == 'table' then rawWeight = rawWeight[1] end
-          pushRecord(out, entry[nameField], {
-            label       = entry[labelField] or entry[nameField],
-            weight      = rawWeight,
-            description = entry[descriptionField],
-            useable     = cfg.useable,
-            shouldClose = cfg.shouldClose,
-            unique      = cfg.unique,
-            stack       = cfg.stack,
-            image       = cfg.image,
-          })
+          local base = entry[nameField]
+          if type(base) == 'string' and base ~= '' then
+            -- weightField can resolve to a number or a table (use first element);
+            -- fall back to the fixed cfg.weight (e.g. blueprints = 1).
+            local rawWeight = entry[weightField]
+            if type(rawWeight) == 'table' then rawWeight = rawWeight[1] end
+            if rawWeight == nil then rawWeight = cfg.weight end
+            local lbl = entry[labelField] or base
+            pushRecord(out, namePrefix .. base .. nameSuffix, {
+              label       = labelPrefix .. lbl .. labelSuffix,
+              weight      = rawWeight,
+              description = entry[descriptionField],
+              useable     = cfg.useable,
+              shouldClose = cfg.shouldClose,
+              unique      = cfg.unique,
+              stack       = cfg.stack,
+              image       = (cfg.imageField and entry[cfg.imageField]) or cfg.image,
+            })
+          end
         end
       end
     end
@@ -154,13 +161,7 @@ local function walk(schemaNode, data, pathParts, out, rootSchema)
     end
   end
 
-  -- Recurse into array items by iterating the actual data array. Each entry
-  -- gets visited with the path extended by its numeric index so annotations
-  -- on the item schema (or on properties nested deeper, e.g.
-  -- labs[].stages[].requiredItems) can resolve their data values via
-  -- getAtPath. Without this we miss every annotation that lives inside an
-  -- array's item shape — including druglabsv2's stage.requiredItems /
-  -- rewardItems / ingOrders.items.
+  -- Recurse into array items by iterating the actual data array.
   if type(schemaNode.items) == 'table' then
     local arr = getAtPath(data, pathParts)
     if type(arr) == 'table' then
@@ -176,63 +177,48 @@ end
 local function collectInstallItems(schema, scriptConfig)
   local out = {}
   walk(schema, scriptConfig, {}, out, schema)
-  -- Dedupe by name — last writer wins. Common when the same item is referenced
-  -- both as a list entry and as a scalar override; the scalar's metadata is
-  -- usually richer so let it overwrite.
+  -- Dedupe by name — last writer wins (scalar override metadata is richer).
   local seen = {}
+  for i = 1, #out do seen[out[i].name] = out[i] end
   local deduped = {}
-  for i = 1, #out do
-    local rec = out[i]
-    seen[rec.name] = rec
-  end
-  for _, rec in pairs(seen) do
-    deduped[#deduped + 1] = rec
-  end
+  for _, rec in pairs(seen) do deduped[#deduped + 1] = rec end
   table.sort(deduped, function(a, b) return a.name < b.name end)
   return deduped
 end
 
 -- ── Renderers ────────────────────────────────────────────────────────────────
 
-local function renderOx(records)
+-- Parameterised Lua item-table renderer. `opts.image` = 'client' (ox/bp,
+-- nested), 'top' (top-level `image`) or 'none' (name-based, no field).
+-- `opts.grid` adds core_inventory's required x/y/category.
+local function renderLua(records, opts)
+  opts = opts or {}
   local lines = {}
   for i = 1, #records do
     local r = records[i]
     lines[#lines + 1] = ("[%s] = {"):format(luaString(r.name))
-    lines[#lines + 1] = ("  ['name'] = %s,"):format(luaString(r.name))
-    lines[#lines + 1] = ("  ['label'] = %s,"):format(luaString(r.label))
-    lines[#lines + 1] = ("  ['weight'] = %d,"):format(math.floor(tonumber(r.weight) or 0))
+    lines[#lines + 1] = ("  name = %s,"):format(luaString(r.name))
+    lines[#lines + 1] = ("  label = %s,"):format(luaString(r.label))
+    lines[#lines + 1] = ("  weight = %d,"):format(math.floor(tonumber(r.weight) or 0))
+    if opts.grid then
+      lines[#lines + 1] = "  x = 1,"
+      lines[#lines + 1] = "  y = 1,"
+      lines[#lines + 1] = "  category = \"misc\","
+    end
     if r.description and r.description ~= '' then
-      lines[#lines + 1] = ("  ['description'] = %s,"):format(luaString(r.description))
+      lines[#lines + 1] = ("  description = %s,"):format(luaString(r.description))
     end
-    if r.stack == false then
-      lines[#lines + 1] = "  ['stack'] = false,"
-    end
+    if r.useable     then lines[#lines + 1] = "  useable = true," end
+    if r.unique      then lines[#lines + 1] = "  unique = true," end
+    if r.shouldClose then lines[#lines + 1] = "  shouldClose = true," end
+    if r.stack == false then lines[#lines + 1] = "  stack = false," end
     if r.image then
-      lines[#lines + 1] = ("  ['client'] = { ['image'] = %s },"):format(luaString(r.image))
-    end
-    lines[#lines + 1] = "},"
-    lines[#lines + 1] = ""
-  end
-  return table.concat(lines, '\n')
-end
-
-local function renderQb(records)
-  local lines = {}
-  for i = 1, #records do
-    local r = records[i]
-    lines[#lines + 1] = ("[%s] = {"):format(luaString(r.name))
-    lines[#lines + 1] = ("  ['name'] = %s,"):format(luaString(r.name))
-    lines[#lines + 1] = ("  ['label'] = %s,"):format(luaString(r.label))
-    lines[#lines + 1] = ("  ['weight'] = %d,"):format(math.floor(tonumber(r.weight) or 0))
-    if r.description and r.description ~= '' then
-      lines[#lines + 1] = ("  ['description'] = %s,"):format(luaString(r.description))
-    end
-    if r.useable     then lines[#lines + 1] = "  ['useable'] = true," end
-    if r.shouldClose then lines[#lines + 1] = "  ['shouldClose'] = true," end
-    if r.unique      then lines[#lines + 1] = "  ['unique'] = true," end
-    if r.image then
-      lines[#lines + 1] = ("  ['image'] = %s,"):format(luaString(r.image))
+      if opts.image == 'client' then
+        lines[#lines + 1] = ("  client = { image = %s },"):format(luaString(r.image))
+      elseif opts.image == 'top' then
+        lines[#lines + 1] = ("  image = %s,"):format(luaString(r.image))
+      end
+      -- 'none' → name-based, no image field emitted
     end
     lines[#lines + 1] = "},"
     lines[#lines + 1] = ""
@@ -245,21 +231,47 @@ local function renderEsxSql(records)
   local rows = {}
   for i = 1, #records do
     local r = records[i]
-    rows[#rows + 1] = ("(%s, %s, %d)"):format(
-      sqlString(r.name),
-      sqlString(r.label),
-      math.floor(tonumber(r.weight) or 0)
-    )
+    rows[#rows + 1] = ("(%s, %s, %d)"):format(sqlString(r.name), sqlString(r.label), math.floor(tonumber(r.weight) or 0))
   end
-  return "INSERT INTO `items` (`name`, `label`, `weight`) VALUES\n" ..
-         table.concat(rows, ',\n') .. ';\n'
+  return "INSERT INTO `items` (`name`, `label`, `weight`) VALUES\n" .. table.concat(rows, ',\n') .. ';\n'
+end
+
+-- ── Inventory registry ───────────────────────────────────────────────────────
+-- One entry per inventory our bridge supports. `render(records)` returns the
+-- ready-to-paste body; `paste`/`images` populate the file header so the owner
+-- knows where the items and PNGs go. `key` matches both the bridge resource
+-- name (settings.inventory) AND the frontend banner's dropdown key.
+local function lua(opts) return function(records) return renderLua(records, opts) end end
+
+local INVENTORIES = {
+  { key = 'ox_inventory',     file = 'ox_inventory.lua',     render = lua{ image = 'client' },            paste = 'ox_inventory/data/items.lua',                                             images = 'ox_inventory/web/images/' },
+  { key = 'qb-inventory',     file = 'qb-inventory.lua',     render = lua{ image = 'top' },               paste = 'qb-core/shared/items.lua',                                                images = 'qb-inventory/html/images/' },
+  { key = 'qs-inventory',     file = 'qs-inventory.lua',     render = lua{ image = 'top' },               paste = 'qs-inventory/shared/items.lua (or qb-core/shared/items.lua on QB)',        images = 'qs-inventory/html/images/' },
+  { key = 'codem-inventory',  file = 'codem-inventory.lua',  render = lua{ image = 'top' },               paste = 'codem-inventory/shared/items.lua (or qb-core/shared/items.lua)',           images = 'codem-inventory/html/itemimages/' },
+  { key = 'tgiann-inventory', file = 'tgiann-inventory.lua', render = lua{ image = 'top' },               paste = "tgiann-inventory's shared items lua",                                     images = 'the SEPARATE inventory_images resource (tgiann serves icons from there, not from tgiann-inventory)' },
+  { key = 'one_inventory',    file = 'one_inventory.lua',    render = lua{ image = 'top' },               paste = 'one_inventory (DB-backed — import via its admin panel / CreateItems export)', images = 'one_inventory/web/images/' },
+  { key = 'ak47_inventory',   file = 'ak47_inventory.lua',   render = lua{ image = 'none' },              paste = 'ak47_inventory/shared/items.lua',                                         images = 'ak47_inventory/web/build/images/  (name each PNG <item>.png — no image field)' },
+  { key = 'core_inventory',   file = 'core_inventory.lua',   render = lua{ image = 'top', grid = true },  paste = "your framework's item source, with core's grid x/y/category on each item", images = 'core_inventory/html/img/' },
+  { key = 'devix-inventory',  file = 'devix-inventory.lua',  render = lua{ image = 'top' },               paste = "devix_inventory's own item list (CONFIRM the path against your install)",  images = "devix_inventory's image folder — CONFIRM against your install (escrowed, no public docs)" },
+  { key = 'dirk_inventory',   file = 'dirk_inventory.lua',   render = lua{ image = 'top' },               paste = "dirk_inventory's shared items lua",                                       images = 'dirk_inventory image folder' },
+  { key = 'bp_inventory',     file = 'bp_inventory.lua',     render = lua{ image = 'client' },            paste = "bp_inventory's items file (ox_inventory-compatible format)",               images = "bp_inventory's own image folder (bp serves icons from its own resource, not ox_inventory)" },
+  { key = 'esx',              file = 'esx.sql',              render = renderEsxSql,                       paste = 'run against your server database',                                        images = 'name each PNG <item>.png in your ESX inventory image folder' },
+}
+
+local function header(inv, resourceName)
+  return table.concat({
+    ('-- %s install items — auto-generated by dirk_lib from %s scriptConfig (do not hand-edit).'):format(inv.key, resourceName),
+    ('-- Paste into: %s'):format(inv.paste),
+    ('-- Item images: %s'):format(inv.images),
+    '',
+    '',
+  }, '\n')
 end
 
 -- ── Public API ───────────────────────────────────────────────────────────────
 
 local lastFingerprint = nil
 local function fingerprint(records)
-  -- Cheap stable string of the records list to skip rewrites when nothing changed.
   local parts = {}
   for i = 1, #records do
     local r = records[i]
@@ -282,9 +294,10 @@ function M.regenerate(schema, scriptConfig)
   lastFingerprint = fp
 
   local resourceName = GetCurrentResourceName()
-  SaveResourceFile(resourceName, 'INSTALLATION/itemsToAdd/ox.lua',  renderOx(records),     -1)
-  SaveResourceFile(resourceName, 'INSTALLATION/itemsToAdd/qb.lua',  renderQb(records),     -1)
-  SaveResourceFile(resourceName, 'INSTALLATION/itemsToAdd/esx.sql', renderEsxSql(records), -1)
+  for i = 1, #INVENTORIES do
+    local inv = INVENTORIES[i]
+    SaveResourceFile(resourceName, 'INSTALLATION/itemsToAdd/' .. inv.file, header(inv, resourceName) .. inv.render(records), -1)
+  end
 end
 
 function M.collect(schema, scriptConfig)
@@ -293,14 +306,10 @@ end
 
 --- Audit: walks schema annotations, finds item names whose values aren't
 --- registered in `lib.inventory.items()`, and returns:
----   {
----     missing  = { 'fish_knife', 'anchor', ... },          -- list of names
----     snippets = { ox = '...', qb = '...', esx = '...' }   -- rendered
----                                                            install blocks for ONLY
----                                                            the missing items
----   }
---- Used by the per-resource `<scriptName>:getMissingItems` callback to feed
---- the admin panel's MissingItemsBanner.
+---   { missing = { rec, ... }, snippets = { <inventoryKey> = '...', ... } }
+--- `snippets` is keyed by every registry inventory key (ox_inventory,
+--- qb-inventory, …, dirk_inventory, bp_inventory, esx). Feeds the admin panel's
+--- MissingItemsBanner dropdown, which defaults to the server's own inventory.
 function M.audit(schema, scriptConfig)
   local all = collectInstallItems(schema, scriptConfig)
   local missing = {}
@@ -310,28 +319,15 @@ function M.audit(schema, scriptConfig)
       missing[#missing + 1] = rec
     end
   end
-  return {
-    missing  = missing,
-    snippets = {
-      ox  = renderOx(missing),
-      qb  = renderQb(missing),
-      esx = renderEsxSql(missing),
-    },
-  }
+  local snippets = {}
+  for i = 1, #INVENTORIES do
+    local inv = INVENTORIES[i]
+    snippets[inv.key] = inv.render(missing)
+  end
+  return { missing = missing, snippets = snippets }
 end
 
---- Console-friendly audit summary. Lists the missing names (capped at 5,
---- with "... and N more" tail), points the server owner at the freshly-
---- regenerated INSTALLATION/itemsToAdd/* files for ready-to-paste blocks.
---- Silent when nothing is missing.
----
---- FiveM already prefixes `print` output with `[script:<resource>]` so the
---- message itself doesn't repeat the resource name.
----
---- Deferred from the scriptConfig load by the caller because the inventory
---- bridge usually isn't fully wired up the moment scriptConfig finishes
---- loading — running the audit too eagerly would falsely report every item
---- as missing.
+--- Console-friendly audit summary. Silent when nothing is missing.
 function M.logAuditWarning(schema, scriptConfig)
   local result = M.audit(schema, scriptConfig)
   local missing = result.missing
@@ -344,7 +340,7 @@ function M.logAuditWarning(schema, scriptConfig)
   end
   local tail = (#missing > PREVIEW) and (' and ' .. (#missing - PREVIEW) .. ' more') or ''
 
-  lib.print.warn(('%d item%s missing from your inventory: %s%s. See INSTALLATION/itemsToAdd/{ox.lua,qb.lua,esx.sql} (in this resource) for the install snippets — or open the admin panel and copy from the missing-items banner.'):format(
+  lib.print.warn(('%d item%s missing from your inventory: %s%s. See INSTALLATION/itemsToAdd/<your-inventory> (in this resource) for a ready-to-paste block — or open the admin panel and copy from the missing-items banner.'):format(
     #missing,
     #missing == 1 and '' or 's',
     table.concat(names, ', '),

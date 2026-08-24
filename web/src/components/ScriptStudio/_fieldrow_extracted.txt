@@ -1,0 +1,95 @@
+/** One field. Wide types get their own block; the rest sit on a single line. */
+function FieldRow({
+  column, value, onChange, onPick, disabled,
+}: {
+  column: SettingColumn;
+  value: unknown;
+  onChange: (next: unknown) => void;
+  onPick: () => void;
+  disabled?: boolean;
+}) {
+  const theme = useMantineTheme();
+  const wide = column.type === 'slider' || column.type === 'range'
+    || column.type === 'tags' || column.type === 'rows' || column.type === 'object';
+
+  return (
+    <Flex
+      direction={wide ? 'column' : 'row'}
+      align={wide ? 'stretch' : 'center'}
+      justify="space-between"
+      gap={wide ? 'xs' : 'sm'}
+      px="sm" py="xs"
+      style={{
+        background: alpha(theme.colors.dark[8], 0.5),
+        border: `0.1vh solid ${alpha(theme.colors.dark[5], 0.35)}`,
+        borderRadius: theme.radius.xs,
+      }}
+    >
+      <Flex direction="column" style={{ minWidth: 0, lineHeight: 1.2 }}>
+        <Text ff="Akrobat Bold" size="xs" c="rgba(255,255,255,0.85)">{column.label}</Text>
+        <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.28)">{column.key}</Text>
+      </Flex>
+
+      {column.type === 'slider' && (
+        <SliderControl value={value} min={column.min} max={column.max ?? 1} disabled={disabled}
+          onChange={(v) => onChange(v)} />
+      )}
+
+      {column.type === 'range' && (
+        <RangeControl value={value} disabled={disabled} suffix={column.suffix} onChange={(v) => onChange(v)} />
+      )}
+
+      {column.type === 'tags' && (
+        <TagsControl
+          value={value}
+          disabled={disabled}
+          numeric={Array.isArray(value) && value.every((v) => typeof v === 'number')}
+          onChange={(v) => onChange(v)}
+        />
+      )}
+
+      {column.type === 'object' && (
+        <Flex direction="column" gap="xxs" style={{ width: '100%' }}>
+          {(column.columns ?? []).map((child) => (
+            <Flex
+              key={child.key}
+              align="center" justify="space-between" gap="sm"
+              px="xs" py="0.4vh"
+              style={{
+                background: alpha(theme.colors.dark[9], 0.4),
+                border: `0.1vh solid ${alpha(theme.colors.dark[5], 0.25)}`,
+                borderRadius: '0.3vh',
+              }}
+            >
+              <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.6)">{child.label}</Text>
+              <SettingControl
+                type={child.type}
+                column={child}
+                value={(value as Row | undefined)?.[child.key]}
+                disabled={disabled}
+                compact
+                onChange={(v) => onChange({ ...(value as Row ?? {}), [child.key]: v })}
+              />
+            </Flex>
+          ))}
+        </Flex>
+      )}
+
+      {column.type === 'rows' && (
+        <NestedRows column={column} value={value} disabled={disabled} onChange={onChange} />
+      )}
+
+      {!wide && (
+        <SettingControl
+          type={column.type}
+          column={column}
+          value={value}
+          disabled={disabled}
+          onChange={onChange}
+          onDrill={opensPicker(column.type) ? onPick : undefined}
+        />
+      )}
+    </Flex>
+  );
+}
+

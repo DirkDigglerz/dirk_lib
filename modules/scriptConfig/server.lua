@@ -375,6 +375,301 @@ end
 -- Records every leaf under a removed subtree as {path, old, new=nil}. Used by
 -- collectChangedLeaves' removal pass below. Empty tables record the container
 -- path itself so a cleared-to-empty list still registers as a change.
+-- ── Override-row storage ──────────────────────────────────────────────────
+--
+-- Values live as ONE ROW PER OVERRIDDEN PATH rather than one blob per script.
+--
+-- The blob pinned every value the moment a server saved anything: smartMerge
+-- sees a stored value and keeps it, so a better default shipped in an update
+-- never reached an existing install. Storing only what an admin deliberately
+-- changed means untouched settings track the code, which is the whole point.
+--
+-- It also makes deletion expressible. `collectChangedLeaves` walks the NEW
+-- config, so a removed value has no leaf to find - the "can't delete the last
+-- store" report. Under rows, removing an override is a DELETE.
+--
+-- GRANULARITY RULE: a row is written at the SHALLOWEST path whose value
+-- differs from the default, and the walk never descends into arrays. So
+-- `basic.debug` is its own row, and a fish edit stores the whole `fish` array
+-- as one row. Per-element rows would be finer, but our arrays merge by
+-- `x-arrayKey` and their indices shift - a row keyed `fish.12.biteChance`
+-- silently retargets the moment someone deletes fish #3.
+
+-- Hoisted above the override diff, which compares canonical JSON rather than
+-- raw values: two doubles can differ in their last bits yet serialise to the
+-- same bytes, and a difference that cannot be stored is not an override.
+
+-- Canonical JSON string with sorted keys so the hash is stable across restarts.
+-- Lua's pairs() iteration order is non-deterministic, so json.encode(tbl) can
+-- produce different strings for the same data on different runs.  This function
+-- always walks object keys in sorted order, giving a deterministic output.
+local function canonicalJson(val)
+  if val == nil then return 'null' end
+  local t = type(val)
+  if t == 'boolean' then return val and 'true' or 'false' end
+  if t == 'number'  then return tostring(val) end
+  if t == 'string'  then return json.encode(val) end -- handles escaping
+  if t ~= 'table'   then return 'null' end
+
+  -- Detect array vs object (same heuristic as json.encode: sequential integer keys from 1)
+  local isArray = true
+  local n = #val
+  if n == 0 then
+    -- Could be empty array or empty object — check for any key
+    if next(val) ~= nil then isArray = false end
+  else
+    for k in pairs(val) do
+      if type(k) ~= 'number' or k < 1 or k > n or math.floor(k) ~= k then
+        isArray = false
+        break
+      end
+    end
+  end
+
+  if isArray then
+    local parts = {}
+    for i = 1, n do
+      parts[i] = canonicalJson(val[i])
+    end
+    return '[' .. table.concat(parts, ',') .. ']'
+  else
+    local keys = {}
+    local keyMap = {} -- sorted string -> original key (preserves type for table lookup)
+    for k in pairs(val) do
+      local sk = tostring(k)
+      keys[#keys + 1] = sk
+      keyMap[sk] = k
+    end
+    table.sort(keys)
+    local parts = {}
+    for i = 1, #keys do
+      local sk = keys[i]
+      parts[i] = json.encode(sk) .. ':' .. canonicalJson(val[keyMap[sk]])
+    end
+    return '{' .. table.concat(parts, ',') .. '}'
+  end
+end
+
+local OVERRIDES_TABLE = 'dirk_scriptConfig_overrides'
+
+local function ensureOverridesTable()
+  if GlobalState.dirk_scriptConfigOverridesReady then return true end
+
+  if not pcall(MySQL.scalar.await, ('SELECT 1 FROM %s LIMIT 1'):format(OVERRIDES_TABLE)) then
+    local ok, createErr = pcall(MySQL.query.await, ([[
+      CREATE TABLE IF NOT EXISTS `%s` (
+        `script`     VARCHAR(50)  NOT NULL,
+        `path`       VARCHAR(191) NOT NULL,
+        `value`      LONGTEXT     DEFAULT NULL,
+        `updated_by` LONGTEXT     DEFAULT NULL,
+        `updated_at` timestamp    NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+        PRIMARY KEY (`script`, `path`)
+      )
+    ]]):format(OVERRIDES_TABLE))
+
+    -- Re-probe rather than trusting the pcall: a concurrent consumer may have
+    -- created it a moment ago, which is a perfectly good outcome.
+    if not pcall(MySQL.scalar.await, ('SELECT 1 FROM %s LIMIT 1'):format(OVERRIDES_TABLE)) then
+      lib.print.error(('scriptConfig: could not create `%s`: %s'):format(OVERRIDES_TABLE, tostring(createErr)))
+      return false
+    end
+  end
+
+  GlobalState.dirk_scriptConfigOverridesReady = true
+  return true
+end
+
+--- The first leaf where two values disagree, as `path = a vs b`.
+--- Diagnostic only: an override row says WHAT differs, never why, and on a
+--- 13KB array "zones differs" is not an answer anyone can act on.
+local function firstDifference(a, b, path)
+  if type(a) ~= type(b) then
+    return ('%s: %s vs %s'):format(path ~= '' and path or '<root>', type(a), type(b))
+  end
+  if type(a) ~= 'table' then
+    if a == b then return nil end
+    return ('%s: %s vs %s'):format(path ~= '' and path or '<root>', tostring(a), tostring(b))
+  end
+  local seen = {}
+  for k in pairs(a) do seen[k] = true end
+  for k in pairs(b) do seen[k] = true end
+  for k in pairs(seen) do
+    local child = path ~= '' and (path .. '.' .. tostring(k)) or tostring(k)
+    local diff = firstDifference(a[k], b[k], child)
+    if diff then return diff end
+  end
+  return nil
+end
+
+--- Every path where `data` differs from `defaults`, shallowest-first.
+--- Arrays are never descended into - see the granularity rule above.
+local function collectOverridePaths(data, defaults, path, out)
+  out = out or {}
+
+  if type(data) ~= 'table' or type(defaults) ~= 'table' or isArrayLike(data) or isArrayLike(defaults) then
+    -- Compare what would be STORED, not the raw values. A polygon coordinate
+    -- that has been through the DB round-trips to a double differing in its
+    -- last bits, so `4267.0837770711` compared unequal to `4267.0837770711`
+    -- and pinned fishing's entire 13KB `zones` array as an override it never
+    -- was - which would have stopped improved default zones ever reaching a
+    -- server again. A difference that cannot be serialised is not a difference.
+    if canonicalJson(data) ~= canonicalJson(defaults) then
+      out[#out + 1] = path
+      debugLog(('override "%s" — first difference: %s'):format(
+        path ~= '' and path or '<root>',
+        firstDifference(data, defaults, path) or 'none found (equal by value?)'))
+    end
+    return out
+  end
+
+  -- keys present in either side; a key the defaults dropped is still an
+  -- override until someone prunes it
+  local seen = {}
+  for key in pairs(data) do seen[key] = true end
+  for key in pairs(defaults) do seen[key] = true end
+
+  for key in pairs(seen) do
+    local childPath = path ~= '' and (path .. '.' .. key) or key
+    collectOverridePaths(data[key], defaults[key], childPath, out)
+  end
+
+  return out
+end
+
+--- Read this script's overrides back into the nested shape the rest of the
+--- pipeline already expects, so renames / migrations / smartMerge are unchanged.
+local function loadOverrides(scriptName)
+  local rows = MySQL.query.await(
+    ('SELECT path, value FROM %s WHERE script = ?'):format(OVERRIDES_TABLE),
+    { scriptName }
+  ) or {}
+
+  local data = {}
+  for i = 1, #rows do
+    local row = rows[i]
+    local ok, decoded = pcall(json.decode, row.value or 'null')
+    if ok then
+      setNestedValue(data, row.path, decoded)
+    else
+      lib.print.warn(('scriptConfig [%s]: override `%s` is not valid JSON, ignoring'):format(scriptName, row.path))
+    end
+  end
+  return data, #rows
+end
+
+--- One-time move of a legacy whole-blob row into override rows.
+---
+--- Only paths that DIFFER from the shipped defaults become rows - copying the
+--- blob verbatim would re-pin every value and throw away the reason for doing
+--- this. The blob is deliberately left in place: it is the rollback, and this
+--- runs once because the presence of rows is what suppresses it.
+local function migrateBlobToOverrides(scriptName, blob, defaults, editor)
+  if type(blob) ~= 'table' or not next(blob) then return 0 end
+
+  local paths = collectOverridePaths(blob, defaults, '', {})
+  if #paths == 0 then
+    lib.print.info(('scriptConfig [%s]: stored config matches defaults, nothing to migrate.'):format(scriptName))
+    return 0
+  end
+
+  local inserts = {}
+  for i = 1, #paths do
+    local path = paths[i]
+    inserts[#inserts + 1] = {
+      scriptName,
+      path,
+      json.encode(getNestedValue(blob, path)),
+      editor,
+    }
+  end
+
+  MySQL.prepare.await(
+    ('INSERT INTO %s (script, path, value, updated_by) VALUES (?, ?, ?, ?)'):format(OVERRIDES_TABLE),
+    inserts
+  )
+
+  lib.print.info(('scriptConfig [%s]: migrated %d overridden path(s) from the legacy blob.'):format(scriptName, #paths))
+  -- Say WHY each one is an override. A migration is one-time and this is the
+  -- only moment anyone can check that a 13KB array really was edited rather
+  -- than being flagged by a comparison quirk.
+  for i = 1, #paths do
+    lib.print.info(('  %s — %s'):format(
+      paths[i],
+      firstDifference(getNestedValue(blob, paths[i]), getNestedValue(defaults, paths[i]), paths[i]) or 'no leaf difference found'))
+  end
+  return #paths
+end
+
+--- Write the current config as override rows: upsert what differs from the
+--- defaults, DELETE the rows for anything that no longer does.
+---
+--- The delete half is what makes "revert to default" and "remove the last list
+--- item" actually persist.
+local function writeOverrides(scriptName, config, defaults, editor)
+  local paths = collectOverridePaths(config, defaults, '', {})
+
+  local keep = {}
+  local upserts = {}
+  for i = 1, #paths do
+    local path = paths[i]
+    keep[path] = true
+    upserts[#upserts + 1] = {
+      scriptName,
+      path,
+      json.encode(getNestedValue(config, path)),
+      editor,
+    }
+  end
+
+  if #upserts > 0 then
+    MySQL.prepare.await(
+      ([[INSERT INTO %s (script, path, value, updated_by) VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE value = VALUES(value), updated_by = VALUES(updated_by)]]):format(OVERRIDES_TABLE),
+      upserts
+    )
+  end
+
+  -- anything stored that is no longer an override is back at its default
+  local existing = MySQL.query.await(
+    ('SELECT path FROM %s WHERE script = ?'):format(OVERRIDES_TABLE),
+    { scriptName }
+  ) or {}
+
+  local drop = {}
+  for i = 1, #existing do
+    local path = existing[i].path
+    if not keep[path] then drop[#drop + 1] = { scriptName, path } end
+  end
+
+  if #drop > 0 then
+    MySQL.prepare.await(
+      ('DELETE FROM %s WHERE script = ? AND path = ?'):format(OVERRIDES_TABLE),
+      drop
+    )
+  end
+
+  return #upserts, #drop
+end
+
+--- Overrides whose path the schema no longer declares.
+---
+--- Reported, never removed on their own: a rename that forgot `x-renamedFrom`
+--- would otherwise destroy the value silently. The panel offers a prune button
+--- for when they really are dead.
+local function unknownOverridePaths(scriptName, schema)
+  local rows = MySQL.query.await(
+    ('SELECT path FROM %s WHERE script = ?'):format(OVERRIDES_TABLE),
+    { scriptName }
+  ) or {}
+
+  local unknown = {}
+  for i = 1, #rows do
+    local path = rows[i].path
+    if not getSchemaNode(schema, path) then unknown[#unknown + 1] = path end
+  end
+  return unknown
+end
+
 local function collectRemovedLeaves(oldValue, path, out)
   if type(oldValue) ~= 'table' or next(oldValue) == nil then
     out[#out + 1] = { path = path, old = oldValue, new = nil }
@@ -458,56 +753,6 @@ end
 -- CONTENT HASH
 -- --------------------------------------------------
 
--- Canonical JSON string with sorted keys so the hash is stable across restarts.
--- Lua's pairs() iteration order is non-deterministic, so json.encode(tbl) can
--- produce different strings for the same data on different runs.  This function
--- always walks object keys in sorted order, giving a deterministic output.
-local function canonicalJson(val)
-  if val == nil then return 'null' end
-  local t = type(val)
-  if t == 'boolean' then return val and 'true' or 'false' end
-  if t == 'number'  then return tostring(val) end
-  if t == 'string'  then return json.encode(val) end -- handles escaping
-  if t ~= 'table'   then return 'null' end
-
-  -- Detect array vs object (same heuristic as json.encode: sequential integer keys from 1)
-  local isArray = true
-  local n = #val
-  if n == 0 then
-    -- Could be empty array or empty object — check for any key
-    if next(val) ~= nil then isArray = false end
-  else
-    for k in pairs(val) do
-      if type(k) ~= 'number' or k < 1 or k > n or math.floor(k) ~= k then
-        isArray = false
-        break
-      end
-    end
-  end
-
-  if isArray then
-    local parts = {}
-    for i = 1, n do
-      parts[i] = canonicalJson(val[i])
-    end
-    return '[' .. table.concat(parts, ',') .. ']'
-  else
-    local keys = {}
-    local keyMap = {} -- sorted string -> original key (preserves type for table lookup)
-    for k in pairs(val) do
-      local sk = tostring(k)
-      keys[#keys + 1] = sk
-      keyMap[sk] = k
-    end
-    table.sort(keys)
-    local parts = {}
-    for i = 1, #keys do
-      local sk = keys[i]
-      parts[i] = json.encode(sk) .. ':' .. canonicalJson(val[keyMap[sk]])
-    end
-    return '{' .. table.concat(parts, ',') .. '}'
-  end
-end
 
 -- Produces a stable, content-derived 31-bit positive integer from a table.
 -- Using a hash instead of an incrementing counter means server resets and
@@ -822,6 +1067,11 @@ local function registerScriptConfig(schema, canEditFn, rules)
     GlobalState.dirk_scriptConfigSchemaReady = true
   end
 
+  -- Values live here now; `dirk_scriptConfig` keeps the per-resource META
+  -- (versions, change log, last editor) and its `data` column becomes the
+  -- legacy blob we migrate from.
+  ensureOverridesTable()
+
   -- Insert defaults if this resource has no row yet
   local rowExists = MySQL.scalar.await(
     'SELECT COUNT(*) FROM dirk_scriptConfig WHERE script = ?',
@@ -841,11 +1091,22 @@ local function registerScriptConfig(schema, canEditFn, rules)
     { scriptName }
   ) or {}
 
-  local rawData   = json.decode(loadedData?.data or '{}') or {}
+  local legacyBlob = json.decode(loadedData?.data or '{}') or {}
   client_version  = loadedData?.client_version  or 0
   local storedVer = loadedData?.resource_version or '0.0.0'
   changeLog = json.decode(loadedData?.change_log or '[]') or {}
   lastEditorMeta = json.decode(loadedData?.last_editor or 'null')
+
+  -- Overrides are the source of truth. A server that has never run this
+  -- version has none yet, so the legacy blob is exploded into rows ONCE -
+  -- keeping only the paths that actually differ from the shipped defaults, or
+  -- the migration would re-pin every value and defeat the point. The blob is
+  -- left where it is: it is the rollback.
+  local rawData, overrideCount = loadOverrides(scriptName)
+  if overrideCount == 0 and next(legacyBlob) then
+    migrateBlobToOverrides(scriptName, legacyBlob, defaultData, json.encode({ name = 'migration' }))
+    rawData = loadOverrides(scriptName)
+  end
 
   -- Hash of the state we just loaded from the DB, captured BEFORE any rename /
   -- migration / merge mutates rawData or recomputes client_version. Compared
@@ -853,7 +1114,7 @@ local function registerScriptConfig(schema, canEditFn, rules)
   -- boot-time UPDATE — that write is the single biggest startup stall
   -- (~0.9s on an idle server, several seconds under DB contention).
   local loadedHash = hashSettings({
-    data             = rawData,
+    data             = rawData,   -- now the override set, not the blob
     client_version   = client_version,
     resource_version = storedVer,
     change_log       = changeLog,
@@ -909,10 +1170,23 @@ local function registerScriptConfig(schema, canEditFn, rules)
   -- before clients read it.
   local bootHash = persistPayloadHash()
   if bootHash ~= loadedHash then
+    writeOverrides(scriptName, scriptConfig, defaultData, json.encode(lastEditorMeta))
+    -- The blob is still written for one release so a rollback has something to
+    -- read. It is a MIRROR now, not the source of truth - the load path reads
+    -- rows. Drop this column write once the migration has shipped and settled.
     MySQL.prepare.await(
       'UPDATE dirk_scriptConfig SET data = ?, client_version = ?, resource_version = ?, change_log = ?, last_editor = ? WHERE script = ?',
       { json.encode(scriptConfig), client_version, currentVer, json.encode(changeLog), json.encode(lastEditorMeta), scriptName }
     )
+  end
+
+  -- Overrides the schema no longer declares. Reported, never removed on their
+  -- own: a rename that forgot `x-renamedFrom` would otherwise destroy the value
+  -- silently. The panel offers a prune for when they really are dead.
+  local orphaned = unknownOverridePaths(scriptName, schema)
+  if #orphaned > 0 then
+    lib.print.warn(('scriptConfig [%s]: %d stored override(s) are not in the schema and were KEPT: %s'):format(
+      scriptName, #orphaned, table.concat(orphaned, ', ')))
   end
   lastPersistedHash = bootHash
   dispatchScriptConfigWatchers(scriptConfig, nil, nil, 'load', true)
@@ -1062,6 +1336,13 @@ local function setScriptConfig(data, forceVers, ctx)
 
   local payloadHash = persistPayloadHash()
   if payloadHash ~= lastPersistedHash then
+    -- Rows first: this is what a restart reads back. `writeOverrides` DELETES
+    -- rows for anything now back at its default, which is what finally makes
+    -- "revert to default" and "remove the last list item" survive a restart -
+    -- the blob could only ever be rewritten, never have a value taken out of
+    -- it in a way `collectChangedLeaves` could see.
+    writeOverrides(scriptName, scriptConfig, defaults, json.encode(lastEditorMeta))
+
     MySQL.prepare.await(
       'UPDATE dirk_scriptConfig SET data = ?, client_version = ?, change_log = ?, last_editor = ? WHERE script = ?',
       { json.encode(scriptConfig), client_version, json.encode(changeLog), json.encode(lastEditorMeta), scriptName }

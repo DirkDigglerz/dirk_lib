@@ -20,6 +20,7 @@ import Notifications from './Notify/main';
 import ProgressBar from './Progress/main';
 import Quiz from './Quiz/main';
 import ScriptConfigChooser from './ScriptConfigChooser/main';
+import ScriptStudio from './ScriptStudio/main';
 import StatusInfo from './StatusInfo/main';
 import TestBed from './TestBed/main';
 import TextUI from './TextUI/main';
@@ -73,6 +74,7 @@ const App: React.FC = () => {
       <AlertDialog />
       <Instructions />
       <ScriptConfigChooser />
+      <ScriptStudio />
       <AdminSection />
     </DirkProvider>
   );

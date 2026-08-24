@@ -1,0 +1,300 @@
+import { alpha, Flex, Text, TextInput, useMantineTheme } from '@mantine/core';
+import { ConfirmModal } from 'dirk-cfx-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { List, Package, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { RowModal } from './RowModal';
+import { useItems } from 'dirk-cfx-react';
+import { ItemArt, StudioButton } from './ui';
+import type { SettingColumn, SettingEntry } from './types';
+
+type Row = Record<string, unknown>;
+
+/**
+ * Every row visible in the section, the way fishing's own list sections work -
+ * you can see the whole set at a glance, add and delete inline, and click a row
+ * to edit it in a modal. No drilling required just to read the list.
+ */
+export function ListRows({
+  entry, rows, onChange, disabled, rowFilter, resource,
+}: {
+  entry: SettingEntry;
+  /** owning script, so a row editor can resolve cross-referencing fields */
+  resource?: string;
+  rows: Row[];
+  onChange: (next: Row[]) => void;
+  disabled?: boolean;
+  /** panel-wide search, so a query narrows the rows as well as the sections */
+  rowFilter?: string;
+}) {
+  const theme = useMantineTheme();
+  const color = theme.colors[theme.primaryColor][5];
+
+  // Fishing ships 37 species and 24 hooks; mounting every row of every list at
+  // once is what made switching scripts stall. Same page size fishing's own
+  // list sections use.
+  const PAGE = 200;
+  const [page, setPage] = useState(0);
+  const [editing, setEditing] = useState<number | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+  const [query, setQuery] = useState('');
+
+  const labelKey = entry.rowLabelKey ?? entry.columns?.[0]?.key ?? '';
+  const items = useItems();
+
+  // A column typed `item` is the obvious case. Failing that, a row whose key
+  // column actually resolves to something in the inventory is an item too -
+  // baitDig.randomItems stores its item in `name`, with nothing in the schema
+  // marking it as one.
+  const itemKey = entry.rowItemKey ?? (() => {
+    const candidate = entry.columns?.find((column) =>
+      (column.key === 'name' || column.key === 'item') && column.type === 'string');
+    if (!candidate) return undefined;
+    const hit = rows.some((row) => !!items[String(row[candidate.key] ?? '')]);
+    return hit ? candidate.key : undefined;
+  })();
+  const columns = entry.columns ?? [];
+  // the columns worth summarising on the card - skip the two already shown
+  const summaryColumns = columns.filter((c) => c.key !== labelKey && c.key !== itemKey).slice(0, 4);
+
+  const visible = useMemo(() => {
+    const active = (rowFilter ?? query).trim();
+    if (!active) return rows.map((_, i) => i);
+    const needle = active.toLowerCase();
+    return rows
+      .map((row, i) => ({ row, i }))
+      .filter(({ row }) => Object.values(row).some((v) => String(v).toLowerCase().includes(needle)))
+      .map(({ i }) => i);
+  }, [rows, query, rowFilter]);
+
+  const pageCount = Math.max(1, Math.ceil(visible.length / PAGE));
+  const paged = visible.slice(page * PAGE, page * PAGE + PAGE);
+
+  // a filter can shrink the list under the current page
+  useEffect(() => { if (page >= pageCount) setPage(0); }, [pageCount, page]);
+
+  const rowTitle = (row: Row, index: number) => String(row[labelKey] ?? `Entry ${index + 1}`);
+
+  const addRow = () => {
+    const template = JSON.parse(JSON.stringify(entry.rowTemplate ?? {}));
+    onChange([...rows, template]);
+    setEditing(rows.length);
+  };
+
+  const deleteRow = (index: number) => {
+    onChange(rows.filter((_, i) => i !== index));
+    setConfirmDelete(null);
+  };
+
+  const saveRow = (index: number, next: Row) => {
+    onChange(rows.map((row, i) => (i === index ? next : row)));
+  };
+
+  return (
+    <Flex direction="column" gap="xxs" style={{ width: '100%' }}>
+      {rows.length > 6 && (
+        <TextInput
+          value={query}
+          onChange={(e) => setQuery(e.currentTarget.value)}
+          placeholder={`Filter ${entry.label.toLowerCase()}`}
+          leftSection={<Search size="1.4vh" color="rgba(255,255,255,0.35)" />}
+          rightSection={query ? (
+            <motion.button
+              type="button"
+              onClick={() => setQuery('')}
+              whileTap={{ scale: 0.85 }}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
+              }}
+              aria-label="Clear filter"
+            >
+              <X size="1.3vh" color="rgba(255,255,255,0.45)" />
+            </motion.button>
+          ) : null}
+          styles={{
+            input: {
+              background: alpha(theme.colors.dark[9], 0.7),
+              border: `0.1vh solid ${alpha(theme.colors.dark[4], 0.5)}`,
+              color: 'rgba(255,255,255,0.85)',
+              fontFamily: 'Akrobat SemiBold',
+              fontSize: '1.3vh',
+              height: '3vh',
+              minHeight: '3vh',
+              borderRadius: theme.radius.xs,
+              // matches the icon well, so the caret is not sitting on the glass
+              paddingLeft: '3.6vh',
+              paddingRight: '3.2vh',
+            },
+            section: { width: '3.6vh' },
+          }}
+          mb="xxs"
+        />
+      )}
+
+      {paged.map((index) => {
+        const row = rows[index];
+        return (
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            <Flex
+              align="center" gap="sm"
+              px="sm" py="xs"
+              style={{
+                background: alpha(theme.colors.dark[9], 0.5),
+                border: `0.1vh solid ${alpha(theme.colors.dark[5], 0.4)}`,
+                borderRadius: theme.radius.xs,
+              }}
+            >
+              {itemKey && <ItemArt name={String(row[itemKey] ?? '')} />}
+
+              <Flex direction="column" style={{ minWidth: '14vh', lineHeight: 1.15 }}>
+                <Text ff="Akrobat Bold" size="xs" c="rgba(255,255,255,0.88)" truncate>
+                  {rowTitle(row, index)}
+                </Text>
+                {itemKey && (
+                  <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.3)" truncate>
+                    {String(row[itemKey] ?? '')}
+                  </Text>
+                )}
+              </Flex>
+
+              {/* at-a-glance values so the list is readable without opening a row */}
+              <Flex align="center" gap="xs" wrap="wrap" style={{ flex: 1, minWidth: 0 }}>
+                {summaryColumns.map((column) => (
+                  <Flex key={column.key} align="center" gap="0.4vh">
+                    <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">{column.label}</Text>
+                    <Text ff="Akrobat Bold" size="xxs" c="rgba(255,255,255,0.7)">
+                      {formatCell(row[column.key], column)}
+                    </Text>
+                  </Flex>
+                ))}
+              </Flex>
+
+              <Flex align="center" gap="xxs" style={{ flexShrink: 0 }}>
+                <RowIconButton icon={Pencil} label="Edit" onClick={() => setEditing(index)} disabled={disabled} />
+                <RowIconButton icon={Trash2} label="Delete" danger onClick={() => setConfirmDelete(index)} disabled={disabled} />
+              </Flex>
+            </Flex>
+          </motion.div>
+        );
+      })}
+
+      {rows.length === 0 && (
+        <Flex align="center" justify="center" gap="xs" py="md"
+          style={{
+            border: `0.1vh dashed ${alpha(theme.colors.dark[4], 0.5)}`,
+            borderRadius: theme.radius.xs,
+          }}
+        >
+          <List size="1.6vh" color="rgba(255,255,255,0.25)" />
+          <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.3)">Nothing here yet</Text>
+        </Flex>
+      )}
+
+      {visible.length === 0 && rows.length > 0 && (
+        <Flex justify="center" py="sm">
+          <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.3)">No entry matches "{query}"</Text>
+        </Flex>
+      )}
+
+      {pageCount > 1 && (
+        <Flex align="center" justify="space-between" pt="xxs">
+          <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.35)">
+            {page * PAGE + 1}–{Math.min((page + 1) * PAGE, visible.length)} of {visible.length}
+          </Text>
+          <Flex gap="xxs">
+            <StudioButton label="Prev" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} />
+            <StudioButton label="Next" onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} disabled={page >= pageCount - 1} />
+          </Flex>
+        </Flex>
+      )}
+
+      <Flex pt="xxs">
+        <StudioButton label={`Add ${singular(entry.label)}`} icon={Plus} onClick={addRow} disabled={disabled} grow />
+      </Flex>
+
+      <AnimatePresence>
+        {editing !== null && rows[editing] && (
+          <RowModal
+            entry={entry}
+            resource={resource}
+            row={rows[editing]}
+            title={rowTitle(rows[editing], editing)}
+            disabled={disabled}
+            onSave={(next) => { saveRow(editing, next); setEditing(null); }}
+            onDelete={() => { setEditing(null); setConfirmDelete(editing); }}
+            onClose={() => setEditing(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {confirmDelete !== null && rows[confirmDelete] && (
+          <ConfirmModal
+            title={`Delete ${singular(entry.label).toLowerCase()}`}
+            description={`"${rowTitle(rows[confirmDelete], confirmDelete)}" is removed from ${entry.label} when you save.`}
+            confirmLabel="Delete"
+            onConfirm={() => deleteRow(confirmDelete)}
+            onClose={() => setConfirmDelete(null)}
+            zIndex={10200}
+          />
+        )}
+      </AnimatePresence>
+    </Flex>
+  );
+}
+
+function RowIconButton({
+  icon: Icon, label, onClick, disabled, danger,
+}: { icon: React.ElementType; label: string; onClick: () => void; disabled?: boolean; danger?: boolean }) {
+  const theme = useMantineTheme();
+  const accent = danger ? '#ef4444' : theme.colors[theme.primaryColor][5];
+
+  return (
+    <motion.button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      whileHover={disabled ? undefined : { background: alpha(accent, 0.16), borderColor: alpha(accent, 0.5) }}
+      whileTap={disabled ? undefined : { scale: 0.94 }}
+      style={{
+        aspectRatio: '1 / 1', height: '2.8vh',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'transparent',
+        border: `0.1vh solid ${alpha(theme.colors.dark[4], 0.55)}`,
+        borderRadius: theme.radius.xs,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        color: 'rgba(255,255,255,0.55)',
+        opacity: disabled ? 0.5 : 1,
+      }}
+      aria-label={label}
+    >
+      <Icon size="1.4vh" />
+    </motion.button>
+  );
+}
+
+function formatCell(value: unknown, column: SettingColumn): string {
+  if (value === null || value === undefined || value === '') return '-';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (column.type === 'coords') {
+    const c = value as { x?: number; y?: number };
+    return typeof c.x === 'number' ? `${c.x.toFixed(0)}, ${c.y?.toFixed(0)}` : '-';
+  }
+  if (column.type === 'enum') {
+    const match = column.options?.find((o) => o.value === value);
+    return match?.label ?? String(value);
+  }
+  return column.suffix ? `${value}${column.suffix}` : String(value);
+}
+
+function singular(label: string): string {
+  if (label.endsWith('ies')) return `${label.slice(0, -3)}y`;
+  if (label.endsWith('s')) return label.slice(0, -1);
+  return label;
+}

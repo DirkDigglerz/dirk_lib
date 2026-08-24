@@ -9,3 +9,10 @@ diag_report.json
 .DS_Store
 Thumbs.db
 *.swp
+
+# The dirk-ui-studio package. Locally this is a symlink to your working copy so
+# edits to the package show up here immediately; in CI the release workflow
+# checks the private repo out to this same path and builds it. Either way
+# web/package.json resolves it as `link:../.studio`, so the path is identical in
+# both places and nothing has to be rewritten at build time.
+.studio

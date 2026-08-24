@@ -1,0 +1,220 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "description": "dirk_loading settings. Designs are authored in the in-game studio (/dirk_loading) and stored here; the active design is handed to the loadscreen on connect via deferrals.handover. Everything else here is the CONTENT library \u2014 backgrounds, links, music, changelogs, players \u2014 which designs bind to as data sources. Nothing in the library assumes how it is laid out; that is the design's job.",
+  "properties": {
+    "activeDesignId": {
+      "type": "string",
+      "default": "dirk-default",
+      "description": "Id of the design shown on the loading screen. Set from the studio."
+    },
+    "designs": {
+      "type": "array",
+      "default": [],
+      "x-serverOnly": true,
+      "description": "The design library authored in the studio. Server-only \u2014 never broadcast to clients; only the active design reaches the loadscreen, via deferrals.handover. Empty by default: the web ships the shipped 'dirk-default' look, so a fresh install renders without any saved design.",
+      "items": {
+        "type": "object"
+      }
+    },
+    "settings": {
+      "type": "object",
+      "description": "Loading screen timings.",
+      "properties": {
+        "carouselTime": {
+          "type": "number",
+          "default": 8,
+          "description": "Seconds each background is shown before the next one fades in"
+        }
+      }
+    },
+    "backgrounds": {
+      "type": "array",
+      "description": "The background library. Each entry is one slide \u2014 a file that ships with the resource, or a full URL. Designs bind to this list; nothing here assumes how many are shown or how they are laid out.",
+      "default": [
+        {
+          "type": "image",
+          "src": "backgrounds/background_1.jpg"
+        },
+        {
+          "type": "image",
+          "src": "backgrounds/background_2.jpg"
+        },
+        {
+          "type": "image",
+          "src": "backgrounds/background_3.jpg"
+        }
+      ],
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video",
+              "youtube"
+            ],
+            "default": "image",
+            "description": "How the slide is rendered."
+          },
+          "src": {
+            "type": "string",
+            "description": "A path under web/build/assets (e.g. backgrounds/background_1.jpg) or a full URL."
+          },
+          "label": {
+            "type": "string",
+            "description": "Optional name, shown only in the settings list."
+          }
+        }
+      }
+    },
+    "links": {
+      "type": "array",
+      "description": "Community links. A design decides how these are shown \u2014 a row of buttons, a sidebar, one big Discord tile. The icon is only used to tell them apart in the settings list.",
+      "default": [
+        {
+          "title": "Discord",
+          "icon": "MessageCircle",
+          "url": ""
+        },
+        {
+          "title": "Store",
+          "icon": "ShoppingCart",
+          "url": ""
+        }
+      ],
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string",
+            "description": "Set from the preset when the link is created. Shown in the settings list so you can tell entries apart."
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "songs": {
+      "type": "array",
+      "description": "Background music playlist. `fileName` resolves to web/build/assets/music/<fileName> (or a full URL).",
+      "default": [
+        {
+          "title": "Real Love Baby",
+          "artist": "Father John Misty",
+          "fileName": "realLove.mp3",
+          "coverArt": "https://upload.wikimedia.org/wikipedia/en/f/f1/Father_John_Misty_-_Real_Love_Baby.jpg"
+        }
+      ],
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "artist": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string"
+          },
+          "coverArt": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "changelogs": {
+      "type": "array",
+      "description": "Changelog entries. A design binds these via a repeat (with a nested repeat over `entries`).",
+      "default": [],
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "addition",
+                    "change",
+                    "fix",
+                    "removal"
+                  ]
+                },
+                "content": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "tips": {
+      "type": "array",
+      "description": "Tips, rules or 'did you know' lines a design can rotate through. A design decides whether it shows them and how \u2014 this is just the pool.",
+      "default": [
+        {
+          "text": "Press F1 for the help menu."
+        },
+        {
+          "text": "Read the rules in Discord before you start."
+        },
+        {
+          "text": "Your character is saved automatically."
+        }
+      ],
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Optional heading, e.g. 'Did you know'."
+          },
+          "text": {
+            "type": "string",
+            "description": "The line itself."
+          }
+        }
+      }
+    },
+    "players": {
+      "type": "array",
+      "description": "Players of the month. Enter a Discord ID per player \u2014 the avatar is fetched server-side (src/server/players.lua) and injected as `img` before handover.",
+      "default": [],
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "discordId": {
+            "type": "string"
+          },
+          "votes": {
+            "type": "number"
+          },
+          "img": {
+            "type": "string",
+            "description": "Optional avatar URL. Overrides the Discord lookup \u2014 use it when no bot token is set."
+          }
+        }
+      }
+    }
+  }
+}

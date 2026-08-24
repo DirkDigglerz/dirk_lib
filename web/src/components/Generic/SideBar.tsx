@@ -16,7 +16,7 @@ type SideBarProps = {
 }
 
 // @ts-expect-error Mantine/Motion no likey
-const MotionBox = motion(Box)
+const MotionBox = motion.create(Box)
 
 function SideBar(props: SideBarProps) {
   const { menuOpen, setMenuOpen, escapeClose, onClose } = props

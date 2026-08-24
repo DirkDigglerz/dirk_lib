@@ -240,6 +240,107 @@ local function collectRegisteredConfigs(src)
   return list
 end
 
+-- ── Script Studio payload ─────────────────────────────────────────────────
+--
+-- One callback returns every script this player may edit, WITH its schema.
+--
+-- The schema is read here rather than shipped in each resource's `files{}`:
+-- dirk_lib's server can already `LoadResourceFile` any started resource, so
+-- adding the hub costs consumer scripts exactly nothing - no fxmanifest edit,
+-- no re-release. It also means a normal player never receives a schema at all;
+-- only the admin who opened the panel does.
+--
+-- VALUES are deliberately NOT included. Each consumer already registers a
+-- permission-gated `<resource>:getFullScriptConfig`, and the client calls those
+-- directly - so server-only values keep travelling through the one path that
+-- checks who is asking, instead of a new one that would have to re-implement
+-- the check.
+lib.callback.register('dirk_lib:getScriptStudio', function(source)
+  local out = {}
+  local total = GetNumResources()
+
+  local ctx
+  if source and source ~= 0 and not isMasterEditor(source) then
+    ctx = resolveMatchCtx(source)
+  end
+
+  for i = 0, total - 1 do
+    local name = GetResourceByFindIndex(i)
+    if name and GetResourceState(name) == 'started' and hasScriptConfigTag(name) then
+      if canEditResource(source, name, ctx) then
+        local rawSchema = LoadResourceFile(name, 'schema.json')
+        if rawSchema then
+          local ok, schema = pcall(json.decode, rawSchema)
+          if ok and type(schema) == 'table' then
+            -- A script NAMES ITSELF in its own schema. Hardcoding
+            -- `name == 'dirk_lib'` here was exactly the per-script knowledge
+            -- inside dirk_lib that this design exists to avoid - and it left
+            -- the shared layer showing as the raw resource name next to the
+            -- scripts it is shared BY.
+            out[#out + 1] = {
+              resource = name,
+              label    = schema['x-label'] or name,
+              icon     = schema['x-icon'] or 'sliders-horizontal',
+              version  = GetResourceMetadata(name, 'version', 0) or 'dev',
+              shared   = schema['x-shared'] == true,
+              schema   = schema,
+            }
+          end
+        end
+      end
+    end
+  end
+
+  -- dirk_lib's own settings are the shared layer every script consumes, so it
+  -- leads regardless of alphabetical order.
+  table.sort(out, function(a, b)
+    if a.shared ~= b.shared then return b.shared end
+    return a.resource < b.resource
+  end)
+
+  return out
+end)
+
+--- Open the hub for this player, optionally focused on one script.
+local function openScriptStudio(src, focus)
+  if not src or src == 0 then return end
+  TriggerClientEvent('dirk_lib:openScriptStudio', src, focus)
+end
+
+-- Every registered script keeps a `/resourceName` command, as it always had -
+-- it just lands in the hub with that script selected rather than opening a
+-- panel of its own. Customers' muscle memory and docs keep working.
+CreateThread(function()
+  Wait(2000)   -- let consumers register first
+  local registered = {}
+  local function registerResourceCommands()
+    local total = GetNumResources()
+    for i = 0, total - 1 do
+      local name = GetResourceByFindIndex(i)
+      if name and not registered[name] and GetResourceState(name) == 'started' and hasScriptConfigTag(name) then
+        registered[name] = true
+        lib.addCommand(name, {
+          help = ('Open %s settings in Script Studio'):format(name),
+        }, function(source)
+          if source == 0 then return end
+          if not canEditResource(source, name) then
+            lib.notify(source, { type = 'error', description = 'No access to that script\'s settings.' })
+            return
+          end
+          openScriptStudio(source, name)
+        end)
+      end
+    end
+  end
+
+  registerResourceCommands()
+  -- a script started later should get its command too
+  AddEventHandler('onResourceStart', function()
+    Wait(500)
+    registerResourceCommands()
+  end)
+end)
+
 lib.addCommand('dirk_config', {
   help = 'Open the Live Configurator to edit registered script configs',
 }, function(source)
@@ -267,7 +368,11 @@ lib.addCommand('dirk_config', {
     lib.notify(source, { type = 'error', description = 'No script configs available — check your access permissions.' })
     return
   end
-  TriggerClientEvent('dirk_lib:openScriptConfigChooser', source, list)
+  -- The chooser is retired: it listed scripts and then handed off to each
+  -- resource's own NUI. Script Studio draws them all, so this opens straight
+  -- into it. The old event handler is left in place for one release so a
+  -- consumer still calling it does not break.
+  openScriptStudio(source)
 end)
 
 RegisterNetEvent('dirk_lib:scriptConfigChooserPick', function(resourceName)
@@ -311,3 +416,4 @@ end)
 -- live entirely client-side now — convars replicate via `setr` and resource
 -- metadata is readable from a client NUI callback. See init.lua's
 -- GET_SCRIPT_CONFIG_MASTER_GROUP / GET_SCRIPT_CONFIG_RESOURCES handlers.)
+

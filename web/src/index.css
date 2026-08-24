@@ -33,3 +33,53 @@ code {
   width: 100% !important;
 }
 
+
+
+/* ── Script Studio ─────────────────────────────────────────────────────────
+   The settings pane is a long scroll, so its bar has to be grabbable. The
+   global 2px thumb suits small popovers but not this, hence a scoped rule
+   rather than widening every scrollbar in dirk_lib. */
+.studio-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.studio-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 0;
+}
+
+.studio-scroll::-webkit-scrollbar-thumb {
+  /* padding-box + transparent border insets the thumb without shrinking the
+     hit area, so it stays easy to grab while looking slim */
+  background: var(--mantine-primary-color-8);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 6px;
+}
+
+.studio-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--mantine-primary-color-6);
+  background-clip: padding-box;
+}
+
+.studio-scroll::-webkit-scrollbar-thumb:active {
+  background: var(--mantine-primary-color-5);
+  background-clip: padding-box;
+}
+
+
+/* ── Portal layering ───────────────────────────────────────────────────────
+   Mantine portals its dropdowns, popovers and tooltips to <body> at
+   --mantine-z-index-popover, which defaults to 300. Script Studio's panel sits
+   at 9990 and its modals at 10100-10300, so every portalled dropdown rendered
+   BEHIND them - including library components like FiveMKeyBindInput,
+   ModelSelect and AccountSelect, which expose no z-index prop of their own.
+
+   Raising the variables is the only fix that reaches those, and it keeps every
+   consumer of dirk_lib's NUI consistent instead of each surface patching it. */
+:root {
+  --mantine-z-index-modal: 10800;
+  --mantine-z-index-popover: 10800;
+  --mantine-z-index-overlay: 10700;
+  --mantine-z-index-max: 11000;
+}

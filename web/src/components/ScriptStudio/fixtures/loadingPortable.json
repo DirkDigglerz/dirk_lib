@@ -1,0 +1,4088 @@
+{
+  "kind": "loading",
+  "label": "Loading screen",
+  "dataSources": [
+    {
+      "key": "settings",
+      "label": "Settings",
+      "tokens": [
+        {
+          "key": "carouselTime",
+          "label": "Seconds per background",
+          "type": "number"
+        },
+        {
+          "key": "loadProgress",
+          "label": "Load progress %",
+          "type": "number"
+        },
+        {
+          "key": "backgroundCount",
+          "label": "Backgrounds — count",
+          "type": "number"
+        },
+        {
+          "key": "linkCount",
+          "label": "Links — count",
+          "type": "number"
+        },
+        {
+          "key": "songCount",
+          "label": "Songs — count",
+          "type": "number"
+        },
+        {
+          "key": "changelogCount",
+          "label": "Changelogs — count",
+          "type": "number"
+        },
+        {
+          "key": "tipCount",
+          "label": "Tips — count",
+          "type": "number"
+        },
+        {
+          "key": "playerCount",
+          "label": "Podium players — count",
+          "type": "number"
+        }
+      ],
+      "sample": [
+        {
+          "carouselTime": 8,
+          "loadProgress": 35,
+          "backgroundCount": 3,
+          "linkCount": 2,
+          "songCount": 1,
+          "changelogCount": 2,
+          "tipCount": 3,
+          "playerCount": 3
+        }
+      ],
+      "repeatable": false,
+      "scalar": false
+    },
+    {
+      "key": "server",
+      "label": "Server",
+      "tokens": [
+        {
+          "key": "name",
+          "label": "Server name",
+          "type": "string"
+        },
+        {
+          "key": "playerName",
+          "label": "Connecting player",
+          "type": "string"
+        },
+        {
+          "key": "online",
+          "label": "Players online",
+          "type": "number"
+        },
+        {
+          "key": "maxPlayers",
+          "label": "Slots",
+          "type": "number"
+        },
+        {
+          "key": "game",
+          "label": "Game",
+          "type": "string"
+        }
+      ],
+      "sample": [
+        {
+          "name": "DirkRP",
+          "playerName": "Dirk",
+          "online": 42,
+          "maxPlayers": 64,
+          "game": "fivem"
+        }
+      ],
+      "repeatable": false,
+      "scalar": false
+    },
+    {
+      "key": "tips",
+      "label": "Tips",
+      "tokens": [
+        {
+          "key": "title",
+          "label": "Heading",
+          "type": "string"
+        },
+        {
+          "key": "text",
+          "label": "Text",
+          "type": "string"
+        }
+      ],
+      "sample": [
+        {
+          "title": "Tip",
+          "text": "Press F1 for the help menu."
+        },
+        {
+          "title": "Tip",
+          "text": "Read the rules in Discord before you start."
+        },
+        {
+          "title": "Tip",
+          "text": "Your character is saved automatically."
+        }
+      ],
+      "repeatable": true,
+      "scalar": false
+    },
+    {
+      "key": "backgrounds",
+      "label": "Backgrounds",
+      "tokens": [
+        {
+          "key": "type",
+          "label": "Type",
+          "type": "enum",
+          "options": [
+            "image",
+            "video",
+            "youtube"
+          ]
+        },
+        {
+          "key": "src",
+          "label": "File, URL or YouTube link",
+          "type": "string"
+        }
+      ],
+      "sample": [
+        {
+          "type": "image",
+          "src": "backgrounds/background_1.jpg"
+        },
+        {
+          "type": "image",
+          "src": "backgrounds/background_2.jpg"
+        },
+        {
+          "type": "image",
+          "src": "backgrounds/background_3.jpg"
+        }
+      ],
+      "repeatable": true,
+      "scalar": false
+    },
+    {
+      "key": "player",
+      "label": "Music player",
+      "tokens": [
+        {
+          "key": "playing",
+          "label": "Playing",
+          "type": "boolean"
+        },
+        {
+          "key": "muted",
+          "label": "Muted",
+          "type": "boolean"
+        },
+        {
+          "key": "volume",
+          "label": "Volume %",
+          "type": "number"
+        },
+        {
+          "key": "progress",
+          "label": "Progress %",
+          "type": "number"
+        },
+        {
+          "key": "elapsed",
+          "label": "Elapsed",
+          "type": "string"
+        },
+        {
+          "key": "duration",
+          "label": "Duration",
+          "type": "string"
+        },
+        {
+          "key": "index",
+          "label": "Track number",
+          "type": "number"
+        },
+        {
+          "key": "title",
+          "label": "Track title",
+          "type": "string"
+        },
+        {
+          "key": "artist",
+          "label": "Track artist",
+          "type": "string"
+        },
+        {
+          "key": "coverArt",
+          "label": "Track cover art",
+          "type": "string"
+        }
+      ],
+      "sample": [
+        {
+          "playing": false,
+          "muted": false,
+          "volume": 100,
+          "progress": 35,
+          "elapsed": "01:12",
+          "duration": "03:24",
+          "index": 0,
+          "title": "Real Love Baby",
+          "artist": "Father John Misty",
+          "coverArt": "https://upload.wikimedia.org/wikipedia/en/f/f1/Father_John_Misty_-_Real_Love_Baby.jpg"
+        }
+      ],
+      "repeatable": false,
+      "scalar": false
+    },
+    {
+      "key": "links",
+      "label": "Links",
+      "tokens": [
+        {
+          "key": "title",
+          "label": "Title",
+          "type": "string"
+        },
+        {
+          "key": "icon",
+          "label": "Icon (Lucide name)",
+          "type": "string"
+        },
+        {
+          "key": "url",
+          "label": "URL",
+          "type": "string"
+        }
+      ],
+      "sample": [
+        {
+          "title": "Discord",
+          "icon": "MessageCircle",
+          "url": "https://discord.gg/example"
+        },
+        {
+          "title": "Store",
+          "icon": "ShoppingCart",
+          "url": "https://store.example.com"
+        }
+      ],
+      "repeatable": true,
+      "scalar": false
+    },
+    {
+      "key": "songs",
+      "label": "Songs",
+      "tokens": [
+        {
+          "key": "title",
+          "label": "Title",
+          "type": "string"
+        },
+        {
+          "key": "artist",
+          "label": "Artist",
+          "type": "string"
+        },
+        {
+          "key": "fileName",
+          "label": "File name",
+          "type": "string"
+        },
+        {
+          "key": "coverArt",
+          "label": "Cover art URL",
+          "type": "string"
+        }
+      ],
+      "sample": [
+        {
+          "title": "Real Love Baby",
+          "artist": "Father John Misty",
+          "fileName": "realLove.mp3",
+          "coverArt": "https://upload.wikimedia.org/wikipedia/en/f/f1/Father_John_Misty_-_Real_Love_Baby.jpg"
+        }
+      ],
+      "repeatable": true,
+      "scalar": false
+    },
+    {
+      "key": "changelogs",
+      "label": "Changelogs",
+      "tokens": [
+        {
+          "key": "title",
+          "label": "Title",
+          "type": "string"
+        },
+        {
+          "key": "date",
+          "label": "Date",
+          "type": "string"
+        },
+        {
+          "key": "entries",
+          "label": "Entries",
+          "type": "list"
+        }
+      ],
+      "sample": [
+        {
+          "title": "Update 1.2",
+          "date": "2026-07-24",
+          "entries": [
+            {
+              "type": "addition",
+              "content": "Added a music player with search and playlists."
+            },
+            {
+              "type": "addition",
+              "content": "Top players of the month now show on the podium."
+            },
+            {
+              "type": "change",
+              "content": "Rebuilt the loading screen on the new studio."
+            },
+            {
+              "type": "fix",
+              "content": "Fixed the changelog arrows skipping an entry."
+            }
+          ]
+        },
+        {
+          "title": "Update 1.1",
+          "date": "2026-07-12",
+          "entries": [
+            {
+              "type": "addition",
+              "content": "Background slideshow supports video and YouTube."
+            },
+            {
+              "type": "change",
+              "content": "Improved loading times and UI responsiveness."
+            },
+            {
+              "type": "fix",
+              "content": "Fixed minor bugs in the audio player."
+            }
+          ]
+        },
+        {
+          "title": "Update 1.0",
+          "date": "2026-07-01",
+          "entries": [
+            {
+              "type": "addition",
+              "content": "Initial release."
+            },
+            {
+              "type": "change",
+              "content": "Tuned the default theme."
+            }
+          ]
+        }
+      ],
+      "repeatable": true,
+      "scalar": false
+    },
+    {
+      "key": "players",
+      "label": "Players of the month",
+      "tokens": [
+        {
+          "key": "name",
+          "label": "Name",
+          "type": "string"
+        },
+        {
+          "key": "discordId",
+          "label": "Discord ID",
+          "type": "string"
+        },
+        {
+          "key": "img",
+          "label": "Avatar",
+          "type": "image"
+        },
+        {
+          "key": "votes",
+          "label": "Votes",
+          "type": "number"
+        },
+        {
+          "key": "rank",
+          "label": "Rank",
+          "type": "number"
+        }
+      ],
+      "sample": [
+        {
+          "name": "John Doe",
+          "discordId": "223456789012345678",
+          "img": "https://i.pravatar.cc/160?img=33",
+          "votes": 80,
+          "rank": 2
+        },
+        {
+          "name": "Dirk Digger",
+          "discordId": "123456789012345678",
+          "img": "https://i.pravatar.cc/160?img=12",
+          "votes": 100,
+          "rank": 1
+        },
+        {
+          "name": "Jane Smith",
+          "discordId": "323456789012345678",
+          "img": "https://i.pravatar.cc/160?img=45",
+          "votes": 60,
+          "rank": 3
+        }
+      ],
+      "repeatable": true,
+      "scalar": false
+    }
+  ],
+  "actions": [
+    {
+      "key": "goto",
+      "label": "Go to page",
+      "needsPage": true
+    },
+    {
+      "key": "openLink",
+      "label": "Open a link"
+    },
+    {
+      "key": "continue",
+      "label": "Continue — shut the loading screen"
+    },
+    {
+      "key": "togglePlay",
+      "label": "Play / pause music"
+    },
+    {
+      "key": "nextSong",
+      "label": "Next song"
+    },
+    {
+      "key": "prevSong",
+      "label": "Previous song"
+    },
+    {
+      "key": "playSong",
+      "label": "Play a specific track"
+    },
+    {
+      "key": "toggleMute",
+      "label": "Mute / unmute"
+    },
+    {
+      "key": "seek",
+      "label": "Seek to position"
+    },
+    {
+      "key": "setVolume",
+      "label": "Set music volume"
+    }
+  ],
+  "fonts": [
+    {
+      "key": "display",
+      "label": "Display",
+      "css": "\"Rajdhani\", \"Oswald\", system-ui, sans-serif"
+    },
+    {
+      "key": "sans",
+      "label": "Sans",
+      "css": "system-ui, sans-serif"
+    },
+    {
+      "key": "mono",
+      "label": "Mono",
+      "css": "ui-monospace, monospace"
+    }
+  ],
+  "iconSets": [
+    {
+      "id": "lucide",
+      "label": "Lucide",
+      "names": [
+        "BookOpen",
+        "ChevronLeft",
+        "ChevronRight",
+        "Crown",
+        "ExternalLink",
+        "Music",
+        "PanelLeft",
+        "Pause",
+        "Pencil",
+        "Play",
+        "Plus",
+        "SkipBack",
+        "SkipForward",
+        "Trash2",
+        "User",
+        "Volume2",
+        "VolumeX"
+      ]
+    }
+  ],
+  "components": [],
+  "images": {
+    "backgrounds/background_1.jpg": "http://127.0.0.1:3011/assets/backgrounds/background_1.jpg",
+    "backgrounds/background_2.jpg": "http://127.0.0.1:3011/assets/backgrounds/background_2.jpg",
+    "backgrounds/background_3.jpg": "http://127.0.0.1:3011/assets/backgrounds/background_3.jpg",
+    "logo.png": "http://127.0.0.1:3011/assets/logo.png",
+    "https://i.pravatar.cc/160?img=33": "https://i.pravatar.cc/160?img=33",
+    "https://i.pravatar.cc/160?img=12": "https://i.pravatar.cc/160?img=12",
+    "https://i.pravatar.cc/160?img=45": "https://i.pravatar.cc/160?img=45",
+    "https://upload.wikimedia.org/wikipedia/en/f/f1/Father_John_Misty_-_Real_Love_Baby.jpg": "https://upload.wikimedia.org/wikipedia/en/f/f1/Father_John_Misty_-_Real_Love_Baby.jpg"
+  },
+  "strings": {
+    "Greeting": "Welcome back, {server.playerName}",
+    "LoadingPercent": "Loading · {settings.loadProgress}%",
+    "NowPlaying": "Now playing",
+    "PlayersOnline": "{server.online} / {server.maxPlayers}",
+    "PlayersOnlineLong": "{server.online} online"
+  },
+  "designs": [
+    {
+      "v": 1,
+      "id": "dirk-default",
+      "name": "DirkScripts Default",
+      "kind": "loading",
+      "pages": [
+        {
+          "id": "main",
+          "label": "Loading"
+        }
+      ],
+      "elements": [
+        {
+          "id": "bg_bg",
+          "type": "frame",
+          "parent": null,
+          "name": "Background",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "fill": "solid",
+          "fillColour": "#000000",
+          "radius": 0,
+          "clip": true,
+          "constraintX": "stretch",
+          "constraintY": "stretch",
+          "cycle": true,
+          "source": "backgrounds",
+          "cycleMs": "{settings.carouselTime}",
+          "cycleFadeMs": 1600
+        },
+        {
+          "id": "bg_bgImage",
+          "type": "frame",
+          "parent": "bg_bg",
+          "name": "Slide image",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "fill": "image",
+          "img": "{src}",
+          "overlay": false,
+          "radius": 0,
+          "conditions": [
+            {
+              "field": "type",
+              "op": "ne",
+              "value": "image",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "bg_bgVideo",
+          "type": "video",
+          "parent": "bg_bg",
+          "name": "Slide video",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "video": "{src}",
+          "videoFit": "cover",
+          "radius": 0,
+          "conditions": [
+            {
+              "field": "type",
+              "op": "eq",
+              "value": "image",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "bg_bgScrim",
+          "type": "frame",
+          "parent": null,
+          "name": "Darken",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "fill": "solid",
+          "fillColour": "#000000/0",
+          "radius": 0,
+          "constraintX": "stretch",
+          "constraintY": "stretch"
+        },
+        {
+          "id": "image_1",
+          "type": "image",
+          "name": "Logo",
+          "x": 728,
+          "y": 18,
+          "w": 144,
+          "h": 144,
+          "fill": "image",
+          "img": "logo.png",
+          "overlay": false,
+          "radius": 3,
+          "constraintX": "center",
+          "effects": [
+            {
+              "type": "dropShadow",
+              "x": 0,
+              "y": 0,
+              "blur": 18,
+              "spread": 0,
+              "colour": "primary.9/50"
+            }
+          ]
+        },
+        {
+          "id": "pom_pod",
+          "type": "frame",
+          "parent": null,
+          "name": "Podium",
+          "x": 29,
+          "y": 46,
+          "w": 321,
+          "h": 113,
+          "fill": "none",
+          "radius": 0,
+          "conditions": [
+            {
+              "field": "ui.players",
+              "op": "truthy",
+              "changes": {
+                "moveX": -369
+              },
+              "changeAnim": {
+                "moveX": {
+                  "ms": 300,
+                  "ease": "easeInOut"
+                }
+              }
+            },
+            {
+              "field": "settings.playerCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "pom_podCard",
+          "type": "frame",
+          "parent": "pom_pod",
+          "name": "Player card",
+          "x": 0,
+          "y": 0,
+          "w": 90,
+          "h": 90,
+          "fill": "image",
+          "img": "{img}",
+          "overlay": true,
+          "radius": 3,
+          "clip": true,
+          "repeat": true,
+          "source": "players",
+          "direction": "row",
+          "gap": 14,
+          "selectedIndex": 1,
+          "selectedW": 113,
+          "selectedH": 113,
+          "hoverChanges": {
+            "scale": 105
+          },
+          "hoverDuration": 300
+        },
+        {
+          "id": "pom_podCrown",
+          "type": "icon",
+          "parent": "pom_podCard",
+          "name": "Crown",
+          "x": 9,
+          "y": 5,
+          "w": 16,
+          "h": 16,
+          "icon": "Crown",
+          "iconSet": "lucide",
+          "colour": "#CD7F32",
+          "conditions": [
+            {
+              "field": "rank",
+              "op": "eq",
+              "value": "1",
+              "changes": {
+                "colour": "#FFD700"
+              }
+            },
+            {
+              "field": "rank",
+              "op": "eq",
+              "value": "2",
+              "changes": {
+                "colour": "#C0C0C0"
+              }
+            }
+          ]
+        },
+        {
+          "id": "pom_podBanner",
+          "type": "frame",
+          "parent": "pom_podCard",
+          "name": "Name banner",
+          "x": 0,
+          "y": 67,
+          "w": 90,
+          "h": 23,
+          "fill": "solid",
+          "fillColour": "rgba(0,0,0,0.6)",
+          "radius": 0,
+          "constraintX": "stretch",
+          "constraintY": "max"
+        },
+        {
+          "id": "pom_podName",
+          "type": "text",
+          "parent": "pom_podBanner",
+          "name": "Name",
+          "x": 0,
+          "y": 5,
+          "w": 90,
+          "h": 13,
+          "content": "{name}",
+          "fontSize": 9,
+          "colour": "#ffffff",
+          "font": "sans",
+          "fontWeight": 600,
+          "align": "center",
+          "textTransform": "uppercase",
+          "letterSpacing": 0.2,
+          "constraintX": "stretch"
+        },
+        {
+          "id": "players_popout",
+          "type": "frame",
+          "parent": null,
+          "name": "Popout section",
+          "x": 9,
+          "y": 9,
+          "w": 360,
+          "h": 30,
+          "fill": "none",
+          "radius": 0,
+          "conditions": [
+            {
+              "field": "ui.players",
+              "op": "truthy",
+              "changes": {
+                "moveX": -369
+              },
+              "changeAnim": {
+                "moveX": {
+                  "ms": 300,
+                  "ease": "easeInOut"
+                }
+              }
+            },
+            {
+              "field": "settings.playerCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "players_bar",
+          "type": "frame",
+          "parent": "players_popout",
+          "name": "Bar",
+          "x": 0,
+          "y": 0,
+          "w": 360,
+          "h": 30,
+          "fill": "solid",
+          "fillColour": "rgba(0,0,0,0.5)",
+          "radius": 3,
+          "conditions": [
+            {
+              "field": "settings.playerCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "players_barTitle",
+          "type": "text",
+          "parent": "players_bar",
+          "name": "Title",
+          "x": 0,
+          "y": 5,
+          "w": 360,
+          "h": 21,
+          "content": "Top Players",
+          "fontSize": 14,
+          "colour": "#8d8d8d",
+          "font": "sans",
+          "fontWeight": 700,
+          "align": "center",
+          "textTransform": "uppercase",
+          "letterSpacing": 0.2,
+          "conditions": [
+            {
+              "field": "settings.playerCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "players_barTab",
+          "type": "frame",
+          "parent": "players_popout",
+          "name": "Tab",
+          "x": 365,
+          "y": 60,
+          "w": 31,
+          "h": 31,
+          "fill": "solid",
+          "fillColour": "rgba(0,0,0,0.5)",
+          "radius": 3,
+          "clip": true,
+          "cursor": "pointer",
+          "shimmer": "hover",
+          "hoverChanges": {
+            "fillColour": "primary.9/35"
+          },
+          "hoverDuration": 180,
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "togglePanel",
+                "target": "players"
+              }
+            ]
+          },
+          "conditions": [
+            {
+              "field": "settings.playerCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "players_barTabIcon",
+          "type": "icon",
+          "parent": "players_barTab",
+          "name": "Tab icon",
+          "x": 9,
+          "y": 9,
+          "w": 14,
+          "h": 14,
+          "icon": "Crown",
+          "iconSet": "lucide",
+          "colour": "rgba(255,255,255,0.8)",
+          "conditions": [
+            {
+              "field": "settings.playerCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "cl_cl",
+          "type": "frame",
+          "parent": null,
+          "name": "Changelog",
+          "x": 1276,
+          "y": 46,
+          "w": 315,
+          "h": 327,
+          "fill": "none",
+          "radius": 0,
+          "cycle": true,
+          "source": "changelogs",
+          "hugH": true,
+          "conditions": [
+            {
+              "field": "ui.changelog",
+              "op": "truthy",
+              "changes": {
+                "moveX": 324
+              },
+              "changeAnim": {
+                "moveX": {
+                  "ms": 300,
+                  "ease": "easeInOut"
+                }
+              }
+            },
+            {
+              "field": "settings.changelogCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "cl_clNav",
+          "type": "frame",
+          "parent": "cl_cl",
+          "name": "Nav row",
+          "x": 0,
+          "y": 0,
+          "w": 315,
+          "h": 50,
+          "fill": "solid",
+          "fillColour": "rgba(0,0,0,0.5)",
+          "radius": 3
+        },
+        {
+          "id": "cl_clPrev",
+          "type": "button",
+          "parent": "cl_clNav",
+          "name": "Previous",
+          "x": 7,
+          "y": 18,
+          "w": 14,
+          "h": 14,
+          "fill": "none",
+          "colour": "rgba(255,255,255,0.8)",
+          "icon": "ChevronLeft",
+          "iconSet": "lucide",
+          "label": "",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "cyclePrev"
+              }
+            ]
+          },
+          "cursor": "pointer",
+          "hover": "brighten",
+          "hoverAmount": 40
+        },
+        {
+          "id": "cl_clTitle",
+          "type": "text",
+          "parent": "cl_clNav",
+          "name": "Release",
+          "x": 27,
+          "y": 9,
+          "w": 261,
+          "h": 18,
+          "content": "{title}",
+          "fontSize": 14,
+          "colour": "rgba(255,255,255,0.8)",
+          "font": "sans",
+          "fontWeight": 700,
+          "align": "center",
+          "letterSpacing": 0.067
+        },
+        {
+          "id": "cl_clDate",
+          "type": "text",
+          "parent": "cl_clNav",
+          "name": "Date",
+          "x": 27,
+          "y": 27,
+          "w": 261,
+          "h": 14,
+          "content": "{date}",
+          "fontSize": 11,
+          "colour": "#8d8d8d",
+          "font": "sans",
+          "fontWeight": 400,
+          "align": "center"
+        },
+        {
+          "id": "cl_clNext",
+          "type": "button",
+          "parent": "cl_clNav",
+          "name": "Next",
+          "x": 294,
+          "y": 18,
+          "w": 14,
+          "h": 14,
+          "fill": "none",
+          "colour": "rgba(255,255,255,0.8)",
+          "icon": "ChevronRight",
+          "iconSet": "lucide",
+          "label": "",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "cycleNext"
+              }
+            ]
+          },
+          "cursor": "pointer",
+          "hover": "brighten",
+          "hoverAmount": 40
+        },
+        {
+          "id": "cl_clList",
+          "type": "frame",
+          "parent": "cl_cl",
+          "name": "Entries",
+          "x": 0,
+          "y": 57,
+          "w": 315,
+          "h": 270,
+          "fill": "solid",
+          "fillColour": "rgba(0,0,0,0.5)",
+          "radius": 3,
+          "scroll": true,
+          "hugH": true,
+          "minH": 54,
+          "maxH": 270
+        },
+        {
+          "id": "cl_clEntry",
+          "type": "frame",
+          "parent": "cl_clList",
+          "name": "Entry",
+          "x": 7,
+          "y": 7,
+          "w": 301,
+          "h": 23,
+          "fill": "none",
+          "repeat": true,
+          "source": "entries",
+          "direction": "col",
+          "gap": 7
+        },
+        {
+          "id": "cl_clBadge",
+          "type": "frame",
+          "parent": "cl_clEntry",
+          "name": "Badge",
+          "x": 0,
+          "y": 0,
+          "w": 23,
+          "h": 23,
+          "fill": "solid",
+          "fillColour": "rgba(26,120,26,0.3)",
+          "radius": 3,
+          "conditions": [
+            {
+              "field": "type",
+              "op": "eq",
+              "value": "change",
+              "changes": {
+                "fillColour": "rgba(19,42,133,0.46)"
+              }
+            },
+            {
+              "field": "type",
+              "op": "eq",
+              "value": "fix",
+              "changes": {
+                "fillColour": "rgba(255,0,0,0.3)"
+              }
+            }
+          ]
+        },
+        {
+          "id": "cl_clAdd",
+          "type": "icon",
+          "parent": "cl_clEntry",
+          "name": "Added",
+          "x": 6,
+          "y": 6,
+          "w": 11,
+          "h": 11,
+          "icon": "Plus",
+          "iconSet": "lucide",
+          "colour": "rgba(255,255,255,0.8)",
+          "conditions": [
+            {
+              "field": "type",
+              "op": "ne",
+              "value": "addition",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "cl_clChg",
+          "type": "icon",
+          "parent": "cl_clEntry",
+          "name": "Changed",
+          "x": 6,
+          "y": 6,
+          "w": 11,
+          "h": 11,
+          "icon": "Pencil",
+          "iconSet": "lucide",
+          "colour": "rgba(255,255,255,0.8)",
+          "conditions": [
+            {
+              "field": "type",
+              "op": "ne",
+              "value": "change",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "cl_clFix",
+          "type": "icon",
+          "parent": "cl_clEntry",
+          "name": "Fixed",
+          "x": 6,
+          "y": 6,
+          "w": 11,
+          "h": 11,
+          "icon": "Trash2",
+          "iconSet": "lucide",
+          "colour": "rgba(255,255,255,0.8)",
+          "conditions": [
+            {
+              "field": "type",
+              "op": "ne",
+              "value": "fix",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "cl_clText",
+          "type": "text",
+          "parent": "cl_clEntry",
+          "name": "Entry text",
+          "x": 28,
+          "y": 0,
+          "w": 273,
+          "h": 23,
+          "content": "{content}",
+          "fontSize": 11,
+          "colour": "rgba(255,255,255,0.8)",
+          "font": "sans",
+          "fontWeight": 500,
+          "letterSpacing": 0.083
+        },
+        {
+          "id": "changelog_popout",
+          "type": "frame",
+          "parent": null,
+          "name": "Popout section",
+          "x": 1276,
+          "y": 9,
+          "w": 315,
+          "h": 30,
+          "fill": "none",
+          "radius": 0,
+          "conditions": [
+            {
+              "field": "ui.changelog",
+              "op": "truthy",
+              "changes": {
+                "moveX": 324
+              },
+              "changeAnim": {
+                "moveX": {
+                  "ms": 300,
+                  "ease": "easeInOut"
+                }
+              }
+            },
+            {
+              "field": "settings.changelogCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "changelog_bar",
+          "type": "frame",
+          "parent": "changelog_popout",
+          "name": "Bar",
+          "x": 0,
+          "y": 0,
+          "w": 315,
+          "h": 30,
+          "fill": "solid",
+          "fillColour": "rgba(0,0,0,0.5)",
+          "radius": 3,
+          "conditions": [
+            {
+              "field": "settings.changelogCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "changelog_barTitle",
+          "type": "text",
+          "parent": "changelog_bar",
+          "name": "Title",
+          "x": 0,
+          "y": 5,
+          "w": 315,
+          "h": 21,
+          "content": "Changelog",
+          "fontSize": 14,
+          "colour": "#8d8d8d",
+          "font": "sans",
+          "fontWeight": 700,
+          "align": "center",
+          "textTransform": "uppercase",
+          "letterSpacing": 0.2,
+          "conditions": [
+            {
+              "field": "settings.changelogCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "changelog_barTab",
+          "type": "frame",
+          "parent": "changelog_popout",
+          "name": "Tab",
+          "x": -36,
+          "y": 95,
+          "w": 31,
+          "h": 31,
+          "fill": "solid",
+          "fillColour": "rgba(0,0,0,0.5)",
+          "radius": 3,
+          "clip": true,
+          "cursor": "pointer",
+          "shimmer": "hover",
+          "hoverChanges": {
+            "fillColour": "primary.9/35"
+          },
+          "hoverDuration": 180,
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "togglePanel",
+                "target": "changelog"
+              }
+            ]
+          },
+          "conditions": [
+            {
+              "field": "settings.changelogCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "changelog_barTabIcon",
+          "type": "icon",
+          "parent": "changelog_barTab",
+          "name": "Tab icon",
+          "x": 9,
+          "y": 9,
+          "w": 14,
+          "h": 14,
+          "icon": "BookOpen",
+          "iconSet": "lucide",
+          "colour": "rgba(255,255,255,0.8)",
+          "conditions": [
+            {
+              "field": "settings.changelogCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "au_mp",
+          "type": "frame",
+          "parent": null,
+          "name": "Music",
+          "x": 9,
+          "y": 724,
+          "w": 360,
+          "h": 167,
+          "fill": "none",
+          "radius": 0,
+          "conditions": [
+            {
+              "field": "ui.music",
+              "op": "truthy",
+              "changes": {
+                "moveX": -369
+              },
+              "changeAnim": {
+                "moveX": {
+                  "ms": 300,
+                  "ease": "easeInOut"
+                }
+              }
+            },
+            {
+              "field": "settings.songCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "au_np",
+          "type": "frame",
+          "parent": "au_mp",
+          "name": "Now playing",
+          "x": 0,
+          "y": 0,
+          "w": 360,
+          "h": 118,
+          "fill": "solid",
+          "fillColour": "rgba(0,0,0,0.5)",
+          "radius": 3,
+          "cycle": true,
+          "source": "songs"
+        },
+        {
+          "id": "au_npCover",
+          "type": "frame",
+          "parent": "au_np",
+          "name": "Cover",
+          "x": 14,
+          "y": 14,
+          "w": 90,
+          "h": 90,
+          "fill": "image",
+          "img": "{coverArt}",
+          "overlay": false,
+          "radius": 5,
+          "opacity": 60
+        },
+        {
+          "id": "au_npTitle",
+          "type": "text",
+          "parent": "au_np",
+          "name": "Track",
+          "x": 118,
+          "y": 14,
+          "w": 228,
+          "h": 25,
+          "content": "{title}",
+          "fontSize": 20,
+          "colour": "#ffffff",
+          "font": "sans",
+          "fontWeight": 500
+        },
+        {
+          "id": "au_npArtist",
+          "type": "text",
+          "parent": "au_np",
+          "name": "Artist",
+          "x": 118,
+          "y": 39,
+          "w": 228,
+          "h": 18,
+          "content": "{artist}",
+          "fontSize": 14,
+          "colour": "#8d8d8d",
+          "font": "sans",
+          "fontWeight": 400
+        },
+        {
+          "id": "au_npBar",
+          "type": "slider",
+          "parent": "au_np",
+          "name": "Progress",
+          "x": 118,
+          "y": 66,
+          "w": 178,
+          "h": 4,
+          "val": 0,
+          "fillColour": "primary.6",
+          "radius": 2,
+          "cursor": "pointer",
+          "bindings": {
+            "val": "player.progress"
+          },
+          "events": {
+            "change": [
+              {
+                "type": "do",
+                "action": "seek",
+                "params": {
+                  "value": "{value}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "au_npTime",
+          "type": "text",
+          "parent": "au_np",
+          "name": "Elapsed",
+          "x": 301,
+          "y": 61,
+          "w": 45,
+          "h": 18,
+          "content": "{player.elapsed}",
+          "fontSize": 14,
+          "colour": "#8d8d8d",
+          "font": "sans",
+          "align": "right"
+        },
+        {
+          "id": "au_npPrev",
+          "type": "button",
+          "parent": "au_np",
+          "name": "Previous",
+          "x": 185,
+          "y": 84,
+          "w": 27,
+          "h": 27,
+          "fill": "none",
+          "colour": "rgba(255,255,255,0.5)",
+          "icon": "SkipBack",
+          "iconSet": "lucide",
+          "label": "",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "prevSong"
+              },
+              {
+                "type": "do",
+                "action": "cyclePrev"
+              }
+            ]
+          },
+          "cursor": "pointer",
+          "hover": "brighten",
+          "hoverAmount": 60
+        },
+        {
+          "id": "au_npPause",
+          "type": "button",
+          "parent": "au_np",
+          "name": "Pause",
+          "x": 219,
+          "y": 84,
+          "w": 27,
+          "h": 27,
+          "fill": "none",
+          "colour": "rgba(255,255,255,0.8)",
+          "icon": "Pause",
+          "iconSet": "lucide",
+          "label": "",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "togglePlay"
+              }
+            ]
+          },
+          "cursor": "pointer",
+          "hover": "brighten",
+          "hoverAmount": 60,
+          "conditions": [
+            {
+              "field": "player.playing",
+              "op": "falsy",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "au_npPlay",
+          "type": "button",
+          "parent": "au_np",
+          "name": "Play",
+          "x": 219,
+          "y": 84,
+          "w": 27,
+          "h": 27,
+          "fill": "none",
+          "colour": "rgba(255,255,255,0.8)",
+          "icon": "Play",
+          "iconSet": "lucide",
+          "label": "",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "togglePlay"
+              }
+            ]
+          },
+          "cursor": "pointer",
+          "hover": "brighten",
+          "hoverAmount": 60,
+          "conditions": [
+            {
+              "field": "player.playing",
+              "op": "truthy",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "au_npNext",
+          "type": "button",
+          "parent": "au_np",
+          "name": "Next",
+          "x": 253,
+          "y": 84,
+          "w": 27,
+          "h": 27,
+          "fill": "none",
+          "colour": "rgba(255,255,255,0.5)",
+          "icon": "SkipForward",
+          "iconSet": "lucide",
+          "label": "",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "nextSong"
+              },
+              {
+                "type": "do",
+                "action": "cycleNext"
+              }
+            ]
+          },
+          "cursor": "pointer",
+          "hover": "brighten",
+          "hoverAmount": 60
+        },
+        {
+          "id": "au_vol",
+          "type": "frame",
+          "parent": "au_mp",
+          "name": "Volume row",
+          "x": 0,
+          "y": 125,
+          "w": 360,
+          "h": 42,
+          "fill": "solid",
+          "fillColour": "rgba(0,0,0,0.5)",
+          "radius": 3
+        },
+        {
+          "id": "au_volMute",
+          "type": "frame",
+          "parent": "au_vol",
+          "name": "Mute",
+          "x": 7,
+          "y": 7,
+          "w": 28,
+          "h": 28,
+          "fill": "solid",
+          "fillColour": "rgba(77,77,77,0.3)",
+          "radius": 3,
+          "cursor": "pointer",
+          "clip": true,
+          "shimmer": "hover",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "toggleMute"
+              }
+            ]
+          }
+        },
+        {
+          "id": "au_volOn",
+          "type": "icon",
+          "parent": "au_volMute",
+          "name": "Sound on",
+          "x": 7,
+          "y": 7,
+          "w": 14,
+          "h": 14,
+          "icon": "Volume2",
+          "iconSet": "lucide",
+          "colour": "rgba(255,255,255,0.8)",
+          "conditions": [
+            {
+              "field": "player.muted",
+              "op": "truthy",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "au_volOff",
+          "type": "icon",
+          "parent": "au_volMute",
+          "name": "Sound off",
+          "x": 7,
+          "y": 7,
+          "w": 14,
+          "h": 14,
+          "icon": "VolumeX",
+          "iconSet": "lucide",
+          "colour": "rgba(255,255,255,0.8)",
+          "conditions": [
+            {
+              "field": "player.muted",
+              "op": "falsy",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "au_volBar",
+          "type": "slider",
+          "parent": "au_vol",
+          "name": "Volume",
+          "x": 49,
+          "y": 18,
+          "w": 297,
+          "h": 6,
+          "val": 100,
+          "fillColour": "primary.6",
+          "radius": 3,
+          "bindings": {
+            "val": "player.volume"
+          },
+          "events": {
+            "change": [
+              {
+                "type": "do",
+                "action": "setVolume",
+                "params": {
+                  "value": "{value}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "music_popout",
+          "type": "frame",
+          "parent": null,
+          "name": "Popout section",
+          "x": 9,
+          "y": 724,
+          "w": 360,
+          "h": 30,
+          "fill": "none",
+          "radius": 0,
+          "conditions": [
+            {
+              "field": "ui.music",
+              "op": "truthy",
+              "changes": {
+                "moveX": -369
+              },
+              "changeAnim": {
+                "moveX": {
+                  "ms": 300,
+                  "ease": "easeInOut"
+                }
+              }
+            },
+            {
+              "field": "settings.songCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "music_barTab",
+          "type": "frame",
+          "parent": "music_popout",
+          "name": "Tab",
+          "x": 365,
+          "y": 68,
+          "w": 31,
+          "h": 31,
+          "fill": "solid",
+          "fillColour": "rgba(0,0,0,0.5)",
+          "radius": 3,
+          "clip": true,
+          "cursor": "pointer",
+          "shimmer": "hover",
+          "hoverChanges": {
+            "fillColour": "primary.9/35"
+          },
+          "hoverDuration": 180,
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "togglePanel",
+                "target": "music"
+              }
+            ]
+          },
+          "conditions": [
+            {
+              "field": "settings.songCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "music_barTabIcon",
+          "type": "icon",
+          "parent": "music_barTab",
+          "name": "Tab icon",
+          "x": 9,
+          "y": 9,
+          "w": 14,
+          "h": 14,
+          "icon": "Music",
+          "iconSet": "lucide",
+          "colour": "rgba(255,255,255,0.8)",
+          "conditions": [
+            {
+              "field": "settings.songCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "frame_2",
+          "type": "frame",
+          "name": "Links",
+          "x": 1325,
+          "y": 862,
+          "w": 126,
+          "h": 29,
+          "fill": "none",
+          "repeat": true,
+          "source": "links",
+          "direction": "row",
+          "gap": 14,
+          "constraintX": "max",
+          "constraintY": "max",
+          "animIn": "slideUp",
+          "animDuration": 400,
+          "stagger": 200,
+          "conditions": [
+            {
+              "field": "settings.linkCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "button_3",
+          "type": "button",
+          "parent": "frame_2",
+          "name": "Link",
+          "x": 0,
+          "y": 0,
+          "w": 126,
+          "h": 29,
+          "fill": "solid",
+          "fillColour": "rgba(0,0,0,0.5)",
+          "radius": 3,
+          "colour": "rgba(255,255,255,0.8)",
+          "icon": "ExternalLink",
+          "iconSet": "lucide",
+          "label": "{title}",
+          "font": "sans",
+          "fontWeight": 600,
+          "fontSize": 16,
+          "textTransform": "uppercase",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "openLink",
+                "params": {
+                  "url": "{url}"
+                }
+              }
+            ]
+          },
+          "cursor": "pointer",
+          "hoverChanges": {
+            "fillColour": "primary.9/35",
+            "colour": "#ffffff"
+          },
+          "hoverDuration": 180,
+          "shimmer": "hover",
+          "clip": true
+        }
+      ],
+      "description": "The shipped loading screen rebuilt as editable elements — Top Players, Changelog, Music and links over a cycling background. The default the studio opens on."
+    },
+    {
+      "v": 1,
+      "id": "dirk-minimal",
+      "name": "Minimal",
+      "kind": "loading",
+      "pages": [
+        {
+          "id": "main",
+          "label": "Loading"
+        }
+      ],
+      "elements": [
+        {
+          "id": "bg_bg",
+          "type": "frame",
+          "parent": null,
+          "name": "Background",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "fill": "solid",
+          "fillColour": "#000000",
+          "radius": 0,
+          "clip": true,
+          "constraintX": "stretch",
+          "constraintY": "stretch",
+          "cycle": true,
+          "source": "backgrounds",
+          "cycleMs": "{settings.carouselTime}",
+          "cycleFadeMs": 1600
+        },
+        {
+          "id": "bg_bgImage",
+          "type": "frame",
+          "parent": "bg_bg",
+          "name": "Slide image",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "fill": "image",
+          "img": "{src}",
+          "overlay": false,
+          "radius": 0,
+          "conditions": [
+            {
+              "field": "type",
+              "op": "ne",
+              "value": "image",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "bg_bgVideo",
+          "type": "video",
+          "parent": "bg_bg",
+          "name": "Slide video",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "video": "{src}",
+          "videoFit": "cover",
+          "radius": 0,
+          "conditions": [
+            {
+              "field": "type",
+              "op": "eq",
+              "value": "image",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "bg_bgScrim",
+          "type": "frame",
+          "parent": null,
+          "name": "Darken",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "fill": "solid",
+          "fillColour": "#000000/0",
+          "radius": 0,
+          "constraintX": "stretch",
+          "constraintY": "stretch"
+        },
+        {
+          "id": "sc_sc",
+          "type": "frame",
+          "parent": null,
+          "name": "Scrim",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "fill": "grad",
+          "radius": 0,
+          "constraintX": "stretch",
+          "constraintY": "stretch",
+          "gradient": {
+            "angle": 0,
+            "stops": [
+              {
+                "colour": "#000000/88",
+                "pos": 0
+              },
+              {
+                "colour": "#000000/45",
+                "pos": 26
+              },
+              {
+                "colour": "#00000000",
+                "pos": 58
+              }
+            ]
+          }
+        },
+        {
+          "id": "lg_img",
+          "type": "image",
+          "parent": null,
+          "name": "Logo",
+          "x": 710,
+          "y": 198,
+          "w": 180,
+          "h": 180,
+          "fill": "image",
+          "img": "logo.png",
+          "overlay": false,
+          "radius": 3,
+          "effects": [
+            {
+              "type": "dropShadow",
+              "x": 0,
+              "y": 0,
+              "blur": 18,
+              "spread": 0,
+              "colour": "primary.9/50"
+            }
+          ],
+          "constraintX": "center"
+        },
+        {
+          "id": "nm_txt",
+          "type": "text",
+          "parent": null,
+          "name": "Server name",
+          "x": 395,
+          "y": 405,
+          "w": 810,
+          "h": 45,
+          "content": "{server.name}",
+          "fontSize": 40,
+          "colour": "#ffffff",
+          "font": "display",
+          "fontWeight": 800,
+          "align": "center",
+          "textTransform": "uppercase",
+          "letterSpacing": 0.11,
+          "clip": true,
+          "constraintX": "center"
+        },
+        {
+          "id": "pb_track",
+          "type": "frame",
+          "parent": null,
+          "name": "Track",
+          "x": 566,
+          "y": 504,
+          "w": 468,
+          "h": 5,
+          "fill": "solid",
+          "fillColour": "rgba(255,255,255,0.14)",
+          "radius": 3,
+          "constraintX": "center"
+        },
+        {
+          "id": "pb_fill",
+          "type": "progress",
+          "parent": null,
+          "name": "Progress",
+          "x": 566,
+          "y": 504,
+          "w": 468,
+          "h": 5,
+          "val": 0,
+          "bindings": {
+            "val": "settings.loadProgress"
+          },
+          "fillColour": "primary.6",
+          "radius": 3
+        },
+        {
+          "id": "tp_tick",
+          "type": "frame",
+          "parent": null,
+          "name": "Tips",
+          "x": 485,
+          "y": 540,
+          "w": 630,
+          "h": 45,
+          "fill": "none",
+          "cycle": true,
+          "source": "tips",
+          "cycleMs": 6000,
+          "cycleFadeMs": 900,
+          "constraintX": "center",
+          "conditions": [
+            {
+              "field": "settings.tipCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "tp_head",
+          "type": "text",
+          "parent": "tp_tick",
+          "name": "Heading",
+          "x": 0,
+          "y": 0,
+          "w": 630,
+          "h": 16,
+          "content": "{title}",
+          "fontSize": 12,
+          "colour": "primary.6",
+          "font": "sans",
+          "fontWeight": 800,
+          "align": "center",
+          "textTransform": "uppercase",
+          "letterSpacing": 0.27
+        },
+        {
+          "id": "tp_body",
+          "type": "text",
+          "parent": "tp_tick",
+          "name": "Text",
+          "x": 0,
+          "y": 19,
+          "w": 630,
+          "h": 23,
+          "content": "{text}",
+          "fontSize": 16,
+          "colour": "rgba(255,255,255,0.72)",
+          "font": "sans",
+          "fontWeight": 500,
+          "align": "center"
+        },
+        {
+          "id": "lk_row",
+          "type": "frame",
+          "parent": null,
+          "name": "Links",
+          "x": 732,
+          "y": 846,
+          "w": 135,
+          "h": 31,
+          "fill": "none",
+          "repeat": true,
+          "source": "links",
+          "direction": "row",
+          "gap": 14,
+          "animIn": "slideUp",
+          "animDuration": 400,
+          "stagger": 120,
+          "constraintX": "center",
+          "constraintY": "max",
+          "conditions": [
+            {
+              "field": "settings.linkCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "lk_btn",
+          "type": "button",
+          "parent": "lk_row",
+          "name": "Link",
+          "x": 0,
+          "y": 0,
+          "w": 135,
+          "h": 31,
+          "fill": "solid",
+          "fillColour": "rgba(255,255,255,0.08)",
+          "radius": 3,
+          "colour": "rgba(255,255,255,0.8)",
+          "icon": "{icon}",
+          "iconSet": "lucide",
+          "label": "{title}",
+          "font": "sans",
+          "fontWeight": 600,
+          "fontSize": 14,
+          "textTransform": "uppercase",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "openLink",
+                "params": {
+                  "url": "{url}"
+                }
+              }
+            ]
+          },
+          "cursor": "pointer",
+          "hoverChanges": {
+            "fillColour": "primary.9/45",
+            "colour": "#ffffff"
+          },
+          "hoverDuration": 180,
+          "clip": true
+        }
+      ],
+      "description": "Logo, server name, progress and a rotating tip, centred over your backgrounds. Quiet, and quick to make your own."
+    },
+    {
+      "v": 1,
+      "id": "dirk-spotlight",
+      "name": "Spotlight",
+      "kind": "loading",
+      "pages": [
+        {
+          "id": "main",
+          "label": "Loading"
+        }
+      ],
+      "elements": [
+        {
+          "id": "bg_bg",
+          "type": "frame",
+          "parent": null,
+          "name": "Background",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "fill": "solid",
+          "fillColour": "#000000",
+          "radius": 0,
+          "clip": true,
+          "constraintX": "stretch",
+          "constraintY": "stretch",
+          "cycle": true,
+          "source": "backgrounds",
+          "cycleMs": "{settings.carouselTime}",
+          "cycleFadeMs": 1600
+        },
+        {
+          "id": "bg_bgImage",
+          "type": "frame",
+          "parent": "bg_bg",
+          "name": "Slide image",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "fill": "image",
+          "img": "{src}",
+          "overlay": false,
+          "radius": 0,
+          "conditions": [
+            {
+              "field": "type",
+              "op": "ne",
+              "value": "image",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "bg_bgVideo",
+          "type": "video",
+          "parent": "bg_bg",
+          "name": "Slide video",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "video": "{src}",
+          "videoFit": "cover",
+          "radius": 0,
+          "conditions": [
+            {
+              "field": "type",
+              "op": "eq",
+              "value": "image",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "bg_bgScrim",
+          "type": "frame",
+          "parent": null,
+          "name": "Darken",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "fill": "solid",
+          "fillColour": "#000000/0",
+          "radius": 0,
+          "constraintX": "stretch",
+          "constraintY": "stretch"
+        },
+        {
+          "id": "sc_sc",
+          "type": "frame",
+          "parent": null,
+          "name": "Scrim",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "fill": "grad",
+          "radius": 0,
+          "constraintX": "stretch",
+          "constraintY": "stretch",
+          "gradient": {
+            "angle": 90,
+            "stops": [
+              {
+                "colour": "#000000/88",
+                "pos": 0
+              },
+              {
+                "colour": "#000000/45",
+                "pos": 26
+              },
+              {
+                "colour": "#00000000",
+                "pos": 58
+              }
+            ]
+          }
+        },
+        {
+          "id": "lg_img",
+          "type": "image",
+          "parent": null,
+          "name": "Logo",
+          "x": 36,
+          "y": 45,
+          "w": 144,
+          "h": 144,
+          "fill": "image",
+          "img": "logo.png",
+          "overlay": false,
+          "radius": 3,
+          "effects": [
+            {
+              "type": "dropShadow",
+              "x": 0,
+              "y": 0,
+              "blur": 18,
+              "spread": 0,
+              "colour": "primary.9/50"
+            }
+          ]
+        },
+        {
+          "id": "nm_txt",
+          "type": "text",
+          "parent": null,
+          "name": "Server name",
+          "x": 36,
+          "y": 180,
+          "w": 378,
+          "h": 45,
+          "content": "{server.name}",
+          "fontSize": 31,
+          "colour": "#ffffff",
+          "font": "display",
+          "fontWeight": 800,
+          "align": "left",
+          "textTransform": "uppercase",
+          "letterSpacing": 0.11,
+          "clip": true
+        },
+        {
+          "id": "gr_txt",
+          "type": "text",
+          "parent": null,
+          "name": "Greeting",
+          "x": 36,
+          "y": 229,
+          "w": 378,
+          "h": 27,
+          "content": "{locale(Greeting)}",
+          "fontSize": 16,
+          "colour": "rgba(255,255,255,0.55)",
+          "font": "sans",
+          "fontWeight": 500,
+          "align": "left",
+          "clip": true
+        },
+        {
+          "id": "pc_txt",
+          "type": "text",
+          "parent": null,
+          "name": "Player count",
+          "x": 36,
+          "y": 261,
+          "w": 378,
+          "h": 27,
+          "content": "{locale(PlayersOnline)}",
+          "fontSize": 16,
+          "colour": "rgba(255,255,255,0.8)",
+          "font": "sans",
+          "fontWeight": 700,
+          "align": "left",
+          "clip": true
+        },
+        {
+          "id": "np_np",
+          "type": "frame",
+          "parent": null,
+          "name": "Now playing",
+          "x": 36,
+          "y": 306,
+          "w": 378,
+          "h": 81,
+          "fill": "solid",
+          "fillColour": "rgba(255,255,255,0.06)",
+          "radius": 3,
+          "clip": true,
+          "conditions": [
+            {
+              "field": "settings.songCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "np_npCover",
+          "type": "image",
+          "parent": "np_np",
+          "name": "Cover",
+          "x": 9,
+          "y": 9,
+          "w": 63,
+          "h": 63,
+          "img": "{player.coverArt}",
+          "overlay": false,
+          "radius": 3
+        },
+        {
+          "id": "np_npLabel",
+          "type": "text",
+          "parent": "np_np",
+          "name": "Label",
+          "x": 76.5,
+          "y": 11,
+          "w": 292.5,
+          "h": 14,
+          "content": "{locale(NowPlaying)}",
+          "fontSize": 10,
+          "colour": "primary.6",
+          "font": "sans",
+          "fontWeight": 800,
+          "textTransform": "uppercase",
+          "letterSpacing": 0.27
+        },
+        {
+          "id": "np_npTitle",
+          "type": "text",
+          "parent": "np_np",
+          "name": "Title",
+          "x": 76.5,
+          "y": 28,
+          "w": 292.5,
+          "h": 22,
+          "content": "{player.title}",
+          "fontSize": 17,
+          "colour": "#ffffff",
+          "font": "sans",
+          "fontWeight": 700,
+          "clip": true
+        },
+        {
+          "id": "np_npArtist",
+          "type": "text",
+          "parent": "np_np",
+          "name": "Artist",
+          "x": 76.5,
+          "y": 50,
+          "w": 292.5,
+          "h": 20,
+          "content": "{player.artist}",
+          "fontSize": 14,
+          "colour": "rgba(255,255,255,0.55)",
+          "font": "sans",
+          "fontWeight": 500,
+          "clip": true
+        },
+        {
+          "id": "tp_tick",
+          "type": "frame",
+          "parent": null,
+          "name": "Tips",
+          "x": 36,
+          "y": 414,
+          "w": 378,
+          "h": 45,
+          "fill": "none",
+          "cycle": true,
+          "source": "tips",
+          "cycleMs": 6000,
+          "cycleFadeMs": 900,
+          "conditions": [
+            {
+              "field": "settings.tipCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "tp_head",
+          "type": "text",
+          "parent": "tp_tick",
+          "name": "Heading",
+          "x": 0,
+          "y": 0,
+          "w": 630,
+          "h": 16,
+          "content": "{title}",
+          "fontSize": 12,
+          "colour": "primary.6",
+          "font": "sans",
+          "fontWeight": 800,
+          "align": "left",
+          "textTransform": "uppercase",
+          "letterSpacing": 0.27
+        },
+        {
+          "id": "tp_body",
+          "type": "text",
+          "parent": "tp_tick",
+          "name": "Text",
+          "x": 0,
+          "y": 19,
+          "w": 630,
+          "h": 23,
+          "content": "{text}",
+          "fontSize": 16,
+          "colour": "rgba(255,255,255,0.72)",
+          "font": "sans",
+          "fontWeight": 500,
+          "align": "left"
+        },
+        {
+          "id": "lk_row",
+          "type": "frame",
+          "parent": null,
+          "name": "Links",
+          "x": 36,
+          "y": 504,
+          "w": 378,
+          "h": 31,
+          "fill": "none",
+          "repeat": true,
+          "source": "links",
+          "direction": "col",
+          "gap": 14,
+          "animIn": "slideUp",
+          "animDuration": 400,
+          "stagger": 120,
+          "conditions": [
+            {
+              "field": "settings.linkCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "lk_btn",
+          "type": "button",
+          "parent": "lk_row",
+          "name": "Link",
+          "x": 0,
+          "y": 0,
+          "w": 378,
+          "h": 31,
+          "fill": "solid",
+          "fillColour": "rgba(255,255,255,0.08)",
+          "radius": 3,
+          "colour": "rgba(255,255,255,0.8)",
+          "icon": "{icon}",
+          "iconSet": "lucide",
+          "label": "{title}",
+          "font": "sans",
+          "fontWeight": 600,
+          "fontSize": 14,
+          "textTransform": "uppercase",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "openLink",
+                "params": {
+                  "url": "{url}"
+                }
+              }
+            ]
+          },
+          "cursor": "pointer",
+          "hoverChanges": {
+            "fillColour": "primary.9/45",
+            "colour": "#ffffff"
+          },
+          "hoverDuration": 180,
+          "clip": true
+        },
+        {
+          "id": "pt_txt",
+          "type": "text",
+          "parent": null,
+          "name": "Progress text",
+          "x": 36,
+          "y": 832,
+          "w": 270,
+          "h": 22,
+          "content": "{locale(LoadingPercent)}",
+          "fontSize": 11,
+          "colour": "rgba(255,255,255,0.45)",
+          "font": "sans",
+          "fontWeight": 700,
+          "align": "left",
+          "textTransform": "uppercase",
+          "letterSpacing": 0.25,
+          "constraintY": "max"
+        },
+        {
+          "id": "pb_track",
+          "type": "frame",
+          "parent": null,
+          "name": "Track",
+          "x": 36,
+          "y": 855,
+          "w": 468,
+          "h": 5,
+          "fill": "solid",
+          "fillColour": "rgba(255,255,255,0.14)",
+          "radius": 3,
+          "constraintY": "max"
+        },
+        {
+          "id": "pb_fill",
+          "type": "progress",
+          "parent": null,
+          "name": "Progress",
+          "x": 36,
+          "y": 855,
+          "w": 468,
+          "h": 5,
+          "val": 0,
+          "bindings": {
+            "val": "settings.loadProgress"
+          },
+          "fillColour": "primary.6",
+          "radius": 3
+        }
+      ],
+      "description": "One column down the left, background full-bleed. Lets your screenshots do the work — good if you have art worth showing."
+    },
+    {
+      "v": 1,
+      "id": "dirk-broadcast",
+      "name": "Broadcast",
+      "kind": "loading",
+      "pages": [
+        {
+          "id": "main",
+          "label": "Loading"
+        }
+      ],
+      "elements": [
+        {
+          "id": "bg_bg",
+          "type": "frame",
+          "parent": null,
+          "name": "Background",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "fill": "solid",
+          "fillColour": "#000000",
+          "radius": 0,
+          "clip": true,
+          "constraintX": "stretch",
+          "constraintY": "stretch",
+          "cycle": true,
+          "source": "backgrounds",
+          "cycleMs": "{settings.carouselTime}",
+          "cycleFadeMs": 1600
+        },
+        {
+          "id": "bg_bgImage",
+          "type": "frame",
+          "parent": "bg_bg",
+          "name": "Slide image",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "fill": "image",
+          "img": "{src}",
+          "overlay": false,
+          "radius": 0,
+          "conditions": [
+            {
+              "field": "type",
+              "op": "ne",
+              "value": "image",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "bg_bgVideo",
+          "type": "video",
+          "parent": "bg_bg",
+          "name": "Slide video",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "video": "{src}",
+          "videoFit": "cover",
+          "radius": 0,
+          "conditions": [
+            {
+              "field": "type",
+              "op": "eq",
+              "value": "image",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "bg_bgScrim",
+          "type": "frame",
+          "parent": null,
+          "name": "Darken",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "fill": "solid",
+          "fillColour": "#000000/0",
+          "radius": 0,
+          "constraintX": "stretch",
+          "constraintY": "stretch"
+        },
+        {
+          "id": "sc_sc",
+          "type": "frame",
+          "parent": null,
+          "name": "Scrim",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "fill": "grad",
+          "radius": 0,
+          "constraintX": "stretch",
+          "constraintY": "stretch",
+          "gradient": {
+            "angle": 0,
+            "stops": [
+              {
+                "colour": "#000000/88",
+                "pos": 0
+              },
+              {
+                "colour": "#000000/45",
+                "pos": 26
+              },
+              {
+                "colour": "#00000000",
+                "pos": 58
+              }
+            ]
+          }
+        },
+        {
+          "id": "lg_img",
+          "type": "image",
+          "parent": null,
+          "name": "Logo",
+          "x": 27,
+          "y": 783,
+          "w": 81,
+          "h": 81,
+          "fill": "image",
+          "img": "logo.png",
+          "overlay": false,
+          "radius": 3,
+          "effects": [
+            {
+              "type": "dropShadow",
+              "x": 0,
+              "y": 0,
+              "blur": 18,
+              "spread": 0,
+              "colour": "primary.9/50"
+            }
+          ],
+          "constraintY": "max"
+        },
+        {
+          "id": "nm_txt",
+          "type": "text",
+          "parent": null,
+          "name": "Server name",
+          "x": 126,
+          "y": 783,
+          "w": 306,
+          "h": 45,
+          "content": "{server.name}",
+          "fontSize": 23,
+          "colour": "#ffffff",
+          "font": "display",
+          "fontWeight": 800,
+          "align": "left",
+          "textTransform": "uppercase",
+          "letterSpacing": 0.11,
+          "clip": true,
+          "constraintY": "max"
+        },
+        {
+          "id": "pc_txt",
+          "type": "text",
+          "parent": null,
+          "name": "Player count",
+          "x": 126,
+          "y": 819,
+          "w": 180,
+          "h": 27,
+          "content": "{locale(PlayersOnlineLong)}",
+          "fontSize": 16,
+          "colour": "rgba(255,255,255,0.8)",
+          "font": "sans",
+          "fontWeight": 700,
+          "align": "left",
+          "clip": true,
+          "constraintY": "max"
+        },
+        {
+          "id": "np_np",
+          "type": "frame",
+          "parent": null,
+          "name": "Now playing",
+          "x": 611,
+          "y": 783,
+          "w": 378,
+          "h": 81,
+          "fill": "solid",
+          "fillColour": "rgba(255,255,255,0.06)",
+          "radius": 3,
+          "clip": true,
+          "constraintX": "center",
+          "constraintY": "max",
+          "conditions": [
+            {
+              "field": "settings.songCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "np_npCover",
+          "type": "image",
+          "parent": "np_np",
+          "name": "Cover",
+          "x": 9,
+          "y": 9,
+          "w": 63,
+          "h": 63,
+          "img": "{player.coverArt}",
+          "overlay": false,
+          "radius": 3
+        },
+        {
+          "id": "np_npLabel",
+          "type": "text",
+          "parent": "np_np",
+          "name": "Label",
+          "x": 76.5,
+          "y": 11,
+          "w": 292.5,
+          "h": 14,
+          "content": "{locale(NowPlaying)}",
+          "fontSize": 10,
+          "colour": "primary.6",
+          "font": "sans",
+          "fontWeight": 800,
+          "textTransform": "uppercase",
+          "letterSpacing": 0.27
+        },
+        {
+          "id": "np_npTitle",
+          "type": "text",
+          "parent": "np_np",
+          "name": "Title",
+          "x": 76.5,
+          "y": 28,
+          "w": 292.5,
+          "h": 22,
+          "content": "{player.title}",
+          "fontSize": 17,
+          "colour": "#ffffff",
+          "font": "sans",
+          "fontWeight": 700,
+          "clip": true
+        },
+        {
+          "id": "np_npArtist",
+          "type": "text",
+          "parent": "np_np",
+          "name": "Artist",
+          "x": 76.5,
+          "y": 50,
+          "w": 292.5,
+          "h": 20,
+          "content": "{player.artist}",
+          "fontSize": 14,
+          "colour": "rgba(255,255,255,0.55)",
+          "font": "sans",
+          "fontWeight": 500,
+          "clip": true
+        },
+        {
+          "id": "lk_row",
+          "type": "frame",
+          "parent": null,
+          "name": "Links",
+          "x": 1285,
+          "y": 806,
+          "w": 135,
+          "h": 31,
+          "fill": "none",
+          "repeat": true,
+          "source": "links",
+          "direction": "row",
+          "gap": 14,
+          "animIn": "slideUp",
+          "animDuration": 400,
+          "stagger": 120,
+          "constraintX": "max",
+          "constraintY": "max",
+          "conditions": [
+            {
+              "field": "settings.linkCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "lk_btn",
+          "type": "button",
+          "parent": "lk_row",
+          "name": "Link",
+          "x": 0,
+          "y": 0,
+          "w": 135,
+          "h": 31,
+          "fill": "solid",
+          "fillColour": "rgba(255,255,255,0.08)",
+          "radius": 3,
+          "colour": "rgba(255,255,255,0.8)",
+          "icon": "{icon}",
+          "iconSet": "lucide",
+          "label": "{title}",
+          "font": "sans",
+          "fontWeight": 600,
+          "fontSize": 14,
+          "textTransform": "uppercase",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "openLink",
+                "params": {
+                  "url": "{url}"
+                }
+              }
+            ]
+          },
+          "cursor": "pointer",
+          "hoverChanges": {
+            "fillColour": "primary.9/45",
+            "colour": "#ffffff"
+          },
+          "hoverDuration": 180,
+          "clip": true
+        },
+        {
+          "id": "pb_track",
+          "type": "frame",
+          "parent": null,
+          "name": "Track",
+          "x": 0,
+          "y": 895,
+          "w": 1600,
+          "h": 5,
+          "fill": "solid",
+          "fillColour": "rgba(255,255,255,0.14)",
+          "radius": 0,
+          "constraintX": "stretch",
+          "constraintY": "max"
+        },
+        {
+          "id": "pb_fill",
+          "type": "progress",
+          "parent": null,
+          "name": "Progress",
+          "x": 0,
+          "y": 895,
+          "w": 1600,
+          "h": 5,
+          "val": 0,
+          "bindings": {
+            "val": "settings.loadProgress"
+          },
+          "fillColour": "primary.6",
+          "radius": 0,
+          "constraintX": "stretch",
+          "constraintY": "max"
+        }
+      ],
+      "description": "A single strip along the bottom, image untouched above it. Identity left, now playing centre, links right."
+    },
+    {
+      "v": 1,
+      "id": "dirk-dashboard",
+      "name": "Dashboard",
+      "kind": "loading",
+      "pages": [
+        {
+          "id": "main",
+          "label": "Loading"
+        }
+      ],
+      "elements": [
+        {
+          "id": "bg_bg",
+          "type": "frame",
+          "parent": null,
+          "name": "Background",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "fill": "solid",
+          "fillColour": "#000000",
+          "radius": 0,
+          "clip": true,
+          "constraintX": "stretch",
+          "constraintY": "stretch",
+          "cycle": true,
+          "source": "backgrounds",
+          "cycleMs": "{settings.carouselTime}",
+          "cycleFadeMs": 1600
+        },
+        {
+          "id": "bg_bgImage",
+          "type": "frame",
+          "parent": "bg_bg",
+          "name": "Slide image",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "fill": "image",
+          "img": "{src}",
+          "overlay": false,
+          "radius": 0,
+          "conditions": [
+            {
+              "field": "type",
+              "op": "ne",
+              "value": "image",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "bg_bgVideo",
+          "type": "video",
+          "parent": "bg_bg",
+          "name": "Slide video",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "video": "{src}",
+          "videoFit": "cover",
+          "radius": 0,
+          "conditions": [
+            {
+              "field": "type",
+              "op": "eq",
+              "value": "image",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "bg_bgScrim",
+          "type": "frame",
+          "parent": null,
+          "name": "Darken",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "fill": "solid",
+          "fillColour": "#04060480",
+          "radius": 0,
+          "constraintX": "stretch",
+          "constraintY": "stretch"
+        },
+        {
+          "id": "lg_img",
+          "type": "image",
+          "parent": null,
+          "name": "Logo",
+          "x": 36,
+          "y": 45,
+          "w": 72,
+          "h": 72,
+          "fill": "image",
+          "img": "logo.png",
+          "overlay": false,
+          "radius": 3,
+          "effects": [
+            {
+              "type": "dropShadow",
+              "x": 0,
+              "y": 0,
+              "blur": 18,
+              "spread": 0,
+              "colour": "primary.9/50"
+            }
+          ]
+        },
+        {
+          "id": "nm_txt",
+          "type": "text",
+          "parent": null,
+          "name": "Server name",
+          "x": 126,
+          "y": 54,
+          "w": 450,
+          "h": 45,
+          "content": "{server.name}",
+          "fontSize": 25,
+          "colour": "#ffffff",
+          "font": "display",
+          "fontWeight": 800,
+          "align": "left",
+          "textTransform": "uppercase",
+          "letterSpacing": 0.11,
+          "clip": true
+        },
+        {
+          "id": "pc_txt",
+          "type": "text",
+          "parent": null,
+          "name": "Player count",
+          "x": 1384,
+          "y": 63,
+          "w": 180,
+          "h": 27,
+          "content": "{locale(PlayersOnline)}",
+          "fontSize": 18,
+          "colour": "rgba(255,255,255,0.8)",
+          "font": "sans",
+          "fontWeight": 700,
+          "align": "right",
+          "clip": true,
+          "constraintX": "max"
+        },
+        {
+          "id": "cl_cl",
+          "type": "frame",
+          "parent": null,
+          "name": "Changelog",
+          "x": 36,
+          "y": 198,
+          "w": 315,
+          "h": 327,
+          "fill": "none",
+          "radius": 0,
+          "cycle": true,
+          "source": "changelogs",
+          "hugH": true,
+          "conditions": [
+            {
+              "field": "settings.changelogCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "cl_clNav",
+          "type": "frame",
+          "parent": "cl_cl",
+          "name": "Nav row",
+          "x": 0,
+          "y": 0,
+          "w": 315,
+          "h": 50,
+          "fill": "solid",
+          "fillColour": "rgba(0,0,0,0.5)",
+          "radius": 3
+        },
+        {
+          "id": "cl_clPrev",
+          "type": "button",
+          "parent": "cl_clNav",
+          "name": "Previous",
+          "x": 7,
+          "y": 18,
+          "w": 14,
+          "h": 14,
+          "fill": "none",
+          "colour": "rgba(255,255,255,0.8)",
+          "icon": "ChevronLeft",
+          "iconSet": "lucide",
+          "label": "",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "cyclePrev"
+              }
+            ]
+          },
+          "cursor": "pointer",
+          "hover": "brighten",
+          "hoverAmount": 40
+        },
+        {
+          "id": "cl_clTitle",
+          "type": "text",
+          "parent": "cl_clNav",
+          "name": "Release",
+          "x": 27,
+          "y": 9,
+          "w": 261,
+          "h": 18,
+          "content": "{title}",
+          "fontSize": 14,
+          "colour": "rgba(255,255,255,0.8)",
+          "font": "sans",
+          "fontWeight": 700,
+          "align": "center",
+          "letterSpacing": 0.067
+        },
+        {
+          "id": "cl_clDate",
+          "type": "text",
+          "parent": "cl_clNav",
+          "name": "Date",
+          "x": 27,
+          "y": 27,
+          "w": 261,
+          "h": 14,
+          "content": "{date}",
+          "fontSize": 11,
+          "colour": "#8d8d8d",
+          "font": "sans",
+          "fontWeight": 400,
+          "align": "center"
+        },
+        {
+          "id": "cl_clNext",
+          "type": "button",
+          "parent": "cl_clNav",
+          "name": "Next",
+          "x": 294,
+          "y": 18,
+          "w": 14,
+          "h": 14,
+          "fill": "none",
+          "colour": "rgba(255,255,255,0.8)",
+          "icon": "ChevronRight",
+          "iconSet": "lucide",
+          "label": "",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "cycleNext"
+              }
+            ]
+          },
+          "cursor": "pointer",
+          "hover": "brighten",
+          "hoverAmount": 40
+        },
+        {
+          "id": "cl_clList",
+          "type": "frame",
+          "parent": "cl_cl",
+          "name": "Entries",
+          "x": 0,
+          "y": 57,
+          "w": 315,
+          "h": 270,
+          "fill": "solid",
+          "fillColour": "rgba(0,0,0,0.5)",
+          "radius": 3,
+          "scroll": true,
+          "hugH": true,
+          "minH": 54,
+          "maxH": 270
+        },
+        {
+          "id": "cl_clEntry",
+          "type": "frame",
+          "parent": "cl_clList",
+          "name": "Entry",
+          "x": 7,
+          "y": 7,
+          "w": 301,
+          "h": 23,
+          "fill": "none",
+          "repeat": true,
+          "source": "entries",
+          "direction": "col",
+          "gap": 7
+        },
+        {
+          "id": "cl_clBadge",
+          "type": "frame",
+          "parent": "cl_clEntry",
+          "name": "Badge",
+          "x": 0,
+          "y": 0,
+          "w": 23,
+          "h": 23,
+          "fill": "solid",
+          "fillColour": "rgba(26,120,26,0.3)",
+          "radius": 3,
+          "conditions": [
+            {
+              "field": "type",
+              "op": "eq",
+              "value": "change",
+              "changes": {
+                "fillColour": "rgba(19,42,133,0.46)"
+              }
+            },
+            {
+              "field": "type",
+              "op": "eq",
+              "value": "fix",
+              "changes": {
+                "fillColour": "rgba(255,0,0,0.3)"
+              }
+            }
+          ]
+        },
+        {
+          "id": "cl_clAdd",
+          "type": "icon",
+          "parent": "cl_clEntry",
+          "name": "Added",
+          "x": 6,
+          "y": 6,
+          "w": 11,
+          "h": 11,
+          "icon": "Plus",
+          "iconSet": "lucide",
+          "colour": "rgba(255,255,255,0.8)",
+          "conditions": [
+            {
+              "field": "type",
+              "op": "ne",
+              "value": "addition",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "cl_clChg",
+          "type": "icon",
+          "parent": "cl_clEntry",
+          "name": "Changed",
+          "x": 6,
+          "y": 6,
+          "w": 11,
+          "h": 11,
+          "icon": "Pencil",
+          "iconSet": "lucide",
+          "colour": "rgba(255,255,255,0.8)",
+          "conditions": [
+            {
+              "field": "type",
+              "op": "ne",
+              "value": "change",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "cl_clFix",
+          "type": "icon",
+          "parent": "cl_clEntry",
+          "name": "Fixed",
+          "x": 6,
+          "y": 6,
+          "w": 11,
+          "h": 11,
+          "icon": "Trash2",
+          "iconSet": "lucide",
+          "colour": "rgba(255,255,255,0.8)",
+          "conditions": [
+            {
+              "field": "type",
+              "op": "ne",
+              "value": "fix",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "cl_clText",
+          "type": "text",
+          "parent": "cl_clEntry",
+          "name": "Entry text",
+          "x": 28,
+          "y": 0,
+          "w": 273,
+          "h": 23,
+          "content": "{content}",
+          "fontSize": 11,
+          "colour": "rgba(255,255,255,0.8)",
+          "font": "sans",
+          "fontWeight": 500,
+          "letterSpacing": 0.083
+        },
+        {
+          "id": "pom_pod",
+          "type": "frame",
+          "parent": null,
+          "name": "Podium",
+          "x": 640,
+          "y": 198,
+          "w": 321,
+          "h": 113,
+          "fill": "none",
+          "radius": 0,
+          "constraintX": "center",
+          "conditions": [
+            {
+              "field": "settings.playerCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "pom_podCard",
+          "type": "frame",
+          "parent": "pom_pod",
+          "name": "Player card",
+          "x": 0,
+          "y": 0,
+          "w": 90,
+          "h": 90,
+          "fill": "image",
+          "img": "{img}",
+          "overlay": true,
+          "radius": 3,
+          "clip": true,
+          "repeat": true,
+          "source": "players",
+          "direction": "row",
+          "gap": 14,
+          "selectedIndex": 1,
+          "selectedW": 113,
+          "selectedH": 113,
+          "hoverChanges": {
+            "scale": 105
+          },
+          "hoverDuration": 300
+        },
+        {
+          "id": "pom_podCrown",
+          "type": "icon",
+          "parent": "pom_podCard",
+          "name": "Crown",
+          "x": 9,
+          "y": 5,
+          "w": 16,
+          "h": 16,
+          "icon": "Crown",
+          "iconSet": "lucide",
+          "colour": "#CD7F32",
+          "conditions": [
+            {
+              "field": "rank",
+              "op": "eq",
+              "value": "1",
+              "changes": {
+                "colour": "#FFD700"
+              }
+            },
+            {
+              "field": "rank",
+              "op": "eq",
+              "value": "2",
+              "changes": {
+                "colour": "#C0C0C0"
+              }
+            }
+          ]
+        },
+        {
+          "id": "pom_podBanner",
+          "type": "frame",
+          "parent": "pom_podCard",
+          "name": "Name banner",
+          "x": 0,
+          "y": 67,
+          "w": 90,
+          "h": 23,
+          "fill": "solid",
+          "fillColour": "rgba(0,0,0,0.6)",
+          "radius": 0,
+          "constraintX": "stretch",
+          "constraintY": "max"
+        },
+        {
+          "id": "pom_podName",
+          "type": "text",
+          "parent": "pom_podBanner",
+          "name": "Name",
+          "x": 0,
+          "y": 5,
+          "w": 90,
+          "h": 13,
+          "content": "{name}",
+          "fontSize": 9,
+          "colour": "#ffffff",
+          "font": "sans",
+          "fontWeight": 600,
+          "align": "center",
+          "textTransform": "uppercase",
+          "letterSpacing": 0.2,
+          "constraintX": "stretch"
+        },
+        {
+          "id": "au_mp",
+          "type": "frame",
+          "parent": null,
+          "name": "Music",
+          "x": 1204,
+          "y": 198,
+          "w": 360,
+          "h": 167,
+          "fill": "none",
+          "radius": 0,
+          "constraintX": "max",
+          "conditions": [
+            {
+              "field": "settings.songCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "au_np",
+          "type": "frame",
+          "parent": "au_mp",
+          "name": "Now playing",
+          "x": 0,
+          "y": 0,
+          "w": 360,
+          "h": 118,
+          "fill": "solid",
+          "fillColour": "rgba(0,0,0,0.5)",
+          "radius": 3,
+          "cycle": true,
+          "source": "songs"
+        },
+        {
+          "id": "au_npCover",
+          "type": "frame",
+          "parent": "au_np",
+          "name": "Cover",
+          "x": 14,
+          "y": 14,
+          "w": 90,
+          "h": 90,
+          "fill": "image",
+          "img": "{coverArt}",
+          "overlay": false,
+          "radius": 5,
+          "opacity": 60
+        },
+        {
+          "id": "au_npTitle",
+          "type": "text",
+          "parent": "au_np",
+          "name": "Track",
+          "x": 118,
+          "y": 14,
+          "w": 228,
+          "h": 25,
+          "content": "{title}",
+          "fontSize": 20,
+          "colour": "#ffffff",
+          "font": "sans",
+          "fontWeight": 500
+        },
+        {
+          "id": "au_npArtist",
+          "type": "text",
+          "parent": "au_np",
+          "name": "Artist",
+          "x": 118,
+          "y": 39,
+          "w": 228,
+          "h": 18,
+          "content": "{artist}",
+          "fontSize": 14,
+          "colour": "#8d8d8d",
+          "font": "sans",
+          "fontWeight": 400
+        },
+        {
+          "id": "au_npBar",
+          "type": "slider",
+          "parent": "au_np",
+          "name": "Progress",
+          "x": 118,
+          "y": 66,
+          "w": 178,
+          "h": 4,
+          "val": 0,
+          "fillColour": "primary.6",
+          "radius": 2,
+          "cursor": "pointer",
+          "bindings": {
+            "val": "player.progress"
+          },
+          "events": {
+            "change": [
+              {
+                "type": "do",
+                "action": "seek",
+                "params": {
+                  "value": "{value}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "au_npTime",
+          "type": "text",
+          "parent": "au_np",
+          "name": "Elapsed",
+          "x": 301,
+          "y": 61,
+          "w": 45,
+          "h": 18,
+          "content": "{player.elapsed}",
+          "fontSize": 14,
+          "colour": "#8d8d8d",
+          "font": "sans",
+          "align": "right"
+        },
+        {
+          "id": "au_npPrev",
+          "type": "button",
+          "parent": "au_np",
+          "name": "Previous",
+          "x": 185,
+          "y": 84,
+          "w": 27,
+          "h": 27,
+          "fill": "none",
+          "colour": "rgba(255,255,255,0.5)",
+          "icon": "SkipBack",
+          "iconSet": "lucide",
+          "label": "",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "prevSong"
+              },
+              {
+                "type": "do",
+                "action": "cyclePrev"
+              }
+            ]
+          },
+          "cursor": "pointer",
+          "hover": "brighten",
+          "hoverAmount": 60
+        },
+        {
+          "id": "au_npPause",
+          "type": "button",
+          "parent": "au_np",
+          "name": "Pause",
+          "x": 219,
+          "y": 84,
+          "w": 27,
+          "h": 27,
+          "fill": "none",
+          "colour": "rgba(255,255,255,0.8)",
+          "icon": "Pause",
+          "iconSet": "lucide",
+          "label": "",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "togglePlay"
+              }
+            ]
+          },
+          "cursor": "pointer",
+          "hover": "brighten",
+          "hoverAmount": 60,
+          "conditions": [
+            {
+              "field": "player.playing",
+              "op": "falsy",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "au_npPlay",
+          "type": "button",
+          "parent": "au_np",
+          "name": "Play",
+          "x": 219,
+          "y": 84,
+          "w": 27,
+          "h": 27,
+          "fill": "none",
+          "colour": "rgba(255,255,255,0.8)",
+          "icon": "Play",
+          "iconSet": "lucide",
+          "label": "",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "togglePlay"
+              }
+            ]
+          },
+          "cursor": "pointer",
+          "hover": "brighten",
+          "hoverAmount": 60,
+          "conditions": [
+            {
+              "field": "player.playing",
+              "op": "truthy",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "au_npNext",
+          "type": "button",
+          "parent": "au_np",
+          "name": "Next",
+          "x": 253,
+          "y": 84,
+          "w": 27,
+          "h": 27,
+          "fill": "none",
+          "colour": "rgba(255,255,255,0.5)",
+          "icon": "SkipForward",
+          "iconSet": "lucide",
+          "label": "",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "nextSong"
+              },
+              {
+                "type": "do",
+                "action": "cycleNext"
+              }
+            ]
+          },
+          "cursor": "pointer",
+          "hover": "brighten",
+          "hoverAmount": 60
+        },
+        {
+          "id": "au_vol",
+          "type": "frame",
+          "parent": "au_mp",
+          "name": "Volume row",
+          "x": 0,
+          "y": 125,
+          "w": 360,
+          "h": 42,
+          "fill": "solid",
+          "fillColour": "rgba(0,0,0,0.5)",
+          "radius": 3
+        },
+        {
+          "id": "au_volMute",
+          "type": "frame",
+          "parent": "au_vol",
+          "name": "Mute",
+          "x": 7,
+          "y": 7,
+          "w": 28,
+          "h": 28,
+          "fill": "solid",
+          "fillColour": "rgba(77,77,77,0.3)",
+          "radius": 3,
+          "cursor": "pointer",
+          "clip": true,
+          "shimmer": "hover",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "toggleMute"
+              }
+            ]
+          }
+        },
+        {
+          "id": "au_volOn",
+          "type": "icon",
+          "parent": "au_volMute",
+          "name": "Sound on",
+          "x": 7,
+          "y": 7,
+          "w": 14,
+          "h": 14,
+          "icon": "Volume2",
+          "iconSet": "lucide",
+          "colour": "rgba(255,255,255,0.8)",
+          "conditions": [
+            {
+              "field": "player.muted",
+              "op": "truthy",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "au_volOff",
+          "type": "icon",
+          "parent": "au_volMute",
+          "name": "Sound off",
+          "x": 7,
+          "y": 7,
+          "w": 14,
+          "h": 14,
+          "icon": "VolumeX",
+          "iconSet": "lucide",
+          "colour": "rgba(255,255,255,0.8)",
+          "conditions": [
+            {
+              "field": "player.muted",
+              "op": "falsy",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "au_volBar",
+          "type": "slider",
+          "parent": "au_vol",
+          "name": "Volume",
+          "x": 49,
+          "y": 18,
+          "w": 297,
+          "h": 6,
+          "val": 100,
+          "fillColour": "primary.6",
+          "radius": 3,
+          "bindings": {
+            "val": "player.volume"
+          },
+          "events": {
+            "change": [
+              {
+                "type": "do",
+                "action": "setVolume",
+                "params": {
+                  "value": "{value}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "tp_tick",
+          "type": "frame",
+          "parent": null,
+          "name": "Tips",
+          "x": 36,
+          "y": 522,
+          "w": 540,
+          "h": 45,
+          "fill": "none",
+          "cycle": true,
+          "source": "tips",
+          "cycleMs": 6000,
+          "cycleFadeMs": 900,
+          "conditions": [
+            {
+              "field": "settings.tipCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "tp_head",
+          "type": "text",
+          "parent": "tp_tick",
+          "name": "Heading",
+          "x": 0,
+          "y": 0,
+          "w": 630,
+          "h": 16,
+          "content": "{title}",
+          "fontSize": 12,
+          "colour": "primary.6",
+          "font": "sans",
+          "fontWeight": 800,
+          "align": "left",
+          "textTransform": "uppercase",
+          "letterSpacing": 0.27
+        },
+        {
+          "id": "tp_body",
+          "type": "text",
+          "parent": "tp_tick",
+          "name": "Text",
+          "x": 0,
+          "y": 19,
+          "w": 630,
+          "h": 23,
+          "content": "{text}",
+          "fontSize": 16,
+          "colour": "rgba(255,255,255,0.72)",
+          "font": "sans",
+          "fontWeight": 500,
+          "align": "left"
+        },
+        {
+          "id": "lk_row",
+          "type": "frame",
+          "parent": null,
+          "name": "Links",
+          "x": 1276,
+          "y": 522,
+          "w": 135,
+          "h": 31,
+          "fill": "none",
+          "repeat": true,
+          "source": "links",
+          "direction": "row",
+          "gap": 14,
+          "animIn": "slideUp",
+          "animDuration": 400,
+          "stagger": 120,
+          "constraintX": "max",
+          "conditions": [
+            {
+              "field": "settings.linkCount",
+              "op": "lt",
+              "value": "1",
+              "hide": true
+            }
+          ]
+        },
+        {
+          "id": "lk_btn",
+          "type": "button",
+          "parent": "lk_row",
+          "name": "Link",
+          "x": 0,
+          "y": 0,
+          "w": 135,
+          "h": 31,
+          "fill": "solid",
+          "fillColour": "rgba(255,255,255,0.08)",
+          "radius": 3,
+          "colour": "rgba(255,255,255,0.8)",
+          "icon": "{icon}",
+          "iconSet": "lucide",
+          "label": "{title}",
+          "font": "sans",
+          "fontWeight": 600,
+          "fontSize": 14,
+          "textTransform": "uppercase",
+          "events": {
+            "click": [
+              {
+                "type": "do",
+                "action": "openLink",
+                "params": {
+                  "url": "{url}"
+                }
+              }
+            ]
+          },
+          "cursor": "pointer",
+          "hoverChanges": {
+            "fillColour": "primary.9/45",
+            "colour": "#ffffff"
+          },
+          "hoverDuration": 180,
+          "clip": true
+        },
+        {
+          "id": "pt_txt",
+          "type": "text",
+          "parent": null,
+          "name": "Progress text",
+          "x": 36,
+          "y": 837,
+          "w": 270,
+          "h": 22,
+          "content": "{locale(LoadingPercent)}",
+          "fontSize": 11,
+          "colour": "rgba(255,255,255,0.45)",
+          "font": "sans",
+          "fontWeight": 700,
+          "align": "left",
+          "textTransform": "uppercase",
+          "letterSpacing": 0.25,
+          "constraintY": "max"
+        },
+        {
+          "id": "pb_track",
+          "type": "frame",
+          "parent": null,
+          "name": "Track",
+          "x": 36,
+          "y": 859,
+          "w": 1528,
+          "h": 5,
+          "fill": "solid",
+          "fillColour": "rgba(255,255,255,0.14)",
+          "radius": 3,
+          "constraintX": "stretch",
+          "constraintY": "max"
+        },
+        {
+          "id": "pb_fill",
+          "type": "progress",
+          "parent": null,
+          "name": "Progress",
+          "x": 36,
+          "y": 859,
+          "w": 1528,
+          "h": 5,
+          "val": 0,
+          "bindings": {
+            "val": "settings.loadProgress"
+          },
+          "fillColour": "primary.6",
+          "radius": 3,
+          "constraintX": "stretch",
+          "constraintY": "max"
+        }
+      ],
+      "description": "Changelog, podium and music as three equal cards, everything visible at once. No tabs to open."
+    }
+  ]
+}

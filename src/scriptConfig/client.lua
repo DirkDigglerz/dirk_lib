@@ -59,3 +59,73 @@ exports('releaseScriptConfigChooserFocus', function()
   if chooserOpen then return end
   SetNuiFocus(false, false)
 end)
+
+-- --------------------------------------------------
+-- SCRIPT STUDIO
+-- --------------------------------------------------
+-- The hub that replaces the chooser. The server hands over the schemas this
+-- player may edit; the VALUES are pulled per resource from that resource's own
+-- permission-gated `getFullScriptConfig`, so server-only values keep travelling
+-- through the one path that checks who is asking.
+
+local studioOpen = false
+
+local function closeStudio()
+  if not studioOpen then return end
+  studioOpen = false
+  SendNuiMessage(json.encode({ action = 'CLOSE_SCRIPT_STUDIO' }))
+  SetNuiFocus(false, false)
+end
+
+RegisterNetEvent('dirk_lib:openScriptStudio', function(focus)
+  if studioOpen then return end
+  studioOpen = true
+
+  local scripts = lib.callback.await('dirk_lib:getScriptStudio', false)
+  if type(scripts) ~= 'table' or #scripts == 0 then
+    studioOpen = false
+    lib.notify({ type = 'error', description = 'No script settings available.' })
+    return
+  end
+
+  -- Values one resource at a time. Sequential on purpose: a callback per
+  -- resource all at once would land as a burst of net events, and the panel
+  -- cannot render before the first one arrives anyway.
+  for i = 1, #scripts do
+    local entry = scripts[i]
+    local ok, values = pcall(function()
+      return lib.callback.await(('%s:getFullScriptConfig'):format(entry.resource), false)
+    end)
+    entry.values = (ok and type(values) == 'table') and values or {}
+  end
+
+  SetNuiFocus(true, true)
+  SendNuiMessage(json.encode({
+    action = 'OPEN_SCRIPT_STUDIO',
+    data = { scripts = scripts, focus = focus },
+  }))
+end)
+
+RegisterNUICallback('CLOSE_SCRIPT_STUDIO', function(_, cb)
+  closeStudio()
+  cb({})
+end)
+
+-- Losing the resource while the panel is open would leave NUI focus stuck.
+AddEventHandler('onResourceStop', function(resource)
+  if resource == GetCurrentResourceName() then closeStudio() end
+end)
+
+-- Proxy the per-resource, permission-gated callbacks the panel needs. The hub
+-- renders every script, but each script still answers for its own data — so
+-- these forward by resource name rather than dirk_lib answering on their behalf.
+RegisterNUICallback('GET_SCRIPT_CONFIG_HISTORY', function(payload, cb)
+  local resource = type(payload) == 'table' and payload.resource
+  if type(resource) ~= 'string' or resource == '' then return cb({ entries = {}, total = 0 }) end
+
+  local ok, result = pcall(function()
+    return lib.callback.await(('%s:getScriptConfigHistory'):format(resource), false, payload)
+  end)
+  cb((ok and type(result) == 'table') and result or { entries = {}, total = 0 })
+end)
+
