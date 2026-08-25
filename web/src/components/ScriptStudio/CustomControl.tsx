@@ -1,7 +1,12 @@
 import * as mantine from '@mantine/core';
 import { alpha, Flex, Text, useMantineTheme } from '@mantine/core';
 import * as cfxReact from 'dirk-cfx-react';
-import { PANE_HEIGHT } from './Controls';
+import { PANE_HEIGHT, PANE_MIN_HEIGHT } from './Controls';
+import { RowModal } from './RowModal';
+import { useStudio } from './store';
+import { notify } from './Toasts';
+import type { SettingEntry } from './types';
+import { translate, useActiveLanguage, useBundles } from './studioLocale';
 import { fetchNui, copyToClipboard } from 'dirk-cfx-react';
 import * as motion from 'framer-motion';
 import { motion as m } from 'framer-motion';
@@ -10,7 +15,7 @@ import * as lucide from 'lucide-react';
 import { AlertTriangle, Check, Copy } from 'lucide-react';
 import * as React from 'react';
 import * as reactDom from 'react-dom';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as jsxRuntime from 'react/jsx-runtime';
 import * as reactLeaflet from 'react-leaflet';
 
@@ -48,7 +53,7 @@ import * as reactLeaflet from 'react-leaflet';
  * through rendering, which is the difference between a clear message and a
  * white panel.
  */
-const CONTRACT_VERSION = 3;
+const CONTRACT_VERSION = 5;
 
 /** What a remote component is handed instead of importing it itself. */
 function sharedDeps() {
@@ -91,6 +96,42 @@ export type CustomProps = {
   value: unknown;
   onChange: (next: unknown) => void;
   canEdit: boolean;
+  /**
+   * Open the PANEL's own editor for one row of a list.
+   *
+   * A script supplies a custom control because it knows how its data should
+   * LOOK - a fish wants its image, its rarity and its weight range, not a
+   * generic row. It does not want to reimplement editing: the panel already
+   * builds a form from the schema, honours `x-rowTabs`, validates, and offers
+   * item and coordinate pickers. Reimplementing that per script is how the
+   * per-script panels got out of hand in the first place.
+   *
+   * So the split is presentation here, editing there. Absent when the setting
+   * is not a list - there is no row to open.
+   */
+  openRow?: (index: number) => void;
+  /** Append a row, seeded from the schema the same way the built-in list does. */
+  addRow?: () => void;
+  /** Remove a row by index. */
+  deleteRow?: (index: number) => void;
+  /**
+   * Translate a key out of the OWNING SCRIPT's locale files.
+   *
+   * A script's own control still has text on it - "Baits", "Permit", a search
+   * placeholder - and hardcoding English there would put an untranslatable
+   * corner inside an otherwise translated panel. Keys resolve against the
+   * script's own `locales/*.json`, which is where its strings already live;
+   * dirk_lib never holds another script's text.
+   */
+  t?: (key: string, fallback: string) => string;
+  /**
+   * Say something happened.
+   *
+   * A control that acts IMMEDIATELY - giving an item, spawning something -
+   * does it somewhere the panel is covering, so without this the button looks
+   * broken whether it worked or not.
+   */
+  notify?: (kind: 'success' | 'error' | 'info', message: string) => void;
 };
 
 // One cache per resource+path: a section re-renders constantly, and evaluating
@@ -183,15 +224,62 @@ const REASONS: Record<string, string> = {
 };
 
 export function CustomControl({
-  resource, component, value, onChange, canEdit,
+  resource, component, value, onChange, canEdit, entry, bare,
 }: {
   resource: string;
   component: string;
+  /** fill the pane: no frame, no border, no rounding (see x-componentFull) */
+  bare?: boolean;
   value: unknown;
   onChange: (next: unknown) => void;
   canEdit: boolean;
+  /** the setting itself, so list rows can be opened in the panel's own editor */
+  entry?: SettingEntry;
 }) {
   const [loaded, setLoaded] = useState<Loaded>({ state: 'loading' });
+
+  /**
+   * Which row the panel's editor is open on.
+   *
+   * The remote component decides WHICH row - it drew the thing that was
+   * clicked - and the panel decides what editing one looks like. That keeps
+   * `x-rowTabs`, validation and the item picker working for a script that
+   * supplied nothing but a prettier row.
+   */
+  const [editingRow, setEditingRow] = useState<number | null>(null);
+
+  const bundles = useBundles();
+  const language = useActiveLanguage();
+  const t = useCallback(
+    (key: string, fallback: string) => translate(bundles, language, resource, key, fallback),
+    [bundles, language, resource],
+  );
+
+  const rows = Array.isArray(value) ? (value as Record<string, unknown>[]) : null;
+
+  // Somewhere else asked for one of these rows to be opened - a validation
+  // problem, most likely. Cleared once taken so asking twice still works.
+  const rowRequest = useStudio((state) => state.openRowRequest);
+  useEffect(() => {
+    if (!rowRequest || !entry || rowRequest.path !== entry.path) return;
+    if (!rows || !rows[rowRequest.index]) return;
+    setEditingRow(rowRequest.index);
+    useStudio.setState({ openRowRequest: null });
+  }, [rowRequest, entry?.path, rows?.length]);
+
+  // Only meaningful for a list; a component for a plain object gets undefined
+  // and can tell the difference.
+  const rowApi = rows
+    ? {
+      openRow: (index: number) => setEditingRow(index),
+      addRow: () => {
+        const template = JSON.parse(JSON.stringify(entry?.rowTemplate ?? {}));
+        onChange([...rows, template]);
+        setEditingRow(rows.length);
+      },
+      deleteRow: (index: number) => onChange(rows.filter((_, i) => i !== index)),
+    }
+    : {};
 
   useEffect(() => {
     let live = true;
@@ -210,12 +298,42 @@ export function CustomControl({
     // throw would otherwise take the whole panel down with it. An iframe would
     // isolate it, at the cost of it looking like a foreign window bolted in.
     // This gets the isolation that actually matters without the cost.
+    const openRow = rows && entry && editingRow !== null && rows[editingRow] ? editingRow : null;
+
     return (
-      <StudioFrame>
-        <ComponentBoundary resource={resource} component={component}>
-          <loaded.Component value={value} onChange={onChange} canEdit={canEdit} />
-        </ComponentBoundary>
-      </StudioFrame>
+      <>
+        <StudioFrame bare={bare}>
+          <ComponentBoundary resource={resource} component={component}>
+            <loaded.Component
+              value={value}
+              onChange={onChange}
+              canEdit={canEdit}
+              t={t}
+              notify={notify}
+              {...rowApi}
+            />
+          </ComponentBoundary>
+        </StudioFrame>
+
+        {openRow !== null && rows && entry && (
+          <RowModal
+            entry={entry}
+            resource={resource}
+            row={rows[openRow]}
+            title={String(rows[openRow][entry.rowLabelKey ?? entry.columns?.[0]?.key ?? ''] ?? `Entry ${openRow + 1}`)}
+            disabled={!canEdit}
+            onSave={(next) => {
+              onChange(rows.map((row, i) => (i === openRow ? next : row)));
+              setEditingRow(null);
+            }}
+            onDelete={() => {
+              onChange(rows.filter((_, i) => i !== openRow));
+              setEditingRow(null);
+            }}
+            onClose={() => setEditingRow(null)}
+          />
+        )}
+      </>
     );
   }
 
@@ -254,17 +372,49 @@ export function CustomControl({
  * Deliberately no padding: a map or a canvas should reach the edges. Anything
  * needing inner spacing can add its own.
  */
-function StudioFrame({ children }: { children: React.ReactNode }) {
+function StudioFrame({ children, bare }: { children: React.ReactNode; bare?: boolean }) {
   const theme = useMantineTheme();
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * Tell the content its box changed.
+   *
+   * Leaflet measures its container ONCE when the map initialises and never
+   * looks again. Mount it in a box that is momentarily zero-height - which is
+   * exactly what happens while the pane is still laying out - and it draws
+   * nothing, for ever, with no error: the tiles are simply positioned inside a
+   * viewport it believes has no size.
+   *
+   * A window resize is what leaflet listens for, so one is fired whenever this
+   * frame's size actually changes. It costs nothing for content that does not
+   * care, and it means a component author never has to know about this.
+   */
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+
+    let last = 0;
+    const observer = new ResizeObserver(() => {
+      const height = node.clientHeight;
+      if (height === last) return;
+      last = height;
+      // after paint, so the content measures the box it ended up with
+      requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <Flex
+      ref={ref as never}
       direction="column"
       style={{
         // The same resting border every setting row uses. The accent is
         // reserved for a staged change, and red for a value that blocks saving.
-        border: `0.1vh solid ${alpha(theme.colors.dark[5], 0.35)}`,
-        background: alpha(theme.colors.dark[8], 0.45),
-        borderRadius: theme.radius.xs,
+        border: bare ? 'none' : `0.1vh solid ${alpha(theme.colors.dark[5], 0.35)}`,
+        background: bare ? 'transparent' : alpha(theme.colors.dark[8], 0.45),
+        borderRadius: bare ? 0 : theme.radius.xs,
         overflow: 'hidden',
         width: '100%',
         // BOUNDED, so a component written as `h="100%"` has something to be
@@ -277,10 +427,35 @@ function StudioFrame({ children }: { children: React.ReactNode }) {
         // the other.
         height: PANE_HEIGHT,
         flex: 1,
-        minHeight: 0,
+        minHeight: PANE_MIN_HEIGHT,
+        // never taller than the pane, whatever the content asks for
+        maxHeight: '100%',
+        // the fill layer below is measured against this
+        position: 'relative',
       }}
     >
-      {children}
+      {/*
+        * The content sits in a layer pinned to all four edges.
+        *
+        * A component written as `h="100%"` - which is the obvious way to write
+        * a map - resolves that percentage against its parent's HEIGHT, and a
+        * parent stretched by `min-height` still computes `height: auto`. So the
+        * frame was the right size while everything inside it was zero tall:
+        * no error, no red box, just nothing, which is the worst way for this to
+        * fail. Pinning to the edges gives the content a definite box whichever
+        * way it sizes itself.
+        */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: 0,
+        }}
+      >
+        {children}
+      </div>
     </Flex>
   );
 }

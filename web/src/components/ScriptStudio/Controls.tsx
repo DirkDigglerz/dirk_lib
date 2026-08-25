@@ -2,13 +2,15 @@ import { alpha, ColorInput, MultiSelect, NumberInput, PasswordInput, Select, Swi
 import { Flex } from '@mantine/core';
 import { motion } from 'framer-motion';
 import { ItemArt } from './ui';
-import { ChevronRight, Crosshair, Eye, EyeOff, Keyboard, MapPin, Package, PackagePlus } from 'lucide-react';
+import { AlertTriangle, ChevronRight, Crosshair, Eye, EyeOff, Keyboard, MapPin, Package, PackagePlus } from 'lucide-react';
 import { useState } from 'react';
 import {
   AccountSelect, BlipDisplaySelect, ControlMultiSelect, ControlSelect, FiveMKeyBindInput,
-  GroupSelect, fetchNui,
+  GroupSelect, Vector4Display, WorldPositionGotoButton, WorldPositionSetButton, fetchNui, useItems,
 } from 'dirk-cfx-react';
+import { MeterControl } from './MeterControl';
 import { Icon } from './Icon';
+import { notify } from './Toasts';
 import { IconPicker } from './IconPicker';
 import { ModelControl } from './ModelControl';
 import type { ControlType, SettingColumn, SettingEntry } from './types';
@@ -27,9 +29,22 @@ export type ControlProps = {
   /** list types hand this up so the row can open the drill-in pane */
   onDrill?: () => void;
   compact?: boolean;
+  /** the script being edited, so "give me one" is gated on ITS permissions */
+  resource?: string;
 };
 
 const CONTROL_WIDTH = '32vh';
+
+/** Why the server refused a "give me one", in words. */
+const GIVE_FAILURES: Record<string, string> = {
+  NoPermission: 'You are not allowed to give yourself items for this script',
+  BadItem: 'That item name is not valid',
+  BadRequest: 'That item name is not valid',
+  NoInventory: 'No inventory bridge is running',
+  InventoryError: 'The inventory refused it',
+  NotAdded: 'It would not fit - your inventory may be full',
+  CallbackFailed: 'The server did not answer',
+};
 
 export function useInputStyles(compact?: boolean) {
   const theme = useMantineTheme();
@@ -46,6 +61,67 @@ export function useInputStyles(compact?: boolean) {
       paddingInline: '0.9vh',
     },
     section: { width: '2.6vh' },
+    // The POPUP, not just the box.
+    //
+    // This lived inline on the panel's own Select, so every input that took
+    // the shared styles still opened a default Mantine dropdown - which is
+    // why the control pickers looked foreign the moment you clicked them.
+    // Shared here, so matching is the default rather than something each call
+    // site has to remember.
+    dropdown: {
+      background: theme.colors.dark[8],
+      border: `0.1vh solid ${theme.colors.dark[6]}`,
+      borderRadius: theme.radius.xs,
+    },
+    option: {
+      fontFamily: 'Akrobat SemiBold',
+      fontSize: compact ? '1.3vh' : '1.4vh',
+      borderRadius: theme.radius.xs,
+    },
+  };
+}
+
+/**
+ * The same input look, as CSS variables.
+ *
+ * A few of dirk-cfx-react's inputs have closed prop types and accept no
+ * `styles` at all - GroupSelect among them - so they came out looking like a
+ * different product from the field above them. Rather than eyeball a matching
+ * colour in CSS, the panel publishes the values it is already using and the
+ * stylesheet reads them: one source, so the two can never drift.
+ */
+export function useInputCssVars(): React.CSSProperties {
+  const styles = useInputStyles();
+  return {
+    '--studio-input-bg': styles.input.background,
+    '--studio-input-border': styles.input.border,
+    '--studio-input-radius': styles.input.borderRadius,
+    '--studio-input-height': styles.input.height,
+    '--studio-input-font-size': styles.input.fontSize,
+    '--studio-input-padding': styles.input.paddingInline,
+    '--studio-dropdown-bg': styles.dropdown.background,
+    '--studio-dropdown-border': styles.dropdown.border,
+    '--studio-dropdown-radius': styles.dropdown.borderRadius,
+  } as React.CSSProperties;
+}
+
+/**
+ * Input styles for a SEARCH box - one with a magnifier in its left section.
+ *
+ * The shared input padding is 0.9vh, sized for a box with nothing in front of
+ * the text; with an icon there the caret starts almost on top of it. Three
+ * separate search boxes had been patched by hand before this existed, so it is
+ * one place rather than a habit.
+ */
+export function useSearchInputStyles(compact?: boolean) {
+  const base = useInputStyles(compact);
+  return {
+    ...base,
+    input: {
+      ...base.input,
+      paddingLeft: compact ? '3vh' : '3.4vh',
+    },
+    section: { width: compact ? '2.6vh' : '2.9vh' },
   };
 }
 
@@ -78,9 +154,15 @@ export const BLIP_COLORS: Record<number, { name: string; hex: string }> = {
   69: { name: 'Lime', hex: '#8fe05f' },
 };
 
-function ControlShell({ children, width }: { children: React.ReactNode; width?: string }) {
+function ControlShell({
+  children, width, className,
+}: { children: React.ReactNode; width?: string; className?: string }) {
   return (
-    <Flex align="center" gap="xs" style={{ width: width ?? CONTROL_WIDTH, flexShrink: 0, justifyContent: 'flex-end' }}>
+    <Flex
+      align="center" gap="xs"
+      className={className}
+      style={{ width: width ?? CONTROL_WIDTH, flexShrink: 0, justifyContent: 'flex-end' }}
+    >
       {children}
     </Flex>
   );
@@ -88,8 +170,15 @@ function ControlShell({ children, width }: { children: React.ReactNode; width?: 
 
 /** Neutral pressable used by the pickers that would open a sub-view in game. */
 function PickerButton({
-  children, onClick, disabled, grow,
-}: { children: React.ReactNode; onClick?: () => void; disabled?: boolean; grow?: boolean }) {
+  children, onClick, disabled, grow, warn,
+}: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  grow?: boolean;
+  /** amber outline: the value is usable but points at something not installed */
+  warn?: boolean;
+}) {
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const [hovered, setHovered] = useState(false);
@@ -111,7 +200,9 @@ function PickerButton({
         height: '3.4vh',
         paddingInline: '0.9vh',
         background: alpha(theme.colors.dark[9], 0.75),
-        border: `0.1vh solid ${hovered && !disabled ? alpha(color, 0.5) : alpha(theme.colors.dark[4], 0.55)}`,
+        border: `0.1vh solid ${warn
+          ? alpha('#f59e0b', 0.55)
+          : hovered && !disabled ? alpha(color, 0.5) : alpha(theme.colors.dark[4], 0.55)}`,
         borderRadius: theme.radius.xs,
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.5 : 1,
@@ -130,12 +221,13 @@ function textareaInput(input: Record<string, unknown>) {
   return { ...rest, paddingBlock: '0.6vh' };
 }
 
-export function SettingControl({ type, value, onChange, entry, column, disabled, onDrill, compact }: ControlProps) {
+export function SettingControl({ type, value, onChange, entry, column, disabled, onDrill, compact, resource }: ControlProps) {
   const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const styles = useInputStyles(compact);
   const swatchStyles = useLeftSectionStyles(compact);
+  const items = useItems();
   const suffix = entry?.suffix ?? column?.suffix;
   const min = entry?.min ?? column?.min;
   const max = entry?.max ?? column?.max;
@@ -251,7 +343,7 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
             // type something that is not an option.
             searchable={(options?.length ?? 0) > 5}
             comboboxProps={{ zIndex: 10800 }}
-            styles={{ ...styles, dropdown: { background: theme.colors.dark[8], border: `0.1vh solid ${theme.colors.dark[6]}` } }}
+            styles={styles}
             style={{ flex: 1 }}
           />
         </ControlShell>
@@ -375,7 +467,7 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
     // business nobody can ever staff, and nothing ever says so.
     case 'group':
       return (
-        <ControlShell width="40vh">
+        <ControlShell width="40vh" className="studio-native">
           <GroupSelect
             value={{ name: typeof value === 'string' ? value : '', grade: 0 }}
             onChange={(next) => onChange(next.name ?? '')}
@@ -413,7 +505,8 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
             // in dirk-cfx-react, so its dropdown is raised by the
             // .mantine-Combobox-dropdown rule in index.css instead.
             style={{ flex: 1 }}
-          />
+            styles={styles}
+            />
         </ControlShell>
       );
 
@@ -427,7 +520,8 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
             onChange={(next) => onChange(next)}
             disabled={disabled}
             style={{ flex: 1 }}
-          />
+            styles={styles}
+            />
         </ControlShell>
       );
 
@@ -455,22 +549,55 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
       );
 
     case 'coords': {
-      const coords = (value ?? {}) as { x?: number; y?: number; z?: number };
-      const fmt = (n?: number) => (typeof n === 'number' ? n.toFixed(1) : '0.0');
+      // The readout AND the buttons, in the row.
+      //
+      // This was a single button that opened a modal to do anything at all -
+      // including just going to look at the place, which is the most common
+      // thing you want from a coordinate and needs no editor open. The old
+      // panels put Goto and Set right next to the numbers, and these are the
+      // very same cfx-react controls those panels used.
+      const vec = (value ?? {}) as { x?: number; y?: number; z?: number; w?: number };
+      const position = {
+        x: typeof vec.x === 'number' ? vec.x : 0,
+        y: typeof vec.y === 'number' ? vec.y : 0,
+        z: typeof vec.z === 'number' ? vec.z : 0,
+        w: typeof vec.w === 'number' ? vec.w : 0,
+      };
+
       return (
-        <ControlShell width="38vh">
-          <PickerButton onClick={onDrill} disabled={disabled} grow>
-            <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.7)">
-              {fmt(coords.x)}, {fmt(coords.y)}, {fmt(coords.z)}
-            </Text>
-            <Flex align="center" gap="xxs" style={{ flexShrink: 0 }}>
-              <Crosshair size="1.4vh" color={color} />
-              <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.05em" c={color}>{t('controls.place', 'Place')}</Text>
+        <ControlShell width="44vh">
+          <Flex align="center" gap="xs" style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Vector4Display value={position} />
+            </div>
+            <Flex gap="0.3vh" style={{ flexShrink: 0 }}>
+              <WorldPositionGotoButton value={position} compact />
+              <WorldPositionSetButton
+                value={position}
+                onChange={(next: { x: number; y: number; z: number; w: number }) => onChange(next)}
+                compact
+              />
             </Flex>
-          </PickerButton>
+          </Flex>
         </ControlShell>
       );
     }
+
+    case 'chance': case 'multiplier': case 'difficulty':
+    case 'forgiveness': case 'rarity': case 'balance': case 'progression':
+      return (
+        <ControlShell width="30vh">
+          <MeterControl
+            scale={type}
+            value={value}
+            min={entry?.min ?? column?.min}
+            max={entry?.max ?? column?.max}
+            disabled={disabled}
+            compact={compact}
+            onChange={onChange}
+          />
+        </ControlShell>
+      );
 
     case 'time':
       return (
@@ -512,6 +639,7 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
             disabled={disabled}
             label={undefined}
             comboboxProps={{ zIndex: 10800 }}
+            styles={styles}
             style={{ flex: 1 }}
           />
         </ControlShell>
@@ -519,8 +647,49 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
 
     case 'item': {
       const name = typeof value === 'string' ? value : '';
+      // Configured but not installed. This is allowed on purpose - you can name
+      // an item you have not added yet and add it before the next restart - so
+      // it is flagged, not blocked.
+      const missing = !!name && !items[name];
       return (
         <ControlShell>
+          {missing && (
+            <Tooltip
+              label={t(
+                'controls.not_in_inventory',
+                'No item by this name is installed. It will not exist in game until you add it to your inventory.',
+              )}
+              position="top"
+              withArrow
+              multiline
+              w={280}
+              zIndex={10500}
+              styles={{
+                tooltip: {
+                  background: alpha(theme.colors.dark[7], 0.97),
+                  border: `0.1vh solid ${alpha('#f59e0b', 0.4)}`,
+                  color: 'rgba(255,255,255,0.8)',
+                  fontFamily: 'Akrobat SemiBold',
+                  fontSize: '1.2vh',
+                  padding: '0.6vh 0.8vh',
+                  lineHeight: 1.35,
+                },
+              }}
+            >
+              <Flex
+                align="center" justify="center"
+                style={{
+                  aspectRatio: '1 / 1', height: '3.4vh',
+                  background: alpha('#f59e0b', 0.12),
+                  border: `0.1vh solid ${alpha('#f59e0b', 0.45)}`,
+                  borderRadius: theme.radius.xs,
+                  cursor: 'help', flexShrink: 0,
+                }}
+              >
+                <AlertTriangle size="1.5vh" color="#f59e0b" />
+              </Flex>
+            </Tooltip>
+          )}
           {name && (
             <Tooltip
               label={t('controls.give_yourself_one', 'Give yourself one')}
@@ -540,10 +709,26 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
             >
               <motion.button
                 type="button"
-                onClick={(e) => {
+                onClick={async (e) => {
                   e.stopPropagation();
-                  // registered by dirk_lib, so it is free in any resource
-                  fetchNui('GIVE_SCRIPT_CONFIG_ITEM', { itemName: name, itemAmount: 1 });
+                  // Gated on the script being EDITED, and it says what happened.
+                  //
+                  // The old call went through dirk_lib's own give-item callback
+                  // whichever script you were looking at, so it was checked
+                  // against permission to edit dirk_lib rather than that script
+                  // - and its answer was thrown away, so a refusal looked
+                  // exactly like a button that did nothing.
+                  const reply = await fetchNui<{ success?: boolean; _error?: string }>(
+                    'GIVE_ITEM',
+                    { resource: resource ?? 'dirk_lib', item: name, count: 1 },
+                    { success: true },
+                  ).catch(() => ({ success: false, _error: 'CallbackFailed' }));
+
+                  if (reply?.success) {
+                    notify('success', t('controls.gave_you_one', 'Gave you 1x {}').replace('{}', name));
+                  } else {
+                    notify('error', GIVE_FAILURES[reply?._error ?? ''] ?? t('controls.give_failed', 'Could not give you that item'));
+                  }
                 }}
                 whileHover={{ background: alpha(color, 0.16), borderColor: alpha(color, 0.5) }}
                 whileTap={{ scale: 0.94 }}
@@ -561,11 +746,14 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
               </motion.button>
             </Tooltip>
           )}
-          <PickerButton onClick={onDrill} disabled={disabled} grow>
+          <PickerButton onClick={onDrill} disabled={disabled} grow warn={missing}>
             <Flex align="center" gap="xs" style={{ minWidth: 0 }}>
               <ItemArt name={name} size="2.4vh" />
-              <Text ff="monospace" size="xxs" c={name ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.35)'} truncate>
-                {name || 'pick an item'}
+              <Text
+                ff="monospace" size="xxs" truncate
+                c={missing ? '#f59e0b' : name ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.35)'}
+              >
+                {name || t('controls.pick_an_item', 'pick an item')}
               </Text>
             </Flex>
             <ChevronRight size="1.5vh" color="rgba(255,255,255,0.35)" />
@@ -638,6 +826,19 @@ export type ControlSize = 'inline' | 'wide' | 'workspace';
  */
 export const PANE_HEIGHT = '100%';
 
+/**
+ * The floor a workspace control never goes below.
+ *
+ * `100%` only means anything when every parent up the chain has a definite
+ * height, and the row a setting renders in does not - so a map asked for 100%
+ * of `auto` and got ZERO. Blank, with no error, because the component had
+ * loaded perfectly well and simply had nowhere to draw.
+ *
+ * The floor makes that unreachable: where the pane does give a height, 100%
+ * wins; where it does not, the control is still a usable size.
+ */
+export const PANE_MIN_HEIGHT = '52vh';
+
 export function controlSize(type: ControlType): ControlSize {
   // A map or a script's own editor claims the pane.
   if (type === 'zones' || type === 'custom') return 'workspace';
@@ -660,9 +861,14 @@ export function isWideType(type: ControlType): boolean {
 export function ControlsControl({
   value, onChange, disabled,
 }: { value: unknown; onChange: (next: unknown) => void; disabled?: boolean }) {
+  // Its own copy, because this one sits outside SettingControl - and a picker
+  // that looks like a different product from the field above it is exactly
+  // what the shared styles exist to prevent.
+  const styles = useInputStyles();
   const ids = Array.isArray(value) ? value.filter((v): v is number => typeof v === 'number') : [];
   return (
     <ControlMultiSelect
+      styles={styles}
       value={ids}
       onChange={(next) => onChange(next)}
       disabled={disabled}

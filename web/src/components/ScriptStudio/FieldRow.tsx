@@ -9,14 +9,19 @@ import { KeybindMapControl } from './KeybindMapControl';
 import { GroupGradeControl } from './GroupGradeControl';
 import { WeekdayControl } from './WeekdayControl';
 import { PositionListControl } from './PositionListControl';
-import { PickListControl } from './PickListControl';
+import { PickListControl, PickOneControl } from './PickListControl';
 import { WeightMapControl } from './WeightMapControl';
 import { MantineColorControl, ShadeControl } from './ThemeControls';
 import { NestedRows } from './NestedRows';
 import type { SettingColumn } from './types';
-import { useChrome } from './studioLocale';
+import { translate, useActiveLanguage, useBundles, useChrome } from './studioLocale';
 
 type Row = Record<string, unknown>;
+
+// NOTE: the meter scales are NOT handled here. SettingControl already renders
+// them and this row falls through to it, so having a case here too drew the
+// bar twice - once beside the label and once in the control column.
+
 
 /** Types that need their own block rather than a right-hand control. */
 export function isWideColumn(type: SettingColumn['type']): boolean {
@@ -41,22 +46,56 @@ export function isWideColumn(type: SettingColumn['type']): boolean {
  * nobody sees.
  */
 export function FieldRow({
-  column, value, onChange, onPick, disabled, itemName, resource,
+  column, value, onChange, onPick, disabled, itemName, resource, path, dimmed,
 }: {
   column: SettingColumn;
+  /**
+   * Path of the setting this row belongs to, so the field's label and help can
+   * be looked up in the owning script's locale files - `settings.<path>.<key>`.
+   */
+  path?: string;
   /** which script this row belongs to - pickList resolves its options from it */
   resource?: string;
   value: unknown;
   onChange: (next: unknown) => void;
-  onPick?: () => void;
+  /**
+   * Open the picker for this field, or for one nested inside it.
+   *
+   * A nested child hands over how to read and write itself, because the modal
+   * that owns the picker cannot know that `blip.color` lives two levels down.
+   */
+  onPick?: (
+    child?: SettingColumn,
+    access?: { read: () => unknown; write: (next: unknown) => void },
+  ) => void;
   disabled?: boolean;
   /** the item this row represents, if any - drives label/description mirroring */
   itemName?: string;
+  /**
+   * Switched off by another field, rather than by permission.
+   *
+   * Dimmed as well as disabled, the same way the settings list treats a gated
+   * row - a field that is merely read-only to you should still look normal,
+   * but one that does not currently apply should look like it.
+   */
+  dimmed?: boolean;
 }) {
   const t = useChrome();
   const theme = useMantineTheme();
   const items = useItems();
   const wide = isWideColumn(column.type);
+
+  // The script's own words where it has them, the schema's English otherwise -
+  // the same fallback chain every other label in the panel uses.
+  const language = useActiveLanguage();
+  const bundles = useBundles();
+  const localised = (field: 'label' | 'description', fallback: string) => (
+    (resource && path)
+      ? translate(bundles, language, resource, `settings.${path}.${column.key}.${field}`, fallback)
+      : fallback
+  );
+  const fieldLabel = localised('label', column.label);
+  const fieldHelp = column.help ? localised('description', column.help) : undefined;
 
   const known = itemName ? items[itemName] : undefined;
   const mirrors = known
@@ -80,11 +119,44 @@ export function FieldRow({
         background: alpha(theme.colors.dark[8], 0.5),
         border: `0.1vh solid ${alpha(theme.colors.dark[5], 0.35)}`,
         borderRadius: theme.radius.xs,
+        // Dimmed rather than hidden: knowing the field exists, and that
+        // something else is switching it off, beats it vanishing.
+        opacity: dimmed ? 0.4 : 1,
+        transition: 'opacity 0.15s',
       }}
     >
       <Flex direction="column" style={{ minWidth: 0, lineHeight: 1.2 }}>
         <Flex align="center" gap="0.5vh">
-          <Text ff="Akrobat Bold" size="xs" c="rgba(255,255,255,0.85)">{column.label}</Text>
+          <Text ff="Akrobat Bold" size="xs" c="rgba(255,255,255,0.85)">{fieldLabel}</Text>
+
+          {/* The schema's description, on hover. Inline it would reflow the
+              form every time a field had something to say. */}
+          {fieldHelp && !mirrors && (
+            <Tooltip
+              label={fieldHelp}
+              position="top"
+              withArrow
+              multiline
+              w={300}
+              zIndex={10500}
+              styles={{
+                tooltip: {
+                  background: alpha(theme.colors.dark[7], 0.97),
+                  border: '0.1vh solid rgba(255,255,255,0.1)',
+                  color: 'rgba(255,255,255,0.75)',
+                  fontFamily: 'Akrobat SemiBold',
+                  fontSize: '1.2vh',
+                  padding: '0.6vh 0.8vh',
+                  lineHeight: 1.35,
+                },
+              }}
+            >
+              <Flex align="center" style={{ cursor: 'help' }}>
+                <Info size="1.2vh" color="rgba(255,255,255,0.35)" />
+              </Flex>
+            </Tooltip>
+          )}
+
           {mirrors && (
             <Tooltip
               label={t('fieldRow.comes_from_this_item_in_your_inventory_r', 'Comes from this item in your inventory — rename it there and it changes everywhere')}
@@ -121,7 +193,14 @@ export function FieldRow({
       )}
 
       {column.type === 'range' && (
-        <RangeControl value={value} disabled={disabled} suffix={column.suffix} onChange={onChange} />
+        <RangeControl
+          value={value}
+          min={column.min}
+          max={column.max}
+          disabled={disabled}
+          suffix={column.suffix}
+          onChange={onChange}
+        />
       )}
 
       {column.type === 'tags' && (
@@ -148,12 +227,19 @@ export function FieldRow({
             >
               <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.6)">{child.label}</Text>
               <SettingControl
+                resource={resource}
                 type={child.type}
                 column={child}
                 value={(value as Row | undefined)?.[child.key]}
                 disabled={disabled}
                 compact
                 onChange={(next) => onChange({ ...(value as Row ?? {}), [child.key]: next })}
+                onDrill={opensPicker(child.type) && onPick
+                  ? () => onPick(child, {
+                    read: () => (value as Row | undefined)?.[child.key],
+                    write: (next) => onChange({ ...(value as Row ?? {}), [child.key]: next }),
+                  })
+                  : undefined}
               />
             </Flex>
           ))}
@@ -185,11 +271,25 @@ export function FieldRow({
         />
       )}
 
+      {column.type === 'pickOne' && column.optionsFrom && resource && (
+        <PickOneControl
+          resource={resource}
+          sourcePath={column.optionsFrom.path}
+          sourceKey={column.optionsFrom.key}
+          sourceLabelKey={column.optionsFrom.labelKey}
+          value={value}
+          disabled={disabled}
+          onChange={onChange}
+          anyLabel={column.anyLabel}
+        />
+      )}
+
       {column.type === 'pickList' && column.optionsFrom && resource && (
         <PickListControl
           resource={resource}
           sourcePath={column.optionsFrom.path}
           sourceKey={column.optionsFrom.key}
+          sourceLabelKey={column.optionsFrom.labelKey}
           value={value}
           disabled={disabled}
           onChange={onChange}
@@ -227,7 +327,7 @@ export function FieldRow({
           value={shown}
           disabled={disabled || mirrors}
           onChange={onChange}
-          onDrill={opensPicker(column.type) && onPick ? onPick : undefined}
+          onDrill={opensPicker(column.type) && onPick ? () => onPick() : undefined}
         />
       )}
     </Flex>

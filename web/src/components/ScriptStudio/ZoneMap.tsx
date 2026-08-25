@@ -8,7 +8,7 @@ import 'leaflet-draw/dist/leaflet.draw.css';
 import { Eye, EyeOff, MapPin, Pencil, PenTool, Trash2, X } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Polygon, useMap } from 'react-leaflet';
-import { PANE_HEIGHT } from './Controls';
+import { PANE_HEIGHT, PANE_MIN_HEIGHT } from './Controls';
 import { FieldRow } from './FieldRow';
 import { Icon } from './Icon';
 import { PickerDrawer } from './PickerDrawer';
@@ -161,7 +161,7 @@ export function ZoneMap({ layers, disabled }: { layers: MapLayerInput[]; disable
     <Flex direction="column" gap="xs" flex={1} style={{ width: '100%', minHeight: 0 }}>
       {/* Fills the workspace pane rather than picking a height. The section
           that holds it is a definite-height column, so there is no sum here. */}
-      <Flex gap="xs" flex={1} style={{ minHeight: 0, height: PANE_HEIGHT }}>
+      <Flex gap="xs" flex={1} style={{ minHeight: PANE_MIN_HEIGHT, height: PANE_HEIGHT }}>
         <Flex
           ref={frameRef as never}
           style={{

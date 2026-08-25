@@ -41,7 +41,17 @@ export function RowModal({
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const [draft, setDraft] = useState<Row>(() => JSON.parse(JSON.stringify(row)));
-  const [picker, setPicker] = useState<SettingColumn | null>(null);
+  /**
+   * What the picker is editing, and where its answer goes.
+   *
+   * A blip's colour and sprite live INSIDE a `blip` object on the row, so
+   * "write it to draft[column.key]" was wrong for exactly the fields most
+   * likely to want a picker - and since nothing was passing a drill handler
+   * down to a nested field either, clicking one simply did nothing.
+   */
+  const [picker, setPicker] = useState<
+    { column: SettingColumn; value: unknown; apply: (next: unknown) => void } | null
+  >(null);
 
   const columns = entry.columns ?? [];
 
@@ -69,12 +79,50 @@ export function RowModal({
   }, [entry.rowTabs, columns]);
 
   const [activeTab, setActiveTab] = useState(tabs[0]?.id ?? 'general');
-  const current = tabs.find((t) => t.id === activeTab) ?? tabs[0];
+  const currentTab = tabs.find((t) => t.id === activeTab) ?? tabs[0];
+
+  // The item comes FIRST, directly under its own picture.
+  //
+  // Which item a row is is the thing everything else on the form describes, and
+  // it is what the image above is showing - so having it turn up wherever the
+  // schema happened to declare it, often at the very bottom, read as an
+  // afterthought. Only the position moves; the field is the same one.
+  const current = useMemo(() => {
+    if (!currentTab || !entry.rowItemKey) return currentTab;
+    const key = entry.rowItemKey;
+    if (!currentTab.columns.some((c) => c.key === key)) return currentTab;
+    return {
+      ...currentTab,
+      columns: [
+        ...currentTab.columns.filter((c) => c.key === key),
+        ...currentTab.columns.filter((c) => c.key !== key),
+      ],
+    };
+  }, [currentTab, entry.rowItemKey]);
 
   const itemName = entry.rowItemKey ? String(draft[entry.rowItemKey] ?? '') : '';
 
   const setField = (key: string, value: unknown) =>
     setDraft((prev) => ({ ...prev, [key]: value }));
+
+  /**
+   * Is this field switched off by another field in the same row?
+   *
+   * A fish's permit price, interval and limits only mean anything while that
+   * fish needs a permit. The settings list has honoured `x-enabledWhen` all
+   * along; row editors never looked at it, so those fields stayed editable and
+   * read as though they applied. The field a rule POINTS AT is never disabled
+   * by it - the same rule the settings list follows, or a switch would grey
+   * itself out and leave no way back.
+   */
+  const gatedOff = (column: SettingColumn) => {
+    const rule = column.enabledWhen;
+    if (!rule) return false;
+    const key = rule.path.startsWith('self.') ? rule.path.slice(5) : rule.path;
+    if (key === column.key) return false;
+    const other = draft[key];
+    return rule.equals === undefined ? !other : other !== rule.equals;
+  };
 
   return (
     <>
@@ -135,7 +183,7 @@ export function RowModal({
                   installed - which is the whole point of the missing-items
                   audit - and fallbackSrc pointed at a file that does not exist,
                   so those rows showed a broken-image box. */}
-              <ItemArt name={itemName} size="9vh" />
+              <ItemArt name={itemName} size="12vh" />
             </Flex>
           )}
 
@@ -145,13 +193,19 @@ export function RowModal({
                 key={column.key}
                 column={column}
                 resource={resource}
+                path={entry.path}
                 // `?? column.default`: a row that predates a field has no key
                 // for it, and blank is not what the server will use
                 value={draft[column.key] ?? column.default}
-                disabled={disabled}
+                disabled={disabled || gatedOff(column)}
+                dimmed={gatedOff(column)}
                 itemName={itemName}
                 onChange={(v) => setField(column.key, v)}
-                onPick={() => setPicker(column)}
+                onPick={(child, apply) => setPicker({
+                  column: child ?? column,
+                  value: child ? apply?.read() : draft[column.key],
+                  apply: (next) => (apply ? apply.write(next) : setField(column.key, next)),
+                })}
               />
             ))}
           </Flex>
@@ -172,11 +226,11 @@ export function RowModal({
       <AnimatePresence>
         {picker && (
           <PickerDrawer
-            type={picker.type}
-            label={picker.label}
-            value={draft[picker.key]}
+            type={picker.column.type}
+            label={picker.column.label}
+            value={picker.value}
             disabled={disabled}
-            onApply={(v) => setField(picker.key, v)}
+            onApply={(v) => picker.apply(v)}
             onClose={() => setPicker(null)}
           />
         )}

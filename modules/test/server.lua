@@ -56,4 +56,57 @@ RegisterCommand('dirktest', function(source, args)
   end)
 end, true)
 
+-- ── Running a suite from Script Studio ───────────────────────────────────
+--
+-- The registry is per-VM, so dirk_lib cannot run another resource's tests: it
+-- has to ask that resource. Every consumer declaring `dirk_lib 'test'` loads
+-- this file, so every one of them answers on its own name.
+--
+-- A DELIBERATE loosening of the console-only stance above, and worth being
+-- explicit about: `dirktest` is restricted to the server console because a
+-- suite can have side effects - fishing's adds and removes items to prove the
+-- inventory bridge works. This callback is gated on permission to EDIT that
+-- script's config, which is a higher bar than being an admin and is already
+-- enough to change any setting in it. Someone who can retune the whole script
+-- can also run its tests.
+lib.callback.register(('%s:test:run'):format(GetCurrentResourceName()), function(source, payload)
+  if not source or source <= 0 then return false, 'InvalidSource' end
+
+  local allowed = false
+  local ok, result = pcall(function()
+    return exports.dirk_lib:canEditScriptConfig(source, GetCurrentResourceName())
+  end)
+  if ok then allowed = result == true end
+  if not allowed then return false, 'NoPermission' end
+
+  local filter = type(payload) == 'table' and payload.filter or nil
+  if filter == '' then filter = nil end
+
+  -- One run at a time, across every admin on the server, with a short
+  -- cooldown after. dirk_lib holds the lock because it is the one place that
+  -- knows about every consumer.
+  local resource = GetCurrentResourceName()
+  local began, reason, detail = exports.dirk_lib:beginTestRun(resource, source)
+  if not began then return false, reason or 'Busy', detail end
+
+  local ok, res = pcall(test.runLocal, filter, source)
+  if not ok or type(res) ~= 'table' then
+    exports.dirk_lib:endTestRun(resource, nil)
+    return false, 'NoTests'
+  end
+
+  local payloadOut = {
+    passed = res.passed,
+    failed = res.failed,
+    skipped = res.skipped,
+    cases = res.cases,
+  }
+
+  -- Cached from HERE rather than reported by the client: the result is what
+  -- this VM actually produced, and nothing in between gets to edit it.
+  exports.dirk_lib:endTestRun(resource, payloadOut)
+
+  return true, nil, payloadOut
+end)
+
 return test

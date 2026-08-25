@@ -3,6 +3,7 @@ import { ConfirmModal } from 'dirk-cfx-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { List, Package, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useStudio } from './store';
 import { RowModal } from './RowModal';
 import { useItems } from 'dirk-cfx-react';
 import { ItemArt, StudioButton } from './ui';
@@ -40,6 +41,16 @@ export function ListRows({
   const [editing, setEditing] = useState<number | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [query, setQuery] = useState('');
+
+  // Somewhere else asked for one of these rows - a validation problem naming
+  // `fish[27].waterTypes` is only useful if it can put you in front of row 27.
+  const rowRequest = useStudio((state) => state.openRowRequest);
+  useEffect(() => {
+    if (!rowRequest || rowRequest.path !== entry.path) return;
+    if (!rows[rowRequest.index]) return;
+    setEditing(rowRequest.index);
+    useStudio.setState({ openRowRequest: null });
+  }, [rowRequest, entry.path, rows.length]);
 
   const labelKey = entry.rowLabelKey ?? entry.columns?.[0]?.key ?? '';
   const items = useItems();

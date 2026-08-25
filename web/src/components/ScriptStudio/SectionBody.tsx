@@ -4,6 +4,8 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { effectiveValue, setValue, useStudio } from './store';
 import { ZoneMap } from './ZoneMap';
 import type { SettingEntry } from './types';
+import { BASIC_CHILD, tabsAsList } from './types';
+import { useChrome } from './studioLocale';
 
 /**
  * Renders one section's settings.
@@ -19,16 +21,64 @@ import type { SettingEntry } from './types';
  * match is selected automatically.
  */
 export function SectionBody({
-  resource, entries, query, renderRow,
+  resource, entries, query, renderRow, railDriven,
 }: {
   resource: string;
   entries: SettingEntry[];
   query: string;
   /** the row renderer lives in main so it keeps its memoised identity */
   renderRow: (entry: SettingEntry, rowFilter?: string) => React.ReactNode;
+  /**
+   * The RAIL is the switcher, so there is no strip in the body.
+   *
+   * A workspace section fills the pane, and its lists are already children in
+   * the rail - Equipment > Rods, Reel, Hook. Drawing a tab strip as well meant
+   * two switchers for one choice, stacked on top of each other, and the strip
+   * made seven separate lists look like seven tabs of one. Each list is its
+   * own place; picking it in the rail is how you get there.
+   */
+  railDriven?: boolean;
 }) {
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
+
+  // Which child the rail is pointing at. Not cleared once read: unlike the tab
+  // strip's one-shot request, this IS the current selection.
+  const requestedList = useStudio((state) => state.activeList);
+
+  const railLists = useMemo(() => entries.filter(tabsAsList), [entries]);
+  const railPlain = useMemo(() => entries.filter((e) => !tabsAsList(e)), [entries]);
+
+  // Landing on the section itself shows its loose settings - the "Basic" of
+  // the pattern - or the first list when it has none.
+  const railActive = railDriven
+    ? (railLists.find((l) => l.path === requestedList)
+      ?? (railPlain.length > 0 ? undefined : railLists[0]))
+    : undefined;
+
+  useEffect(() => {
+    if (!railDriven) return;
+    // When the section's own settings are showing, the child that is on screen
+    // is Basic - say so, or the rail highlights nothing at all.
+    useStudio.setState({
+      shownList: railActive?.path ?? (railPlain.length > 0 ? BASIC_CHILD : null),
+    });
+  }, [railDriven, railActive?.path, railPlain.length]);
+
+  if (railDriven) {
+    if (railActive) {
+      return (
+        <Flex direction="column" flex={1} style={{ minHeight: 0 }}>
+          <Fragment key={railActive.path}>{renderRow(railActive, query || undefined)}</Fragment>
+        </Flex>
+      );
+    }
+    return (
+      <Flex direction="column" gap="xs" flex={1} style={{ minHeight: 0 }}>
+        {railPlain.map((entry, index) => withSubgroup(entry, index, railPlain, renderRow, color, theme))}
+      </Flex>
+    );
+  }
 
   // Polygon layers all share one canvas rather than getting a map each.
   const mapLayers = entries.filter((e) => e.type === 'zones');
@@ -49,7 +99,7 @@ export function SectionBody({
     );
   }
 
-  const lists = entries.filter((e) => e.type === 'list');
+  const lists = entries.filter(tabsAsList);
   const useTabs = lists.length >= 2;
 
   if (!useTabs) {
@@ -57,27 +107,44 @@ export function SectionBody({
     return <>{entries.map((entry, index) => withSubgroup(entry, index, entries, renderRow, color, theme))}</>;
   }
 
-  const plain = entries.filter((e) => e.type !== 'list');
+  // The exact complement of what is tabbed. Testing for `type !== 'list'` was
+  // right only while a tabbed list was always type `list`: a script's own
+  // control standing in for one is type `custom`, so all seven of fishing's
+  // equipment lists went into the tab strip AND rendered stacked underneath
+  // it - one column of seven full-height grids you could not get past.
+  const plain = entries.filter((e) => !tabsAsList(e));
 
+  // The loose settings become a tab of their own rather than a preamble
+  // stacked above the strip. Bait Dig is four numbers and two lists, and
+  // reading the numbers first then meeting a tab strip made the strip look
+  // like it belonged to the last number rather than to the section.
   return (
-    <>
-      {plain.map((entry, index) => withSubgroup(entry, index, plain, renderRow, color, theme))}
-      <ListTabs resource={resource} lists={lists} query={query} renderRow={renderRow} />
-    </>
+    <ListTabs
+      resource={resource}
+      lists={lists}
+      plain={plain}
+      query={query}
+      renderRow={renderRow}
+    />
   );
 }
 
+const BASIC_TAB = BASIC_CHILD;
+
 function ListTabs({
-  resource, lists, query, renderRow,
+  resource, lists, plain, query, renderRow,
 }: {
   resource: string;
   lists: SettingEntry[];
+  /** the section's loose settings, shown as a leading "Basic" tab */
+  plain: SettingEntry[];
   query: string;
   renderRow: (entry: SettingEntry, rowFilter?: string) => React.ReactNode;
 }) {
   const theme = useMantineTheme();
+  const t = useChrome();
   const color = theme.colors[theme.primaryColor][5];
-  const [activePath, setActivePath] = useState(lists[0]?.path ?? '');
+  const [activePath, setActivePath] = useState(plain.length > 0 ? BASIC_TAB : (lists[0]?.path ?? ''));
 
   // how many rows in each list match the current search
   const matches = useMemo(() => {
@@ -103,8 +170,11 @@ function ListTabs({
   }, [query, matches, activePath, lists]);
 
   useEffect(() => {
-    if (!lists.some((l) => l.path === activePath)) setActivePath(lists[0]?.path ?? '');
-  }, [lists, activePath]);
+    if (activePath === BASIC_TAB && plain.length > 0) return;
+    if (!lists.some((l) => l.path === activePath)) {
+      setActivePath(plain.length > 0 ? BASIC_TAB : (lists[0]?.path ?? ''));
+    }
+  }, [lists, plain.length, activePath]);
 
   // The rail can name a tab directly. Cleared once taken so that picking the
   // same one again still works, and so it does not fight a later manual choice.
@@ -116,7 +186,8 @@ function ListTabs({
     useStudio.setState({ activeList: null });
   }, [requestedList, lists]);
 
-  const active = lists.find((l) => l.path === activePath) ?? lists[0];
+  const showBasic = activePath === BASIC_TAB && plain.length > 0;
+  const active = showBasic ? undefined : (lists.find((l) => l.path === activePath) ?? lists[0]);
 
   // Tell the rail what is on screen, so the matching child highlights.
   useEffect(() => {
@@ -140,6 +211,32 @@ function ListTabs({
           flexShrink: 0,
         }}
       >
+        {plain.length > 0 && (
+          <motion.button
+            type="button"
+            onClick={() => setActivePath(BASIC_TAB)}
+            whileTap={{ scale: 0.98 }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.5vh',
+              padding: '0.5vh 0.9vh',
+              background: showBasic ? alpha(color, 0.16) : 'transparent',
+              border: '0.1vh solid transparent',
+              borderRadius: theme.radius.xs,
+              cursor: 'pointer',
+            }}
+          >
+            <Text
+              ff="Akrobat Bold" size="xs" tt="uppercase" lts="0.05em"
+              c={showBasic ? color : 'rgba(255,255,255,0.6)'}
+            >
+              {t('sectionBody.basic', 'Basic')}
+            </Text>
+            <Text ff="monospace" size="xxs" c={showBasic ? alpha(color, 0.7) : 'rgba(255,255,255,0.3)'}>
+              {plain.length}
+            </Text>
+          </motion.button>
+        )}
+
         {lists.map((list) => {
           const on = list.path === active?.path;
           const hits = matches.get(list.path) ?? 0;
@@ -184,6 +281,12 @@ function ListTabs({
 
           A min-height keeps the jump small when a short tab follows a long one,
           without capping how tall a long one may be. */}
+      {showBasic && (
+        <Flex direction="column" gap="xs" style={{ minHeight: '24vh' }}>
+          {plain.map((entry, index) => withSubgroup(entry, index, plain, renderRow, color, theme))}
+        </Flex>
+      )}
+
       {active && (
         <Flex
           direction="column"

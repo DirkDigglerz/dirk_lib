@@ -486,6 +486,198 @@ lib.callback.register('dirk_lib:spawnVehicle', function(source, payload)
   return true, nil, { netId = NetworkGetNetworkIdFromEntity(vehicle), plate = plate }
 end)
 
+-- ── Changelogs ───────────────────────────────────────────────────────────
+-- Every script already ships a CHANGELOG.md, and the server can read any
+-- file inside any resource - the same route scriptConfig already uses for
+-- schema.json, which is deliberately not in files{} either. So "what changed
+-- in the version I am running" needs no endpoint and no network: it is sitting
+-- in the resource folder, and it is the changelog for the exact build
+-- installed rather than whatever is newest.
+--
+-- Capped because this is going over the NUI bridge. Fishing's is already 578
+-- lines and only the recent entries are ever read.
+
+local CHANGELOG_MAX = 96 * 1024
+
+-- ── Test runs: one at a time, and remembered ─────────────────────────────
+--
+-- A suite has side effects - fishing's adds and removes items to prove the
+-- inventory bridge works - so two admins running one at the same time would
+-- be testing each other's mess. And a result is worth keeping: opening the
+-- page should show what happened last time rather than an empty screen and a
+-- button, and certainly rather than firing a run just because someone looked.
+--
+-- The lock and the cache live HERE, in dirk_lib, because the runs live in
+-- every consumer: one place that knows about all of them.
+local testRuns = {}
+local TEST_COOLDOWN = 20
+
+exports('beginTestRun', function(resource, src)
+  if type(resource) ~= 'string' then return false, 'BadRequest' end
+  local state = testRuns[resource]
+  local now = os.time()
+
+  if state and state.running then
+    -- A crashed run must not lock the suite for ever.
+    if now - (state.startedAt or 0) < 120 then
+      return false, 'AlreadyRunning', state.runningBy
+    end
+  end
+
+  if state and state.finishedAt and now - state.finishedAt < TEST_COOLDOWN then
+    return false, 'TooSoon', TEST_COOLDOWN - (now - state.finishedAt)
+  end
+
+  testRuns[resource] = {
+    running = true,
+    startedAt = now,
+    runningBy = src and GetPlayerName(src) or 'console',
+    result = state and state.result or nil,
+    finishedAt = state and state.finishedAt or nil,
+  }
+  return true
+end)
+
+exports('endTestRun', function(resource, result)
+  local state = testRuns[resource]
+  if not state then return end
+  state.running = false
+  state.finishedAt = os.time()
+  if type(result) == 'table' then state.result = result end
+end)
+
+lib.callback.register('dirk_lib:getTestState', function(source, payload)
+  if source == 0 then return false, 'NoPermission' end
+  local resource = type(payload) == 'table' and payload.resource or nil
+  if type(resource) ~= 'string' then return false, 'BadRequest' end
+  if not canEditResource(source, resource) then return false, 'NoPermission' end
+
+  local state = testRuns[resource]
+  if not state then return true, nil, { ran = false } end
+
+  return true, nil, {
+    ran = state.finishedAt ~= nil,
+    running = state.running == true,
+    runningBy = state.runningBy,
+    at = state.finishedAt,
+    ageSeconds = state.finishedAt and (os.time() - state.finishedAt) or nil,
+    result = state.result,
+  }
+end)
+
+-- Which scripts have a test suite loaded.
+--
+-- Read from the MANIFEST rather than by asking each resource: a consumer that
+-- does not load lib.test would never answer a callback, and `await` on an
+-- event nobody registered simply hangs. `dirk_lib 'test'` in an fxmanifest is
+-- what force-loads the module, so its presence is the answer.
+lib.callback.register('dirk_lib:getTestIndex', function(source, payload)
+  if source == 0 then return false, 'NoPermission' end
+  local resources = type(payload) == 'table' and payload.resources or nil
+  if type(resources) ~= 'table' then return false, 'BadRequest' end
+
+  local found = {}
+  for i = 1, #resources do
+    local resource = resources[i]
+    if type(resource) == 'string' and GetResourceState(resource) == 'started'
+      and canEditResource(source, resource) then
+      local count = GetNumResourceMetadata(resource, 'dirk_lib') or 0
+      for m = 0, count - 1 do
+        if GetResourceMetadata(resource, 'dirk_lib', m) == 'test' then
+          found[#found + 1] = resource
+          break
+        end
+      end
+    end
+  end
+
+  return true, nil, found
+end)
+
+-- Which of these scripts actually ship one, so the panel only offers the tab
+-- where there is something to read. One call rather than one per script.
+lib.callback.register('dirk_lib:getChangelogIndex', function(source, payload)
+  if source == 0 then return false, 'NoPermission' end
+  local resources = type(payload) == 'table' and payload.resources or nil
+  if type(resources) ~= 'table' then return false, 'BadRequest' end
+
+  local found = {}
+  for i = 1, #resources do
+    local resource = resources[i]
+    if type(resource) == 'string' and GetResourceState(resource) == 'started'
+      and canEditResource(source, resource) then
+      local text = LoadResourceFile(resource, 'CHANGELOG.md')
+      if type(text) == 'string' and text:find('%S') then
+        found[#found + 1] = resource
+      end
+    end
+  end
+
+  return true, nil, found
+end)
+
+lib.callback.register('dirk_lib:getChangelog', function(source, payload)
+  if source == 0 then return false, 'NoPermission' end
+
+  local resource = type(payload) == 'table' and payload.resource or nil
+  if type(resource) ~= 'string' or resource == '' then return false, 'BadRequest' end
+  if GetResourceState(resource) ~= 'started' then return false, 'NotStarted' end
+
+  -- Gated like everything else in the panel: a changelog is not a secret, but
+  -- there is no reason for someone who cannot open a script's settings to be
+  -- pulling files out of it either.
+  if not canEditResource(source, resource) then return false, 'NoPermission' end
+
+  local text = LoadResourceFile(resource, 'CHANGELOG.md')
+  if type(text) ~= 'string' or text == '' then return false, 'NoChangelog' end
+  if #text > CHANGELOG_MAX then text = text:sub(1, CHANGELOG_MAX) end
+
+  return true, nil, {
+    text = text,
+    version = GetResourceMetadata(resource, 'version', 0),
+  }
+end)
+
+-- ── Giving an item (a list row's "give me one" button) ───────────────────
+-- Same shape and the same reasoning as vehicle spawning above: the SERVER
+-- hands the item over, so the permission check is a gate rather than advice,
+-- and a client that asks for something it is not allowed gets nothing.
+--
+-- Generic on purpose. dirk_lib does not know what a fish is - it knows a
+-- script asked for one of its own items to be given to the person editing it,
+-- and that that person is allowed to edit that script.
+
+lib.callback.register('dirk_lib:giveItem', function(source, payload)
+  if source == 0 then return false, 'NoPermission' end
+
+  local resource = type(payload) == 'table' and payload.resource or nil
+  if type(resource) ~= 'string' or resource == '' then return false, 'BadRequest' end
+
+  -- Gated on the OWNING script, not on dirk_lib: someone trusted with
+  -- fishing's settings can hand themselves a fish, which is the whole point of
+  -- the button, without that implying anything about the rest of the server.
+  if not canEditResource(source, resource) then return false, 'NoPermission' end
+
+  local name = payload.item
+  if type(name) ~= 'string' or name == '' or #name > 64 or name:find('[^%w_%-]') then
+    return false, 'BadItem'
+  end
+
+  local count = tonumber(payload.count) or 1
+  if count < 1 then count = 1 end
+  if count > 100 then count = 100 end
+
+  if not lib.inventory or not lib.inventory.addItem then return false, 'NoInventory' end
+
+  local ok, added = pcall(lib.inventory.addItem, source, name, count, payload.metadata)
+  if not ok then return false, 'InventoryError' end
+  -- Bridges disagree on what they return - some a boolean, some nothing at
+  -- all - so only an explicit `false` counts as a refusal.
+  if added == false then return false, 'NotAdded' end
+
+  return true
+end)
+
 -- (Master group + registered-resources lookups for the Script Config tab
 -- live entirely client-side now — convars replicate via `setr` and resource
 -- metadata is readable from a client NUI callback. See init.lua's

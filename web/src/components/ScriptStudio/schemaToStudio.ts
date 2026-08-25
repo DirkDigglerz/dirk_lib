@@ -52,6 +52,8 @@ export type StudioMeta = {
     label: string;
     icon: string;
     description?: string;
+    /** this section owns the pane instead of joining the scrolling stack */
+    workspace?: boolean;
     /** exact paths or prefixes (a prefix matches `prefix` and `prefix.*`) */
     paths: string[];
   }[];
@@ -86,6 +88,7 @@ const CONTROL_TYPES = new Set<string>([
   'text', 'enum', 'enumList', 'pickList', 'color', 'blipColor', 'blipSprite',
   'blipDisplay', 'ped', 'vehicle', 'coords', 'positions', 'time', 'keybind',
   'control', 'controls', 'item', 'list', 'zones', 'palette', 'slider', 'range',
+  'chance', 'multiplier', 'difficulty', 'forgiveness', 'rarity', 'balance', 'progression',
   'group',
   'tags', 'model', 'account', 'accounts', 'mantineColor', 'shade', 'keyvalue',
   'icon',
@@ -258,7 +261,18 @@ function enumOptions(node: JsonSchema): { value: string; label: string }[] | und
  */
 function columnsFor(node: JsonSchema, rows: unknown[]): { columns: SettingColumn[]; template: Record<string, unknown> } {
   const itemProps: JsonSchema | undefined = node?.items?.properties;
-  const sample = (rows.find((r) => r && typeof r === 'object' && !Array.isArray(r)) ?? {}) as Record<string, unknown>;
+
+  // A live row first, then a SHIPPED one.
+  //
+  // Several of these arrays declare no `items` schema - their shape is only
+  // ever implied by their default rows - so an emptied list had nothing left
+  // to describe itself with: no sample, no columns, and a row editor with
+  // nothing in it. Worse, it was unrecoverable from the panel, because adding
+  // a row back needs the very columns that had just gone missing. The defaults
+  // still know the shape, so they are the fallback.
+  const isRow = (r: unknown) => !!r && typeof r === 'object' && !Array.isArray(r);
+  const defaults = Array.isArray(node?.default) ? node.default : [];
+  const sample = (rows.find(isRow) ?? defaults.find(isRow) ?? {}) as Record<string, unknown>;
   const installList = !!node?.['x-installItemList'];
   const arrayKey: string | undefined = node?.['x-arrayKey'];
   // Reward-pool rows name their own kind. baitDig.randomItems ships no `items`
@@ -301,7 +315,17 @@ function columnsFor(node: JsonSchema, rows: unknown[]): { columns: SettingColumn
     if (requiredKeys.has(key)) column.required = true;
     if (rowRules[key]) column.validate = [...(column.validate ?? []), ...rowRules[key]!];
     columns.push(column);
-    template[key] = child.default ?? value ?? defaultForControl(column.type);
+    // NOT `?? value`. `sample` is the first existing row and it is here to
+    // infer what a column IS when the schema does not say - it is not what a
+    // NEW row should contain. Seeding from it meant "Add fish" opened already
+    // filled in with another fish, and anything left untouched was saved as a
+    // silent duplicate of it.
+    //
+    // The exception is a key every SHIPPED row agrees on. `type: "item"` is the
+    // same in all nine of the reward-pool defaults - it describes the shape
+    // rather than any one entry, and a new row without it is malformed. A key
+    // the defaults disagree on is content, and stays blank.
+    template[key] = child.default ?? constantDefault(defaults, key) ?? defaultForControl(column.type);
   }
 
   // dotted keys, resolved against the columns just built
@@ -346,6 +370,14 @@ function buildColumn(
   // the row editor can show what the server will actually use.
   const built = buildColumnInner(key, child, value, isItem);
   const out: SettingColumn = child.default !== undefined ? { ...built, default: child.default } : built;
+  // A field inside a row editor had nowhere to say what it means. Inline help
+  // works in the settings list because every row is one line; in a modal it
+  // would push the form around, so this rides on a hover instead.
+  if (typeof child.description === 'string' && child.description) out.help = child.description;
+  // "Only applies while that field says X", within the row. Same `self.`
+  // convention x-validate already uses for referring to a sibling field.
+  const gate = child['x-enabledWhen'] as { path?: string; equals?: unknown } | undefined;
+  if (gate?.path) out.enabledWhen = { path: gate.path, equals: gate.equals };
   // Only a DECLARED item counts for the install audit. `isItem` also covers the
   // reward-pool heuristic, which is right for rendering a picker and wrong for
   // telling someone their inventory is missing an entry.
@@ -363,6 +395,33 @@ function buildColumnInner(key: string, child: JsonSchema, value: unknown, isItem
   const label = humanise(key);
   const min = child.minimum;
   const max = child.maximum;
+
+  // A SINGLE value that has to name a row in another list - a tournament runs
+  // in one fishing zone, or anywhere. x-optionsFrom was only honoured on
+  // arrays, so the scalar case had nowhere to go and fell through to free
+  // text, where a typo silently means "nowhere".
+  if (child.type !== 'array') {
+    const one = child['x-optionsFrom'] as
+      { path?: string; key?: string; labelKey?: string } | string | undefined;
+    if (one) {
+      const path = typeof one === 'string' ? one : one.path;
+      if (path) {
+        return {
+          key, label, type: 'pickOne',
+          // "Leave blank for any location" is a real choice, not an empty
+          // field, so the blank option is named rather than nameless.
+          anyLabel: typeof child['x-anyLabel'] === 'string'
+            ? (child['x-anyLabel'] as string)
+            : undefined,
+          optionsFrom: {
+            path,
+            key: (typeof one === 'string' ? 'name' : one.key) ?? 'name',
+            labelKey: typeof one === 'string' ? undefined : one.labelKey,
+          },
+        };
+      }
+    }
+  }
 
   // arrays inside a row
   const arrayValue = Array.isArray(value) ? value : (Array.isArray(child.default) ? child.default : undefined);
@@ -417,13 +476,21 @@ function buildColumnInner(key: string, child: JsonSchema, value: unknown, isItem
     // inferred when the key is simply the name of a top-level list ('fish' ->
     // fish[].name). Free text here accepts a typo and the tournament then
     // scores nothing, silently.
-    const from = child['x-optionsFrom'] as { path?: string; key?: string } | string | undefined;
+    const from = child['x-optionsFrom'] as
+      { path?: string; key?: string; labelKey?: string } | string | undefined;
     if (from) {
       const path = typeof from === 'string' ? from : from.path;
       if (path) {
         return {
           key, label, type: 'pickList',
-          optionsFrom: { path, key: (typeof from === 'string' ? 'name' : from.key) ?? 'name' },
+          optionsFrom: {
+            path,
+            key: (typeof from === 'string' ? 'name' : from.key) ?? 'name',
+            // What a person should SEE when the stored value is an opaque id.
+            // A business points at places by id; showing the id back is a
+            // worse control than the free-text box it replaced.
+            labelKey: typeof from === 'string' ? undefined : from.labelKey,
+          },
         };
       }
     }
@@ -448,12 +515,17 @@ function buildColumnInner(key: string, child: JsonSchema, value: unknown, isItem
     // (fish.weightLimits did, fish.permitWeightLimit and rewardItems[].amount
     // did not, and those two fell through to free-text chips).
     const numericItems = child.items?.type === 'number' || child.items?.type === 'integer';
+    // Bounds on a PAIR live on the items, not on the array - `minimum` beside
+    // `minItems` would be a length, not a value. Reading only the array's own
+    // minimum left a depth of -10 perfectly acceptable.
+    const pairMin = min ?? child.items?.minimum;
+    const pairMax = max ?? child.items?.maximum;
     if (child.minItems === 2 && child.maxItems === 2 && numericItems) {
-      return { key, label, type: 'range', min, max };
+      return { key, label, type: 'range', min: pairMin, max: pairMax };
     }
 
     const allNumbers = rows.length > 0 && rows.every((r) => typeof r === 'number');
-    if (allNumbers && rows.length === 2) return { key, label, type: 'range', min, max };
+    if (allNumbers && rows.length === 2) return { key, label, type: 'range', min: pairMin, max: pairMax };
     return { key, label, type: 'tags' };
   }
 
@@ -501,10 +573,27 @@ function buildColumnInner(key: string, child: JsonSchema, value: unknown, isItem
   return { key, label, type: control, options: enumOptions(child), min, max };
 }
 
+/**
+ * The value of `key` when every shipped row has the SAME one, else undefined.
+ *
+ * That is the test for "structural": a discriminator like `type: "item"` is
+ * part of what a row IS, while a name or a price is what one particular row
+ * happens to say.
+ */
+function constantDefault(defaults: unknown[], key: string): unknown {
+  const rows = defaults.filter((r): r is Record<string, unknown> => !!r && typeof r === 'object' && !Array.isArray(r));
+  if (rows.length === 0) return undefined;
+  const first = rows[0]![key];
+  // Only worth carrying for primitives; two objects being "the same" is a
+  // deeper question than a new row needs answered.
+  if (first === undefined || (typeof first === 'object' && first !== null)) return undefined;
+  return rows.every((row) => row[key] === first) ? first : undefined;
+}
+
 function defaultForControl(control: ControlType): unknown {
   switch (control) {
     case 'boolean': return false;
-    case 'number': case 'integer': case 'percent': return 0;
+    case 'number': case 'integer': case 'percent': case 'chance': case 'slider': return 0;
     case 'blipColor': return 46;
     case 'blipSprite': return 1;
     case 'blipDisplay': return 4;
@@ -581,7 +670,15 @@ function detectMapShape(rows: unknown[]): 'polygon' | 'marker' {
  * changes, not the contents.
  */
 function orderGroups(groups: SettingGroup[], entries: SettingEntry[]): SettingGroup[] {
+  const declared = new Set(groups.filter((g) => g.workspace).map((g) => g.id));
+
   const isWorkspace = (id: string) => {
+    // Declared with `x-workspace` counts the same as inferred from content.
+    // Ordering used to judge only by what a section CONTAINS, so a declared
+    // one kept its place in the scrolling stack while behaving like a
+    // workspace - in the rail it sat among the ordinary sections instead of
+    // down with its own kind.
+    if (declared.has(id)) return true;
     const mine = entries.filter((entry) => entry.group === id);
     if (mine.length === 0) return false;
     // Dominated by one, rather than merely containing one: a section with a map
@@ -706,6 +803,7 @@ export function schemaToStudio(schema: JsonSchema, meta: StudioMeta): StudioScri
       label: humanise(groupId),
       icon: (groupNode?.['x-icon'] as string) ?? meta.groupIcons?.[groupId] ?? 'sliders-horizontal',
       description: groupNode?.description,
+      workspace: groupNode?.['x-workspace'] === true,
     });
 
     const serverOnly = !!groupNode?.['x-serverOnly'];
@@ -748,9 +846,15 @@ export function schemaToStudio(schema: JsonSchema, meta: StudioMeta): StudioScri
   // it. The field a rule POINTS AT is never disabled by it, or turning a
   // switch off would grey out the switch and leave no way back.
   for (const entry of entries) {
-    const own = nodeAt(schema, entry.path)?.['x-enabledWhen'] as EnabledWhen | undefined;
-    const block = topLevel[entry.path.split('.')[0]!]?.['x-enabledWhen'] as EnabledWhen | undefined;
-    const rule = own ?? block;
+    // Every ancestor, nearest first - not just the top-level property.
+    // `basic.bigFishDifficulty` is a master switch over the three numbers
+    // beside it, and only the outermost block was ever consulted, so a rule
+    // written one level in was read by nobody and quietly did nothing.
+    const parts = entry.path.split('.');
+    let rule = nodeAt(schema, entry.path)?.['x-enabledWhen'] as EnabledWhen | undefined;
+    for (let i = parts.length - 1; i > 0 && !rule; i -= 1) {
+      rule = nodeAt(schema, parts.slice(0, i).join('.'))?.['x-enabledWhen'] as EnabledWhen | undefined;
+    }
     if (rule && rule.path !== entry.path) entry.enabledWhen = rule;
   }
 
@@ -797,12 +901,26 @@ export function schemaToStudio(schema: JsonSchema, meta: StudioMeta): StudioScri
     }
 
     for (const section of sections) {
-      if (groups.some((g) => g.id === section.id)) continue;
+      // A section whose id happens to match a top-level property - `places`,
+      // `fish`, `equipment` - already has an auto-built group under that id.
+      // Skipping it here threw the DECLARED label, icon and description away
+      // and left the generic ones, which is why every such section showed the
+      // default sliders icon while `devices` (id ≠ property `phones`) kept its
+      // phone. The declaration is the author's intent, so it wins.
+      const existing = groups.find((g) => g.id === section.id);
+      if (existing) {
+        existing.label = section.label;
+        existing.icon = section.icon;
+        existing.description = section.description ?? existing.description;
+        if (section.workspace) existing.workspace = true;
+        continue;
+      }
       groups.push({
         id: section.id,
         label: section.label,
         icon: section.icon,
         description: section.description,
+        workspace: section.workspace === true,
       });
     }
 
@@ -881,6 +999,7 @@ function walkObject(
       // A NUI callback that says whether the typed value actually works.
       validateWith: child?.['x-validateWith'],
       component: child?.['x-component'],
+      componentFull: child?.['x-componentFull'] === true,
     });
   }
 }
@@ -904,7 +1023,14 @@ function buildListEntry(
   // likely to be wanted, and this function never consults inferControl - it
   // decides its own type - so a declared component would otherwise be carried
   // on the entry and never actually rendered.
+  //
+  // It still carries everything a LIST carries. A custom control draws the
+  // rows and hands one back to the panel to edit, and the panel builds that
+  // form out of exactly this metadata - columns, the row template, the row
+  // label, x-rowTabs. Without it the rows looked right and the editor opened
+  // empty.
   if (typeof node?.['x-component'] === 'string') {
+    const custom = columnsFor(node, rows);
     return {
       path,
       label: humanise(key),
@@ -915,18 +1041,37 @@ function buildListEntry(
       default: fallback,
       value,
       component: node['x-component'],
+      componentFull: node['x-componentFull'] === true,
+      rowLabelKey: rowLabelKey(custom.columns, node?.['x-arrayKey'], node?.['x-itemTitle']),
+      rowItemKey: rowItemKey(custom.columns),
+      rowTabs: rowTabs?.[path],
+      columns: custom.columns,
+      rowTemplate: custom.template,
       serverOnly: serverOnly || undefined,
     };
   }
 
-  const numericRows = rows.length > 0 && rows.every((r) => typeof r === 'number');
+  /**
+   * The rows that describe this list's SHAPE.
+   *
+   * The live value when there is one, the shipped default when there is not.
+   * Emptying a `[min, max]` pair otherwise left nothing to judge by, and it
+   * came back as a single nameless text box - the same way an emptied object
+   * list lost its columns. What a list IS does not change because it happens
+   * to be empty right now.
+   */
+  const shapeRows = rows.length > 0
+    ? rows
+    : (Array.isArray(node?.default) ? node.default : []);
+
+  const numericRows = shapeRows.length > 0 && shapeRows.every((r) => typeof r === 'number');
   const namedControls = /(control|key)/i.test(key);
 
   // A pair of numbers is a min/max, whatever it is called. This has to be
   // tested BEFORE the control-id branch: that branch used to claim any array
   // of numbers, which turned baitDig.gridDensity ([5,10] dig tiles) and
   // basic.cellFishDensity into GTA control-id pickers.
-  if (numericRows && rows.length === 2 && !namedControls) {
+  if (numericRows && shapeRows.length === 2 && !namedControls) {
     return {
       path,
       label: humanise(key),
@@ -1018,7 +1163,21 @@ function buildListEntry(
 
   const isScalarList = rows.length > 0 && rows.every((r) => typeof r !== 'object' || r === null);
 
-  if (isScalarList || (!node?.items?.properties && rows.length === 0)) {
+  /**
+   * An EMPTY list is not evidence of anything.
+   *
+   * "No `items` schema and no rows" was being read as "a list of loose
+   * values", which gave it one column called `value`. For a list whose shape
+   * only ever came from its default rows - several of fishing's - that is
+   * wrong the moment someone empties it: the columns vanish, the row editor
+   * offers a single nameless field, and the list can never be filled back in
+   * from the panel. The shipped rows still describe the shape, so they get a
+   * say before that conclusion is drawn.
+   */
+  const shippedRows = Array.isArray(node?.default) ? node.default : [];
+  const shippedAreObjects = shippedRows.some((r) => r && typeof r === 'object' && !Array.isArray(r));
+
+  if (!shippedAreObjects && (isScalarList || (!node?.items?.properties && rows.length === 0))) {
     return {
       path,
       label: humanise(key),
@@ -1050,6 +1209,7 @@ function buildListEntry(
     mapShape: mapPaths.has(path) ? (mapPaths.shapes.get(path) ?? detectMapShape(rows)) : undefined,
     mapColor: mapPaths.has(path) ? mapPaths.colors.get(path) : undefined,
     component: node?.['x-component'],
+    componentFull: node?.['x-componentFull'] === true,
     group,
     subgroup,
     rowLabelKey: rowLabelKey(columns, node?.['x-arrayKey'], node?.['x-itemTitle']),

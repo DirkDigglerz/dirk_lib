@@ -254,7 +254,7 @@
   "settings.logger.datadog.site.label": "站點",
   "settings.logger.datadog.site.description": "Datadog 站點，例如 datadoghq.com、datadoghq.eu、us5.datadoghq.com。",
   "sections.basic.label": "基本",
-  "sections.appearance.label": "外觀主題",
+  "sections.appearance.label": "主題",
   "sections.bridging.label": "橋接設定",
   "sections.groups.label": "群組",
   "sections.discord.label": "Discord",

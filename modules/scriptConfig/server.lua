@@ -696,7 +696,13 @@ local function collectChangedLeaves(partial, previous, path, out)
     if type(value) == 'table' then
       collectChangedLeaves(value, oldValue, nextPath, out)
     else
-      local defaultValue = settingsSchema and getDefaultForPath(settingsSchema, nextPath) or nil
+      -- NOT `schema and lookup(...) or nil`: that idiom collapses on `false`.
+      -- Every boolean whose default is false came back nil, so writing false
+      -- to one looked like a change from nothing, and saving anything at all
+      -- logged "debug: default -> false" alongside whatever you actually
+      -- edited. Half the booleans in every schema default to false.
+      local defaultValue
+      if settingsSchema then defaultValue = getDefaultForPath(settingsSchema, nextPath) end
       local isImplicitDefault = oldValue == nil and defaultValue ~= nil and isEqualValue(defaultValue, value)
 
       if not isImplicitDefault and not isEqualValue(oldValue, value) then

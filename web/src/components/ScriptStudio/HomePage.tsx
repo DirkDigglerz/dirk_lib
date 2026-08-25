@@ -1,8 +1,11 @@
 import { alpha, Flex, Text, useMantineTheme } from '@mantine/core';
 import { motion } from 'framer-motion';
+import { useState } from 'react';
 import {
-  BookOpen, Boxes, History, Library, Save, Search, ShieldCheck, SlidersHorizontal,
+  BookOpen, Boxes, ChevronRight, History, Library, Save, Search, ShieldCheck,
+  SlidersHorizontal,
 } from 'lucide-react';
+import { Dispatch } from './Dispatch';
 import { useStudio } from './store';
 import { translate, useActiveLanguage, useBundles } from './studioLocale';
 import { Icon } from './main';
@@ -35,34 +38,56 @@ export function HomePage() {
   const configurable = scripts.filter((s) => !s.shared);
   const shared = scripts.find((s) => s.shared);
   const settingCount = scripts.reduce((sum, s) => sum + s.entries.length, 0);
+  const [howOpen, setHowOpen] = useState(false);
 
   return (
+    /* One panel, not a scroll.
+     *
+     * This page ran well past the fold on a laptop, so the two things worth
+     * seeing - anything urgent, and the scripts you came to open - were both
+     * below it. The header and the script row are pinned, announcements take
+     * whatever height is left, and the reference notes fold away. */
     <Flex
-      direction="column" gap="lg" p="xl"
-      className="studio-scroll"
-      style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}
+      direction="column" gap="md" p="lg"
+      style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}
     >
-      <Flex direction="column" gap="xs">
-        <Flex align="center" gap="sm">
-          <SlidersHorizontal size="3vh" color={color} />
-          <Text ff="Akrobat Bold" size="xl" c="rgba(255,255,255,0.95)" tt="uppercase" lts="0.04em">
-            {t('home.title', 'Script Studio')}
-          </Text>
-        </Flex>
-        <Text ff="Akrobat SemiBold" size="sm" c="rgba(255,255,255,0.45)" style={{ maxWidth: '90vh' }}>
-          {t('home.subtitle', "Every dirk script's settings, in one place. Pick a script on the left to edit it, or use the pages below the rail for things that span all of them.")}
-        </Text>
+      {/* No title here. The bar above already says Script Studio and says what
+          it is, and the rail already says Overview - a third copy on the page
+          itself was the same sentence twice on one screen. The stats are the
+          only thing this row was actually carrying. */}
+      <Flex align="center" gap="xs" style={{ flexShrink: 0 }}>
+          <Stat
+            icon={Boxes}
+            value={String(configurable.length)}
+            label={configurable.length === 1
+              ? t('home.stat.script', 'script')
+              : t('home.stat.scripts', 'scripts')}
+          />
+          <Stat
+            icon={SlidersHorizontal}
+            value={String(settingCount)}
+            label={t('home.stat.settings', 'settings')}
+          />
+          {shared && (
+            <Stat
+              icon={Library}
+              value={t('home.stat.shared', 'Shared')}
+              label={t('home.stat.sharedShort', 'every script')}
+            />
+          )}
       </Flex>
 
-      <Flex gap="sm" wrap="wrap">
-        <Stat icon={Boxes} value={String(configurable.length)} label={configurable.length === 1 ? t('home.stat.script', 'script') : t('home.stat.scripts', 'scripts')} />
-        <Stat icon={SlidersHorizontal} value={String(settingCount)} label={t('home.stat.settings', 'settings')} />
-        {shared && <Stat icon={Library} value={t('home.stat.shared', 'Shared')} label={t('home.stat.sharedHelp', 'settings every script uses')} wide />}
+      {/* What DirkScripts has to say, before what this panel is. Anything
+          urgent - a breaking change, an update needing a config edit - should
+          be the first thing read. Scrolls INSIDE its own box when there is a
+          lot, so the page around it never moves. */}
+      <Flex direction="column" style={{ flex: 1, minHeight: 0 }}>
+        <Dispatch />
       </Flex>
 
       {configurable.length > 0 && (
-        <Flex direction="column" gap="xs">
-          <Text ff="Akrobat Bold" size="xs" tt="uppercase" lts="0.12em" c="rgba(255,255,255,0.35)">
+        <Flex direction="column" gap="xs" style={{ flexShrink: 0 }}>
+          <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.12em" c="rgba(255,255,255,0.35)">
             {t('home.detected', 'Detected on this server')}
           </Text>
           <Flex gap="xs" wrap="wrap">
@@ -74,19 +99,19 @@ export function HomePage() {
                 whileHover={{ y: -2, background: alpha(color, 0.12) }}
                 whileTap={{ scale: 0.98 }}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '0.9vh',
-                  padding: '1vh 1.4vh',
+                  display: 'flex', alignItems: 'center', gap: '0.8vh',
+                  padding: '0.8vh 1.2vh',
                   background: alpha(theme.colors.dark[9], 0.5),
                   border: `0.1vh solid ${alpha(theme.colors.dark[5], 0.5)}`,
                   borderRadius: theme.radius.xs,
                   cursor: 'pointer', textAlign: 'left',
                 }}
               >
-                <Icon name={script.icon} size="2vh" color={color} />
-                <Flex direction="column" style={{ lineHeight: 1.25 }}>
-                  <Text ff="Akrobat Bold" size="sm" c="rgba(255,255,255,0.9)">{script.label}</Text>
+                <Icon name={script.icon} size="1.8vh" color={color} />
+                <Flex direction="column" style={{ lineHeight: 1.2 }}>
+                  <Text ff="Akrobat Bold" size="xs" c="rgba(255,255,255,0.9)">{script.label}</Text>
                   <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.3)">
-                    {script.resource} · v{script.version} · {script.entries.length} {t('home.stat.settings', 'settings')}
+                    v{script.version} · {script.entries.length} {t('home.stat.settings', 'settings')}
                   </Text>
                 </Flex>
               </motion.button>
@@ -95,27 +120,48 @@ export function HomePage() {
         </Flex>
       )}
 
-      <Flex direction="column" gap="xs">
-        <Text ff="Akrobat Bold" size="xs" tt="uppercase" lts="0.12em" c="rgba(255,255,255,0.35)">
-          {t('home.how', 'How this works')}
-        </Text>
-        <Flex direction="column" gap="xxs">
-          <Note icon={Save} title={t('home.note.save.title', 'Nothing saves until you press Save')}>
-            {t('home.note.save.body', 'Edits are staged. The bar at the bottom counts them, Undo and Redo step through them, and Discard throws the lot away.')}
-          </Note>
-          <Note icon={History} title={t('home.note.overrides.title', 'Only what you changed is stored')}>
-            {t('home.note.overrides.body', "A setting you never touch keeps following the script's own default, so improvements that ship in an update actually reach this server. Change history shows who changed what, and lets you put it back.")}
-          </Note>
-          <Note icon={Search} title={t('home.note.search.title', 'Search covers everything')}>
-            {t('home.note.search.body', 'Names, descriptions, setting paths and list rows \u2014 across the whole script.')}
-          </Note>
-          <Note icon={ShieldCheck} title={t('home.note.serverOnly.title', 'Some settings never leave the server')}>
-            {t('home.note.serverOnly.body', 'Tokens, webhooks and keys are marked SERVER ONLY. They are editable here and are never sent to players.')}
-          </Note>
-          <Note icon={BookOpen} title={t('home.note.invalid.title', 'Red means it will not save')}>
-            {t('home.note.invalid.body', 'A setting outside its allowed range blocks saving and says why. Greyed-out settings are switched off by another setting, which is named on the row.')}
-          </Note>
-        </Flex>
+      {/* Kept, but folded. Worth reading once and never again, which is
+          exactly the kind of thing that should not cost height every time. */}
+      <Flex direction="column" gap="xs" style={{ flexShrink: 0 }}>
+        <motion.button
+          type="button"
+          onClick={() => setHowOpen((v) => !v)}
+          whileTap={{ scale: 0.995 }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '0.6vh',
+            background: 'transparent', border: 'none', padding: 0,
+            cursor: 'pointer', textAlign: 'left', width: 'fit-content',
+          }}
+        >
+          <ChevronRight
+            size="1.4vh"
+            color="rgba(255,255,255,0.35)"
+            style={{ transform: howOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}
+          />
+          <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.12em" c="rgba(255,255,255,0.35)">
+            {t('home.how', 'How this works')}
+          </Text>
+        </motion.button>
+
+        {howOpen && (
+          <Flex direction="column" gap="xxs">
+            <Note icon={Save} title={t('home.note.save.title', 'Nothing saves until you press Save')}>
+              {t('home.note.save.body', 'Edits are staged. The bar at the bottom counts them, Undo and Redo step through them, and Discard throws the lot away.')}
+            </Note>
+            <Note icon={History} title={t('home.note.overrides.title', 'Only what you changed is stored')}>
+              {t('home.note.overrides.body', 'A setting you never touch keeps following the script default, so improvements that ship in an update actually reach this server. Change history shows who changed what, and lets you put it back.')}
+            </Note>
+            <Note icon={Search} title={t('home.note.search.title', 'Search covers everything')}>
+              {t('home.note.search.body', 'Names, descriptions, setting paths and list rows, across the whole script.')}
+            </Note>
+            <Note icon={ShieldCheck} title={t('home.note.serverOnly.title', 'Some settings never leave the server')}>
+              {t('home.note.serverOnly.body', 'Tokens, webhooks and keys are marked SERVER ONLY. They are editable here and are never sent to players.')}
+            </Note>
+            <Note icon={BookOpen} title={t('home.note.invalid.title', 'Red means it will not save')}>
+              {t('home.note.invalid.body', 'A setting outside its allowed range blocks saving and says why. Greyed-out settings are switched off by another setting, which is named on the row.')}
+            </Note>
+          </Flex>
+        )}
       </Flex>
     </Flex>
   );

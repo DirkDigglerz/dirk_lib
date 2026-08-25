@@ -16,6 +16,14 @@ export type ControlType =
   | 'enum'
   | 'enumList'
   | 'pickList'
+  | 'pickOne'
+  | 'chance'
+  | 'multiplier'
+  | 'difficulty'
+  | 'forgiveness'
+  | 'rarity'
+  | 'balance'
+  | 'progression'
   | 'color'
   | 'blipColor'
   | 'blipSprite'
@@ -92,7 +100,20 @@ export type SettingColumn = {
   suffix?: string;
   options?: SettingOption[];
   /** pickList: the setting whose rows supply the options, e.g. 'fish' */
-  optionsFrom?: { path: string; key: string };
+  /** the schema's description, shown on hover inside a row editor */
+  help?: string;
+  /**
+   * Grey this field out unless a sibling in the same row says otherwise.
+   *
+   * `{ path: 'self.permitRequired', equals: true }` - the permit price on a
+   * fish means nothing until that fish needs a permit. Row editors ignored
+   * `x-enabledWhen` entirely, so those fields stayed editable and looked as
+   * though they applied.
+   */
+  enabledWhen?: { path: string; equals?: unknown };
+  /** what the blank option means for a `pickOne`, e.g. "Anywhere" */
+  anyLabel?: string;
+  optionsFrom?: { path: string; key: string ; labelKey?: string };
   min?: number;
   max?: number;
   /** the schema's default for this field, shown when a row omits the key */
@@ -142,6 +163,16 @@ export type SettingEntry = {
    * living in dirk_lib.
    */
   component?: string;
+  /**
+   * Let the script's own control fill the whole workspace.
+   *
+   * A control sits in a setting ROW by default - label and description on the
+   * left, the control framed beside them - which is right for something that
+   * belongs among other settings. A map is not that: it wants the pane, and
+   * framing one inside a row inside a padded pane boxes it in twice. Opt in
+   * with `x-componentFull` and the row chrome and the frame both step aside.
+   */
+  componentFull?: boolean;
   path: string;
   /** schema constraints, checked before a save is allowed */
   required?: boolean;
@@ -183,6 +214,16 @@ export type SettingEntry = {
 };
 
 export type SettingGroup = {
+  /**
+   * This section owns the pane rather than sitting in the scrolling stack.
+   *
+   * Inferred for a section that is mostly a map or a script's own control -
+   * those need the room. Declared with `x-workspace` when a section simply
+   * reads better as its own place: Bait Dig is a handful of numbers and two
+   * lists, and behind tabs in its own pane it stops feeling like a dropdown
+   * hanging off the section above it.
+   */
+  workspace?: boolean;
   id: string;
   label: string;
   icon: string;
@@ -214,3 +255,29 @@ export type StudioScript = {
    */
   clientVersion?: number;
 };
+
+/**
+ * Does this setting belong in a section's tab strip?
+ *
+ * A section holding several LISTS shows one at a time behind tabs - fishing's
+ * Equipment is seven of them. A script's own control standing in for one of
+ * those lists is still one of those lists: it holds the same array and wants
+ * the same tab. Without this, adding `x-component` to a tabbed list silently
+ * dropped it out of the strip and stacked all seven down the page.
+ */
+export function tabsAsList(entry: SettingEntry): boolean {
+  if (entry.type === 'list') return true;
+  // A script's own control standing in for a list, and a list of references to
+  // other settings - fishing's Misc tab is exactly that - are both still one
+  // of the section's lists and both still want a tab.
+  return (entry.type === 'custom' || entry.type === 'refs') && Array.isArray(entry.value);
+}
+
+/**
+ * The id of a workspace section's own settings, as a rail child.
+ *
+ * A section with lists gets one child per list; the settings that are not in
+ * any list need a name of their own to be selectable, and "Basic" is what they
+ * are. Not a real path, so it can never collide with one.
+ */
+export const BASIC_CHILD = '__basic__';

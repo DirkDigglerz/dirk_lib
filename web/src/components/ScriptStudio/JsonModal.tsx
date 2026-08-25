@@ -6,6 +6,7 @@ import { effectiveValue, setValue } from './store';
 import { StudioButton } from './ui';
 import type { StudioScript } from './types';
 import { useChrome } from './studioLocale';
+import { problemsForValues } from './validate';
 
 /**
  * Paste a whole config in, or copy one out.
@@ -33,6 +34,26 @@ export function JsonModal({
 
   const check = useMemo(() => validate(text, script), [text, script]);
 
+  /**
+   * The SAME checks the form applies, against what was pasted.
+   *
+   * Syntax and unknown paths were the only things this ever looked at, so a
+   * string where a number belongs, a percentage of 400 or a misspelled enum
+   * applied without a word - while the identical value typed into the form was
+   * refused. Blocking here rather than warning, because the save bar already
+   * blocks a save for exactly these problems: letting it in through this door
+   * only moves the failure somewhere less obvious.
+   */
+  const problems = useMemo(() => {
+    if (!check.ok) return [];
+    const known = new Set(script.entries.map((entry) => entry.path));
+    const flat = flatten(check.parsed as Record<string, unknown>, known);
+    const values = new Map<string, unknown>(
+      Object.entries(flat).filter(([path]) => known.has(path)),
+    );
+    return problemsForValues(script.resource, values);
+  }, [check, script]);
+
   const copy = () => {
     copyToClipboard(text);
     setCopied(true);
@@ -40,7 +61,7 @@ export function JsonModal({
   };
 
   const apply = () => {
-    if (!check.ok) return;
+    if (!check.ok || problems.length > 0) return;
     const known = new Set(script.entries.map((entry) => entry.path));
     const flat = flatten(check.parsed as Record<string, unknown>, known);
     let changed = 0;
@@ -99,6 +120,17 @@ export function JsonModal({
                 <AlertTriangle size="1.5vh" color="#E0776B" />
                 <Text ff="Akrobat SemiBold" size="xs" c="#E0776B">{check.error}</Text>
               </>
+            ) : problems.length > 0 ? (
+              <>
+                <AlertTriangle size="1.5vh" color="#E0776B" />
+                <Text ff="Akrobat SemiBold" size="xs" c="#E0776B" style={{ flexShrink: 0 }}>
+                  {problems.length} {problems.length === 1 ? 'value is' : 'values are'} not valid:
+                </Text>
+                <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.55)" truncate>
+                  {problems.slice(0, 2).map((p) => `${p.label} — ${p.message}`).join(' · ')}
+                  {problems.length > 2 ? ` +${problems.length - 2}` : ''}
+                </Text>
+              </>
             ) : check.unknown.length > 0 ? (
               <>
                 <AlertTriangle size="1.5vh" color="#E0B15F" />
@@ -136,7 +168,7 @@ export function JsonModal({
             <StudioButton
               label={t('jsonModal.stage_import', 'Stage import')}
               primary
-              disabled={!canEdit || !check.ok}
+              disabled={!canEdit || !check.ok || problems.length > 0}
               onClick={apply}
             />
           </Flex>

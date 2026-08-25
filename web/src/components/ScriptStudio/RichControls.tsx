@@ -90,16 +90,46 @@ export function SliderControl({
 
 /** A two-number bound - weight limits, depth range, crush circle count. */
 export function RangeControl({
-  value, onChange, disabled, suffix,
+  value, onChange, disabled, suffix, min, max,
 }: {
   value: unknown;
   onChange: (next: number[]) => void;
   disabled?: boolean;
   suffix?: string;
+  /** bounds from the schema's `items`, when it declares any */
+  min?: number;
+  max?: number;
 }) {
   const styles = useInputStyles();
   const pair = Array.isArray(value) ? value : [0, 0];
   const [low, high] = [Number(pair[0] ?? 0), Number(pair[1] ?? 0)];
+
+  /**
+   * A pair that cannot be nonsense.
+   *
+   * The schema's rules caught a backwards pair on SAVE, which is late: the
+   * field accepted a depth of -10 and said nothing until the save bar refused,
+   * and the two numbers could cross over in the meantime. Both bounds are
+   * held here as you type - the schema still has the last word, this just
+   * stops you writing something it will reject.
+   */
+  const clamp = (n: number) => {
+    let out = Number.isFinite(n) ? n : 0;
+    if (typeof min === 'number') out = Math.max(min, out);
+    if (typeof max === 'number') out = Math.min(max, out);
+    return out;
+  };
+
+  // The edited side wins and pushes the other, rather than being silently
+  // refused: dragging a minimum past the maximum usually means you want both.
+  const setLow = (next: number) => {
+    const value = clamp(next);
+    onChange([value, Math.max(value, high)]);
+  };
+  const setHigh = (next: number) => {
+    const value = clamp(next);
+    onChange([Math.min(low, value), value]);
+  };
 
   return (
     <Flex align="center" gap="xs" style={{ width: '100%' }}>
@@ -107,7 +137,10 @@ export function RangeControl({
         <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.1em" c="rgba(255,255,255,0.35)">Min</Text>
         <NumberInput
           value={low}
-          onChange={(v) => onChange([Number(v) || 0, high])}
+          onChange={(v) => setLow(Number(v) || 0)}
+          min={min}
+          max={max}
+          clampBehavior="strict"
           disabled={disabled}
           decimalScale={2}
           hideControls
@@ -119,7 +152,10 @@ export function RangeControl({
         <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.1em" c="rgba(255,255,255,0.35)">Max</Text>
         <NumberInput
           value={high}
-          onChange={(v) => onChange([low, Number(v) || 0])}
+          onChange={(v) => setHigh(Number(v) || 0)}
+          min={min}
+          max={max}
+          clampBehavior="strict"
           disabled={disabled}
           decimalScale={2}
           hideControls

@@ -114,3 +114,40 @@ code {
 .studio-scroll > * {
   flex-shrink: 0;
 }
+
+/* Inputs that come from dirk-cfx-react with a closed prop type.
+   They are Mantine underneath but arrive with their own defaults, so without
+   this they sit visibly apart from the panel's own fields. The values come
+   from the panel itself (see useInputCssVars), never guessed here. */
+.studio-native .mantine-Input-input,
+.studio-native .mantine-MultiSelect-input,
+.studio-native .mantine-Select-input {
+  background: var(--studio-input-bg);
+  border: var(--studio-input-border);
+  border-radius: var(--studio-input-radius);
+  min-height: var(--studio-input-height);
+  height: var(--studio-input-height);
+  font-family: 'Akrobat SemiBold';
+  font-size: var(--studio-input-font-size);
+  padding-inline: var(--studio-input-padding);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* The popup half, for the inputs whose props are closed.
+   A dropdown is PORTALLED to <body>, so no wrapper class can reach it - it
+   has to be matched globally. The values are the panel's own (published on
+   its root by useInputCssVars), and the rules no-op anywhere those variables
+   are not defined, so nothing outside the panel is touched. */
+.mantine-Combobox-dropdown,
+.mantine-Select-dropdown,
+.mantine-MultiSelect-dropdown,
+.mantine-Autocomplete-dropdown {
+  background: var(--studio-dropdown-bg, inherit);
+  border: var(--studio-dropdown-border, inherit);
+  border-radius: var(--studio-dropdown-radius, inherit);
+}
+
+.mantine-Combobox-option {
+  font-family: 'Akrobat SemiBold';
+  border-radius: var(--studio-dropdown-radius, inherit);
+}

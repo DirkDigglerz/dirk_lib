@@ -254,7 +254,7 @@
   "settings.logger.datadog.site.label": "Sritis",
   "settings.logger.datadog.site.description": "Datadog sritis, pvz. datadoghq.com, datadoghq.eu, us5.datadoghq.com.",
   "sections.basic.label": "Pagrindiniai",
-  "sections.appearance.label": "Išvaizda",
+  "sections.appearance.label": "Tema",
   "sections.bridging.label": "Integracijos",
   "sections.groups.label": "Grupės",
   "sections.discord.label": "Discord",

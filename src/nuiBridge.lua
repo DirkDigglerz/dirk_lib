@@ -73,6 +73,125 @@ return function(frameworkBridge)
   -- itself; all that comes back is a network id. Without permission there is
   -- no vehicle to be seated in, so this callback existing in a resource is not
   -- a way to spawn one.
+  -- Test suites: which scripts have one, and running one on request.
+  RegisterNuiCallback('GET_TEST_INDEX', function(data, cb)
+    CreateThread(function()
+      local ok, success, _err, found = pcall(lib.callback.await, 'dirk_lib:getTestIndex', {
+        resources = type(data) == 'table' and data.resources or {},
+      })
+      cb({ resources = (ok and success and type(found) == 'table') and found or {} })
+    end)
+  end)
+
+  RegisterNuiCallback('GET_TEST_STATE', function(data, cb)
+    CreateThread(function()
+      local ok, success, _err, state = pcall(lib.callback.await, 'dirk_lib:getTestState', {
+        resource = type(data) == 'table' and data.resource or nil,
+      })
+      cb((ok and success and type(state) == 'table') and state or { ran = false })
+    end)
+  end)
+
+  RegisterNuiCallback('RUN_TESTS', function(data, cb)
+    CreateThread(function()
+      local resource = type(data) == 'table' and data.resource or nil
+      if type(resource) ~= 'string' or resource == '' then
+        cb({ ok = false, _error = 'BadRequest' })
+        return
+      end
+
+      -- Answered by the SCRIPT, not by dirk_lib: the registry is per-VM.
+      local ok, success, err, result = pcall(lib.callback.await, ('%s:test:run'):format(resource), {
+        filter = type(data) == 'table' and data.filter or nil,
+      })
+
+      if not ok or not success or type(result) ~= 'table' then
+        cb({ ok = false, _error = (ok and err) or 'CallbackFailed' })
+        return
+      end
+      cb({ ok = true, result = result })
+    end)
+  end)
+
+  -- Changelogs, read straight out of each resource's own CHANGELOG.md.
+  RegisterNuiCallback('GET_CHANGELOG', function(data, cb)
+    CreateThread(function()
+      local ok, success, err, payload = pcall(lib.callback.await, 'dirk_lib:getChangelog', {
+        resource = type(data) == 'table' and data.resource or nil,
+      })
+      if not ok or not success then
+        cb({ ok = false, _error = (ok and err) or 'CallbackFailed' })
+        return
+      end
+      cb({ ok = true, text = payload and payload.text or '', version = payload and payload.version or nil })
+    end)
+  end)
+
+  RegisterNuiCallback('GET_CHANGELOG_INDEX', function(data, cb)
+    CreateThread(function()
+      local ok, success, _err, found = pcall(lib.callback.await, 'dirk_lib:getChangelogIndex', {
+        resources = type(data) == 'table' and data.resources or {},
+      })
+      cb({ resources = (ok and success and type(found) == 'table') and found or {} })
+    end)
+  end)
+
+  -- World position, for any coordinate control in the panel.
+  --
+  -- dirk-cfx-react's Vector4 buttons call these BY NAME with no resource
+  -- scope - every script that has an admin panel registers its own pair. The
+  -- Studio is dirk_lib's own page, so `fetchNui` posts here: without these the
+  -- Goto and Set buttons post into nothing and silently do nothing, which is
+  -- exactly how they behaved. Kept identical to the copies in dirk_fishing and
+  -- dirk_druglabsv2 so a coordinate behaves the same wherever it is edited.
+  RegisterNuiCallback('GET_POSITION', function(_, cb)
+    local ped = PlayerPedId()
+    local pos = GetEntityCoords(ped)
+    cb({ x = pos.x, y = pos.y, z = pos.z, w = GetEntityHeading(ped) })
+  end)
+
+  RegisterNuiCallback('GOTO_POSITION', function(data, cb)
+    cb({})
+    if type(data) ~= 'table' then return end
+    local x = tonumber(data.x) or 0.0
+    local y = tonumber(data.y) or 0.0
+    local z = tonumber(data.z) or 0.0
+    local w = tonumber(data.w) or 0.0
+    local ped = PlayerPedId()
+    -- The ped root sits about a metre above the visual ground when standing,
+    -- so drop it by one rather than arriving mid-air.
+    SetEntityCoords(ped, x + 0.0, y + 0.0, z - 1.0, false, false, false, false)
+    SetEntityHeading(ped, w % 360.0)
+  end)
+
+  -- Give the editor one of a script's own items.
+  --
+  -- Same reasoning as SPAWN_VEHICLE below: the server decides, gated on
+  -- permission to edit the OWNING script, so this callback existing is not a
+  -- way to hand yourself items.
+  RegisterNuiCallback('GIVE_ITEM', function(data, cb)
+    CreateThread(function()
+      local resource = type(data) == 'table' and data.resource or nil
+      local item = type(data) == 'table' and data.item or nil
+      if type(resource) ~= 'string' or type(item) ~= 'string' or item == '' then
+        cb({ success = false, _error = 'BadRequest' })
+        return
+      end
+
+      local ok, success, err = pcall(lib.callback.await, 'dirk_lib:giveItem', {
+        resource = resource,
+        item = item,
+        count = tonumber(data.count) or 1,
+      })
+
+      if not ok or not success then
+        cb({ success = false, _error = (ok and err) or 'CallbackFailed' })
+        return
+      end
+      cb({ success = true })
+    end)
+  end)
+
   RegisterNuiCallback('SPAWN_VEHICLE', function(data, cb)
     CreateThread(function()
       local model = type(data) == 'table' and data.model or nil

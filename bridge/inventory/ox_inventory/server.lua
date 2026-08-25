@@ -94,6 +94,36 @@ local bridge = {
   getItemBySlot = function(invId, slot)
     return exports.ox_inventory:GetSlot(invId, slot)
   end,
+
+  --- The first slot holding `item`, optionally matching metadata.
+  ---
+  --- Six other bridges implement this and ox did not, so `lib.inventory
+  --- .getItemByName` was simply nil on the most common inventory of the lot.
+  --- Consumers had noticed: fishing guards every call to it and carries its
+  --- own scan in loadout.lua. The surface should be the same whichever
+  --- inventory is installed, so here it is.
+  ---
+  --- ox's own Search returns the matching SLOTS, so no full walk is needed.
+  ---@param invId number|string
+  ---@param item string
+  ---@param md table|nil
+  getItemByName = function(invId, item, md)
+    local found = exports.ox_inventory:Search(invId, 'slots', item, md)
+    if type(found) ~= 'table' then return nil end
+    -- Lowest slot first, so repeat calls are stable rather than whichever
+    -- order the search happened to return.
+    local best
+    for i = 1, #found do
+      local slot = found[i]
+      if slot and (not best or (slot.slot or 0) < (best.slot or 0)) then best = slot end
+    end
+    return best
+  end,
+
+  --- Same lookup, with metadata required.
+  getItemByMetadata = function(invId, item, md)
+    return bridge.getItemByName(invId, item, md)
+  end,
   
   getItemLabel = function(item)
     local item_exists =  exports.ox_inventory:Items(item)

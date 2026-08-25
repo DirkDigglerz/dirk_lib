@@ -1,6 +1,9 @@
 import { alpha, Flex, Text, TextInput, useMantineTheme } from '@mantine/core';
-import { resolveItemLabel, useItems } from 'dirk-cfx-react';
-import { Link2 } from 'lucide-react';
+import { fetchNui, resolveItemLabel, useItems } from 'dirk-cfx-react';
+import { Gift, Link2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { useState } from 'react';
+import { notify } from './Toasts';
 import { useInputStyles } from './Controls';
 import { effectiveValue, useStudio } from './store';
 import { ItemArt } from './ui';
@@ -90,6 +93,11 @@ export function RefListControl({
                 styles={styles}
               />
             </Flex>
+
+            {/* The old Misc tab could hand you one of these to test with, and
+                that is most of what the tab was for. The server decides, gated
+                on permission to edit this script. */}
+            <GiftButton resource={resource} itemName={itemName} label={String(row.label ?? itemName)} />
           </Flex>
         );
       })}
@@ -102,5 +110,58 @@ export function RefListControl({
         {t('refListControl.these_follow_the_items_configured_elsewh', 'These follow the items configured elsewhere in this script — change the item there and it changes here.')}
       </Text>
     </Flex>
+  );
+}
+
+
+/** Give yourself one, and say whether it landed. */
+function GiftButton({ resource, itemName, label }: { resource: string; itemName: string; label: string }) {
+  const theme = useMantineTheme();
+  const t = useChrome();
+  const color = theme.colors[theme.primaryColor][5];
+  const [busy, setBusy] = useState(false);
+
+  if (!itemName) return null;
+
+  const give = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const reply = await fetchNui<{ success?: boolean; _error?: string }>(
+        'GIVE_ITEM', { resource, item: itemName, count: 1 }, { success: true },
+      );
+      if (reply?.success) {
+        notify('success', t('refListControl.gave', 'Gave you 1x {}').replace('{}', label));
+      } else {
+        notify('error', t('refListControl.gave_failed', 'Could not give you {}').replace('{}', label));
+      }
+    } catch {
+      notify('error', t('refListControl.gave_failed', 'Could not give you {}').replace('{}', label));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <motion.button
+      type="button"
+      onClick={give}
+      title={t('refListControl.give_one', 'Give me one')}
+      whileHover={{ background: alpha(color, 0.15) }}
+      whileTap={{ scale: 0.95 }}
+      style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: '3vh', height: '3vh',
+        background: 'transparent',
+        border: `0.1vh solid ${alpha(color, 0.25)}`,
+        borderRadius: theme.radius.xs,
+        cursor: 'pointer',
+        flexShrink: 0,
+        opacity: busy ? 0.4 : 1,
+        pointerEvents: busy ? 'none' : 'auto',
+      }}
+    >
+      <Gift size="1.5vh" color={alpha(color, 0.85)} />
+    </motion.button>
   );
 }

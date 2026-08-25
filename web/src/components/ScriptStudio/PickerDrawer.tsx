@@ -1,9 +1,11 @@
 import { alpha, Flex, NumberInput, Text, TextInput, useMantineTheme } from '@mantine/core';
 import { Modal, fetchNui, isEnvBrowser, useItems } from 'dirk-cfx-react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { motion } from 'framer-motion';
-import { Crosshair, Keyboard, MapPin, Navigation, Package, Palette, Search } from 'lucide-react';
+import { ItemArt } from './ui';
+import { Crosshair, Keyboard, MapPin, Navigation, Package, Palette, Plus, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { BLIP_COLORS, useInputStyles } from './Controls';
+import { BLIP_COLORS, useInputStyles, useSearchInputStyles } from './Controls';
 import { StudioButton } from './ui';
 import { MOCK_ITEMS } from './mockData';
 import type { ControlType } from './types';
@@ -34,6 +36,7 @@ export function PickerDrawer({ type, label, help, value, onApply, onClose, disab
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const styles = useInputStyles();
+  const searchStyles = useSearchInputStyles();
   const [draft, setDraft] = useState<unknown>(value);
   const [query, setQuery] = useState('');
   const [capturing, setCapturing] = useState(false);
@@ -62,6 +65,21 @@ export function PickerDrawer({ type, label, help, value, onApply, onClose, disab
   // server actually has, and would happily write one it does not.
   const inventory = useItems();
 
+  /**
+   * A callback ref, not a plain one.
+   *
+   * The virtualiser asks for its scroll element while rendering, and a plain
+   * ref is still null on that first pass - so it started with no element,
+   * never set up its observer, and rendered an empty window. The list scrolled
+   * (the sized spacer was there) and showed nothing, which is the same
+   * measure-once-against-nothing trap the map hit.
+   *
+   * Held in state so attaching the node re-renders and the virtualiser gets a
+   * real element to measure.
+   */
+  const [listEl, setListEl] = useState<HTMLDivElement | null>(null);
+
+
   const items = useMemo(() => {
     if (type !== 'item') return [];
     const all = Object.keys(inventory).length > 0
@@ -77,6 +95,31 @@ export function PickerDrawer({ type, label, help, value, onApply, onClose, disab
     return all.filter((item) => item.name.toLowerCase().includes(needle)
       || item.label.toLowerCase().includes(needle));
   }, [type, query, inventory]);
+
+  /**
+   * A typed name that matches no installed item.
+   *
+   * Offered as its own row rather than silently allowed, so choosing it is a
+   * decision. Hidden once the name IS installed - there is a real row for it.
+   */
+  const customName = useMemo(() => {
+    const typed = query.trim();
+    if (type !== 'item' || !typed) return '';
+    return items.some((item) => item.name.toLowerCase() === typed.toLowerCase()) ? '' : typed;
+  }, [type, query, items]);
+
+  // Row height in px, from vh, because the virtualiser measures in pixels and
+  // the panel is sized in vh. Measured per row after mount, so this only has
+  // to be close.
+  const itemVirtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => listEl,
+    estimateSize: () => Math.round(window.innerHeight * 0.052),
+    overscan: 10,
+    // Re-window whenever the list changes length, so typing a search does not
+    // leave the virtualiser holding a range from the previous result set.
+    getItemKey: (index) => items[index]?.name ?? index,
+  });
 
   return (
     <Modal
@@ -187,54 +230,118 @@ export function PickerDrawer({ type, label, help, value, onApply, onClose, disab
                 onChange={(e) => setQuery(e.currentTarget.value)}
                 placeholder={t('pickerDrawer.search_the_inventory', 'Search the inventory')}
                 leftSection={<Search size="1.5vh" color="rgba(255,255,255,0.35)" />}
-                styles={styles}
+                styles={searchStyles}
                 style={{ width: '100%' }}
               />
-              <Flex direction="column" gap="xxs">
-                {items.map((item) => {
-                  const active = item.name === draft;
-                  return (
-                    <motion.button
-                      key={item.name}
-                      type="button"
-                      onClick={() => !disabled && setDraft(item.name)}
-                      whileTap={{ scale: 0.995 }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: '0.9vh',
-                        padding: '0.7vh 0.8vh',
-                        background: active ? alpha(color, 0.12) : alpha(theme.colors.dark[8], 0.45),
-                        border: `0.1vh solid ${active ? alpha(color, 0.5) : alpha(theme.colors.dark[5], 0.3)}`,
-                        borderRadius: theme.radius.xs,
-                        cursor: disabled ? 'not-allowed' : 'pointer',
-                        textAlign: 'left', width: '100%',
-                      }}
-                    >
-                      <Flex
-                        align="center" justify="center" w="3.2vh" h="3.2vh"
+              {/* Only what is on screen is rendered.
+                  An inventory is thousands of items, and every one of them was
+                  mounted the moment the picker opened - a few thousand buttons,
+                  each with its own image - so the modal stalled before it drew,
+                  and got slower every time the server added an item. */}
+              {/* Name an item that is not installed YET.
+                  Building new equipment usually means configuring it before
+                  the item exists - it lands on the next restart - and a picker
+                  that only offers what is already installed makes that a
+                  chicken-and-egg problem. Typed names are accepted and flagged
+                  amber wherever they appear, rather than refused. */}
+              {customName && (
+                <motion.button
+                  type="button"
+                  // Applies and closes rather than just selecting. The row
+                  // reads as a decision - "use this name anyway" - so needing
+                  // to then find Apply made it look like it had done nothing.
+                  onClick={() => {
+                    if (disabled) return;
+                    setDraft(customName);
+                    onApply(customName);
+                    onClose();
+                  }}
+                  whileTap={{ scale: 0.995 }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.9vh',
+                    padding: '0.7vh 0.8vh',
+                    background: alpha('#f59e0b', 0.1),
+                    border: `0.1vh solid ${alpha('#f59e0b', 0.45)}`,
+                    borderRadius: theme.radius.xs,
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    textAlign: 'left', width: '100%',
+                  }}
+                >
+                  <Flex
+                    align="center" justify="center" w="3.2vh" h="3.2vh"
+                    style={{ flexShrink: 0 }}
+                  >
+                    <Plus size="1.6vh" color="#f59e0b" />
+                  </Flex>
+                  <Flex direction="column" style={{ minWidth: 0, lineHeight: 1.15 }}>
+                    <Text ff="Akrobat Bold" size="xs" c="#f59e0b">
+                      {t('pickerDrawer.use_this_name', 'Use this name anyway')}
+                    </Text>
+                    <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.4)">
+                      {customName} — {t('pickerDrawer.not_installed', 'not installed yet')}
+                    </Text>
+                  </Flex>
+                </motion.button>
+              )}
+
+              <div
+                ref={setListEl}
+                className="studio-scroll"
+                style={{ maxHeight: '44vh', overflowY: 'auto' }}
+              >
+                <div style={{ height: itemVirtualizer.getTotalSize(), width: '100%', position: 'relative' }}>
+                  {itemVirtualizer.getVirtualItems().map((virtual) => {
+                    const item = items[virtual.index];
+                    if (!item) return null;
+                    const active = item.name === draft;
+                    return (
+                      <div
+                        key={item.name}
+                        data-index={virtual.index}
+                        ref={itemVirtualizer.measureElement}
                         style={{
-                          background: alpha(theme.colors.dark[6], 0.6),
-                          border: `0.1vh solid ${alpha(theme.colors.dark[4], 0.45)}`,
-                          borderRadius: '0.3vh', flexShrink: 0,
+                          position: 'absolute', top: 0, left: 0, width: '100%',
+                          transform: `translateY(${virtual.start}px)`,
+                          paddingBottom: '0.4vh',
                         }}
                       >
-                        <Package size="1.6vh" color="rgba(255,255,255,0.45)" />
-                      </Flex>
-                      <Flex direction="column" style={{ minWidth: 0, lineHeight: 1.15 }}>
-                        <Text ff="Akrobat Bold" size="xs" c={active ? color : 'rgba(255,255,255,0.85)'}>{item.label}</Text>
-                        <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.3)">{item.name}</Text>
-                      </Flex>
-                    </motion.button>
-                  );
-                })}
+                        <motion.button
+                          type="button"
+                          onClick={() => !disabled && setDraft(item.name)}
+                          whileTap={{ scale: 0.995 }}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: '0.9vh',
+                            padding: '0.7vh 0.8vh',
+                            background: active ? alpha(color, 0.12) : alpha(theme.colors.dark[8], 0.45),
+                            border: `0.1vh solid ${active ? alpha(color, 0.5) : alpha(theme.colors.dark[5], 0.3)}`,
+                            borderRadius: theme.radius.xs,
+                            cursor: disabled ? 'not-allowed' : 'pointer',
+                            textAlign: 'left', width: '100%',
+                          }}
+                        >
+                          {/* The actual item image. This drew a generic parcel
+                              icon for every row - while a note underneath
+                              promised real images - so the one list where you
+                              choose an item by sight was the one place you
+                              could not see one. ItemArt falls back to the
+                              parcel by itself when an item has no image. */}
+                          <ItemArt name={item.name} size="3.2vh" />
+                          <Flex direction="column" style={{ minWidth: 0, lineHeight: 1.15 }}>
+                            <Text ff="Akrobat Bold" size="xs" c={active ? color : 'rgba(255,255,255,0.85)'}>{item.label}</Text>
+                            <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.3)">{item.name}</Text>
+                          </Flex>
+                        </motion.button>
+                      </div>
+                    );
+                  })}
+                </div>
+
                 {items.length === 0 && (
                   <Flex justify="center" py="md">
                     <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.3)">No item matches "{query}"</Text>
                   </Flex>
                 )}
-              </Flex>
-              <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.28)" pt="xxs">
-                {t('pickerDrawer.in_game_this_list_is_the_live_inventory_', 'In game this list is the live inventory, with real item images.')}
-              </Text>
+              </div>
             </>
           )}
 

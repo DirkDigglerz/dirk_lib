@@ -1,4 +1,4 @@
-import { MultiSelect } from '@mantine/core';
+import { MultiSelect, Select } from '@mantine/core';
 import { resolveItemLabel, useItems } from 'dirk-cfx-react';
 import { useMemo } from 'react';
 import { useInputStyles } from './Controls';
@@ -14,13 +14,15 @@ import { effectiveValue, useStudio } from './store';
  * so renaming a fish upstairs is reflected here before either is saved.
  */
 export function PickListControl({
-  resource, sourcePath, sourceKey, value, onChange, disabled,
+  resource, sourcePath, sourceKey, sourceLabelKey, value, onChange, disabled,
 }: {
   resource: string;
   /** the setting holding the source list, e.g. 'fish' */
   sourcePath: string;
   /** the key on each row that holds the name, e.g. 'name' */
   sourceKey: string;
+  /** the key to SHOW, when the stored value is an id rather than a name */
+  sourceLabelKey?: string;
   value: unknown;
   onChange: (next: string[]) => void;
   disabled?: boolean;
@@ -41,13 +43,16 @@ export function PickListControl({
         if (!row || typeof row !== 'object') return null;
         const name = String((row as Record<string, unknown>)[sourceKey] ?? '');
         if (!name) return null;
+        const shown = sourceLabelKey
+          ? String((row as Record<string, unknown>)[sourceLabelKey] ?? name)
+          : String((row as Record<string, unknown>).label ?? name);
         // the inventory's label if it knows this one, else whatever the row says
-        const label = resolveItemLabel(items, name, String((row as Record<string, unknown>).label ?? name));
+        const label = resolveItemLabel(items, name, shown);
         return { value: name, label: label === name ? name : `${label} (${name})` };
       })
       .filter((option): option is { value: string; label: string } => option !== null);
     // `draft` is in the deps on purpose: the source list is being edited too
-  }, [entries, resource, sourcePath, sourceKey, items, draft]);
+  }, [entries, resource, sourcePath, sourceKey, sourceLabelKey, items, draft]);
 
   const selected = Array.isArray(value) ? value.map(String) : [];
 
@@ -72,6 +77,74 @@ export function PickListControl({
       comboboxProps={{ zIndex: 10800 }}
       styles={{ ...styles, input: { ...styles.input, height: undefined, minHeight: '3.2vh' } }}
       style={{ width: '100%' }}
+    />
+  );
+}
+
+
+/**
+ * The same reference, when only one is allowed.
+ *
+ * A tournament runs in ONE fishing zone, or anywhere at all - which is why the
+ * blank option is offered rather than the field being required. Built on the
+ * same source list as the multi-select above so the two cannot drift apart.
+ */
+export function PickOneControl({
+  resource, sourcePath, sourceKey, sourceLabelKey, value, onChange, disabled, anyLabel,
+}: {
+  resource: string;
+  sourcePath: string;
+  sourceKey: string;
+  sourceLabelKey?: string;
+  value: unknown;
+  onChange: (next: string | undefined) => void;
+  disabled?: boolean;
+  /** what "no choice" means here, e.g. "Anywhere" */
+  anyLabel?: string;
+}) {
+  const styles = useInputStyles();
+  const entries = useStudio((state) => state.scripts.find((s) => s.resource === resource)?.entries ?? []);
+  const draft = useStudio((state) => state.draft[resource]);
+
+  const options = useMemo(() => {
+    const source = entries.find((entry) => entry.path === sourcePath);
+    const rows = source ? effectiveValue(resource, source) : null;
+    if (!Array.isArray(rows)) return [];
+    return rows
+      .map((row) => {
+        if (!row || typeof row !== 'object') return null;
+        const stored = String((row as Record<string, unknown>)[sourceKey] ?? '');
+        if (!stored) return null;
+        const shown = sourceLabelKey
+          ? String((row as Record<string, unknown>)[sourceLabelKey] ?? stored)
+          : String((row as Record<string, unknown>).label ?? stored);
+        return { value: stored, label: shown };
+      })
+      .filter((o): o is { value: string; label: string } => o !== null);
+    // `draft` on purpose: the source list is being edited in the same session
+  }, [entries, resource, sourcePath, sourceKey, sourceLabelKey, draft]);
+
+  const current = typeof value === 'string' ? value : '';
+
+  // A value pointing at a row that no longer exists stays visible and says so.
+  const data = useMemo(() => {
+    const known = options.some((o) => o.value === current);
+    const missing = current && !known
+      ? [{ value: current, label: `${current} — not in ${sourcePath}` }]
+      : [];
+    return [{ value: '', label: anyLabel ?? 'Any' }, ...options, ...missing];
+  }, [options, current, sourcePath, anyLabel]);
+
+  return (
+    <Select
+      data={data}
+      value={current}
+      onChange={(next) => onChange(next || undefined)}
+      disabled={disabled}
+      searchable
+      allowDeselect={false}
+      styles={styles}
+      style={{ flex: 1 }}
     />
   );
 }

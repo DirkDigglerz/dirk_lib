@@ -4,6 +4,8 @@ import { MOCK_LOCALES } from './mockLocales';
 import { MOCK_SCRIPTS } from './mockData';
 import type { LocaleBundles } from './studioLocale';
 import type { SettingEntry, StudioScript } from './types';
+import { studioQueryClient } from './studioQuery';
+import type { DispatchEntry } from './Dispatch';
 
 // A staged edit. `reset` means "put this back to the shipped default on save",
 // which is a delete server-side rather than a write - the same distinction the
@@ -62,6 +64,34 @@ type StudioState = {
    */
   shownList: string | null;
   /**
+   * "Open row 27 of `fish`" - asked for from somewhere that is not the list.
+   *
+   * A validation problem names a row (`fish[27].waterTypes`), and the only
+   * useful thing to do with that is put you in front of it. The list owns its
+   * own row editor, so this is how anything else asks it to open one. Cleared
+   * once taken.
+   */
+  openRowRequest: { path: string; index: number } | null;
+  /**
+   * Announcements for the Overview page.
+   *
+   * Empty until dirk_lib fetches them, and the page falls back to its mock
+   * spread so it can be designed against something. Already filtered when it
+   * arrives: which script is running, who is behind a version, whether a promo
+   * has started - all resolved server-side, so a client only ever holds the
+   * entries it was meant to see.
+   */
+  dispatch: DispatchEntry[];
+  /**
+   * Resources with a CHANGELOG.md worth reading.
+   *
+   * Asked once, for every script at once, so the rail can offer the tab only
+   * where there is something behind it rather than opening an empty page.
+   */
+  changelogs: string[];
+  /** resources with a lib.test suite loaded, so the rail only offers the tab there */
+  tests: string[];
+  /**
    * Id of the design currently open in the editor, or null while browsing.
    *
    * Browsing designs is an ordinary page and keeps the rail. EDITING is a mode:
@@ -92,6 +122,10 @@ export const useStudio = create<StudioState>(() => ({
   drillPath: null,
   activeList: null,
   shownList: null,
+  openRowRequest: null,
+  dispatch: [],
+  changelogs: [],
+  tests: [],
   editingDesign: null,
 }));
 
@@ -396,6 +430,15 @@ export async function commitDraft(resource: string): Promise<boolean> {
   }
 
   applyStagedLocally(resource);
+
+  // A save is exactly the thing that adds a change-log entry, so the cached
+  // history for this script is now wrong. Nothing dropped it, and history is
+  // cached for a minute on the grounds that a written log line never changes -
+  // true of each line, false of the list. So saving looked like it had not
+  // been recorded at all: the entry was in the database and the panel was
+  // still showing the page it fetched before the save.
+  studioQueryClient.invalidateQueries({ queryKey: ['scriptConfigHistory', resource] });
+
   // The version moves on with every write; keeping the old one would make the
   // NEXT save look stale.
   const nextVersion = reply.meta?.client_version;

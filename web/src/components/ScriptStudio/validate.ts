@@ -23,9 +23,34 @@ export type Problem = { path: string; label: string; group: string; message: str
 
 /** Everything wrong with a script's staged config, in rail order. */
 export function problemsFor(resource: string): Problem[] {
+  return collectProblems(resource);
+}
+
+/**
+ * The same checks, against values that are not in the store yet.
+ *
+ * The manual JSON editor pastes a whole config in one go. It could only tell
+ * you whether the text parsed and which paths it did not recognise - so a
+ * string where a number belongs, a percentage of 400, an enum spelled wrong,
+ * or a required field left blank all applied without a word, while the exact
+ * same value typed into the form would have been caught. Same rules, whichever
+ * door the value comes through.
+ */
+export function problemsForValues(
+  resource: string,
+  values: Map<string, unknown>,
+): Problem[] {
+  return collectProblems(resource, values);
+}
+
+function collectProblems(resource: string, override?: Map<string, unknown>): Problem[] {
   const state = useStudio.getState();
   const script = state.scripts.find((s) => s.resource === resource);
   if (!script) return [];
+
+  const valueOf = (entry: SettingEntry) => (
+    override?.has(entry.path) ? override.get(entry.path) : effectiveValue(resource, entry)
+  );
 
   // The old rules carried locale keys, not sentences - `ErrMinMax`,
   // `ErrRequired`. Resolving through the owning script's bundle keeps that,
@@ -35,7 +60,7 @@ export function problemsFor(resource: string): Problem[] {
 
   const lookup: Lookup = (path) => {
     const entry = script.entries.find((e) => e.path === path);
-    return entry ? effectiveValue(resource, entry) : undefined;
+    return entry ? valueOf(entry) : undefined;
   };
 
   const problems: Problem[] = [];
@@ -46,7 +71,7 @@ export function problemsFor(resource: string): Problem[] {
     // switched off would block every save on a server that does not use it.
     if (entry.enabledWhen && !test(entry.enabledWhen as Condition, undefined, lookup)) continue;
 
-    const value = effectiveValue(resource, entry);
+    const value = valueOf(entry);
     for (const message of checkValue(entry, value, lookup)) {
       problems.push({ path: entry.path, label: entry.label, group: entry.group, message: say(message) });
     }
