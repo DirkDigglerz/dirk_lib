@@ -442,6 +442,36 @@ end
     end)
   end)
 
+  --- The Logs page: one page of lines, its filter options, and how much is kept.
+  ---
+  --- Three separate callbacks rather than one payload, because they are asked
+  --- for at very different rates. Rows are paged as you scroll; the facets and
+  --- the health figures change slowly and the page caches them for minutes.
+  --- Bundling them would refetch the expensive ones on every scroll.
+  RegisterNuiCallback('GET_LOGS', function(data, cb)
+    if not adminUiOpen() then cb({ success = false, _error = 'NotOpen' }) return end
+    CreateThread(function()
+      local ok, result, err = pcall(lib.callback.await, 'dirk_lib:getLogs', type(data) == 'table' and data or {})
+      cb({ success = ok and result ~= nil, data = result, _error = (not ok) and 'CallbackFailed' or err })
+    end)
+  end)
+
+  RegisterNuiCallback('GET_LOG_FACETS', function(data, cb)
+    if not adminUiOpen() then cb({ success = false, _error = 'NotOpen' }) return end
+    CreateThread(function()
+      local ok, result, err = pcall(lib.callback.await, 'dirk_lib:getLogFacets', type(data) == 'table' and data or {})
+      cb({ success = ok and result ~= nil, data = result, _error = (not ok) and 'CallbackFailed' or err })
+    end)
+  end)
+
+  RegisterNuiCallback('GET_LOG_HEALTH', function(_, cb)
+    if not adminUiOpen() then cb({ success = false, _error = 'NotOpen' }) return end
+    CreateThread(function()
+      local ok, result, err = pcall(lib.callback.await, 'dirk_lib:getLogHealth')
+      cb({ success = ok and result ~= nil, data = result, _error = (not ok) and 'CallbackFailed' or err })
+    end)
+  end)
+
   RegisterNuiCallback('STUDIO_REQUEST', function(data, cb)
     if not adminUiOpen() then cb({ success = false, _error = 'NotOpen' }) return end
     CreateThread(function()

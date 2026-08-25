@@ -613,6 +613,109 @@
             "path": "logger.service",
             "equals": "fivemanage"
           }
+        },
+        "local": {
+          "type": "object",
+          "description": "Keep log lines in this server's own database, so the Logs page has something to show. Independent of the external services above - both can run, or neither.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "x-restartRequired": false,
+              "description": "Keep every log line in a `dirk_logs` table, which is what the Logs page reads. On by default - this is where logs live now. Turning it off leaves the page empty."
+            },
+            "retentionDays": {
+              "type": "integer",
+              "default": 14,
+              "minimum": 1,
+              "maximum": 365,
+              "description": "How long a log line is kept. Older rows are deleted hourly, in slices, so a long-idle server does not lock the table catching up.",
+              "x-enabledWhen": {
+                "path": "logger.local.enabled",
+                "equals": true
+              }
+            }
+          }
+        },
+        "routes": {
+          "type": "array",
+          "x-arrayKey": "id",
+          "x-serverOnly": true,
+          "description": "Send matching log lines to a Discord webhook, as well as keeping them here. Leave a filter empty to mean 'any' - a route with no filters at all forwards everything.",
+          "x-rowOrder": [
+            "label",
+            "enabled",
+            "url",
+            "resources",
+            "events",
+            "levels"
+          ],
+          "x-rowControls": {
+            "url": {
+              "control": "secret",
+              "action": {
+                "label": "Test",
+                "callback": "testLogRoute",
+                "icon": "send",
+                "sendSection": true
+              }
+            },
+            "resources": "tags",
+            "events": "tags",
+            "levels": {
+              "control": "enumList",
+              "options": [
+                {
+                  "value": "info",
+                  "label": "Info"
+                },
+                {
+                  "value": "warn",
+                  "label": "Warning"
+                },
+                {
+                  "value": "error",
+                  "label": "Error"
+                }
+              ]
+            }
+          },
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "enabled": {
+                "type": "boolean"
+              },
+              "url": {
+                "type": "string"
+              },
+              "resources": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "events": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "levels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": []
         }
       }
     }

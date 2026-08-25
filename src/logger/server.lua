@@ -18,6 +18,9 @@
 -- Helpers (ported verbatim from the old modules/logger/server.lua).
 -- ─────────────────────────────────────────────────────────────────────────
 
+local localSink = require '@dirk_lib.src.logger.localSink'
+local routes = require '@dirk_lib.src.logger.routes'
+
 local function removeColorCodes(str)
     -- replace ^[0-9] with nothing
     str = string.gsub(str, "%^%d", "")
@@ -225,15 +228,34 @@ local function resolveActive()
     end
 end
 
+--- The local sink follows the same settings block, and the same live updates.
+---
+--- Read through `.on` rather than `.get` at module load: a client-side get at
+--- load time deadlocks, and the server side is no less prone to reading a
+--- config that has not arrived yet.
+local function resolveLocal()
+    local cfg = lib.scriptConfig and lib.scriptConfig.get
+        and (lib.scriptConfig.get('logger') or {})
+        or {}
+    localSink.configure(cfg['local'])
+    routes.configure(cfg.routes)
+end
+
 CreateThread(function()
     Wait(0)
     resolveActive()
+    resolveLocal()
     if lib.scriptConfig and lib.scriptConfig.on then
         lib.scriptConfig.on('logger', function()
             resolveActive()
+            resolveLocal()
         end)
     end
 end)
+
+-- Reading the table back is its own concern; loaded here so the callbacks
+-- exist wherever the sink does.
+require '@dirk_lib.src.logger.read'
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- Per-backend buffered emit. One buffer per process (shared across every
@@ -382,6 +404,33 @@ exports('logger_emit', function(source, event, message, ...)
     -- GetInvokingResource() is valid synchronously inside the export call;
     -- fall back to dirk_lib if it's ever nil (e.g. an in-VM call).
     local resource = GetInvokingResource() or cache.resource
+
+    -- Three INDEPENDENT destinations, none of them conditional on another.
+    --
+    -- The local table is where logs live - it is what the panel reads. Routes
+    -- forward a subset on to Discord as WELL, never instead. The external
+    -- service is its own thing again. `emit` below returns immediately when no
+    -- external service is configured, which is most servers, so hanging
+    -- anything else off it would have made the whole feature work only for
+    -- people who already had Datadog.
+    -- A consumer says how serious a line is with a `level:warn` tag, which
+    -- rides the existing varargs rather than changing the call signature every
+    -- script already uses. It matters because routes filter on it: "send me
+    -- the problems" is the second route anyone makes.
+    local level = 'info'
+    for _, tag in ipairs({ ... }) do
+        if type(tag) == 'string' then
+            local found = tag:match('^level:(%a+)$')
+            if found == 'warn' or found == 'error' or found == 'info' then
+                level = found
+                break
+            end
+        end
+    end
+
+    pcall(localSink.write, resource, source, event, message, level, nil)
+    pcall(routes.forward, resource, event, message, level, localSink.playerFor(source))
+
     local ok, err = pcall(emit, resource, source, event, message, ...)
     if not ok then
         lib.print.warn(('[lib.logger] emit failed: %s'):format(tostring(err)))
@@ -394,5 +443,20 @@ end)
 -- name ('datadog'|'loki'|'fivemanage') or nil when off — the name alone is not
 -- a secret (it's already visible in the panel's service dropdown).
 exports('logger_isConfigured', function()
-    return active and active.service or nil
+    -- The LOCAL sink counts.
+    --
+    -- Consumers use this to answer "is there any point building a log payload"
+    -- - fishing skips the whole embed unless something will receive it. When
+    -- this only reported external services, adding the local sink meant the
+    -- Logs page stayed empty even with logging switched on: every call site
+    -- correctly decided nobody was listening, while a table sat there waiting.
+    --
+    -- An external service still wins the NAME, because a consumer that cares
+    -- which backend is live means that one; 'local' is the honest answer when
+    -- the database is the only destination.
+    if active and active.service then return active.service end
+    if localSink.isEnabled() then return 'local' end
+    -- A route with no local sink is unusual but legal: forward to Discord,
+    -- keep nothing. Still a destination, so still worth building a payload for.
+    return routes.wants(GetInvokingResource() or cache.resource) and 'routes' or nil
 end)

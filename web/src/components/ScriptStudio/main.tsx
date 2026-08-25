@@ -2275,7 +2275,7 @@ const SettingRow = memo(function SettingRow({
           {entry.action && (
             <FieldAction
               resource={resource}
-              entry={entry}
+              action={entry.action}
               value={value}
               section={entry.action.sendSection ? sectionValues(resource, entry.path) : undefined}
               disabled={!canEdit}

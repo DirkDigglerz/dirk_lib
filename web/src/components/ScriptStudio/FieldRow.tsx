@@ -9,6 +9,7 @@ import { KeybindMapControl } from './KeybindMapControl';
 import { GroupGradeControl } from './GroupGradeControl';
 import { WeekdayControl } from './WeekdayControl';
 import { PedsField } from './PedControl';
+import { FieldAction } from './FieldAction';
 import { PositionListControl } from './PositionListControl';
 import { PickListControl, PickOneControl } from './PickListControl';
 import { WeightMapControl } from './WeightMapControl';
@@ -227,6 +228,20 @@ export function FieldRow({
           suffix={column.suffix}
           onChange={onChange}
         />
+      )}
+
+      {/* A row field can DO something too - testing the webhook you just
+          pasted into a route is precisely when the button is wanted. */}
+      {column.action && resource && (
+        <Flex justify="flex-end">
+          <FieldAction
+            resource={resource}
+            action={column.action}
+            value={value}
+            section={row}
+            disabled={disabled}
+          />
+        </Flex>
       )}
 
       {column.type === 'peds' && (

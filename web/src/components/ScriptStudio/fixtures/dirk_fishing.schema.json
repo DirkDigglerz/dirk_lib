@@ -9065,98 +9065,18 @@
         "path": "logging.enabled",
         "equals": true
       },
-      "description": "Discord webhook logging. Posts server-side events (sales, catches, etc.) to a Discord channel via a webhook. The webhook URL is server-only and never sent to any client. Everything is OFF by default - set a webhook URL, turn logging on, then enable the events you want.",
+      "description": "What fishing reports. Webhooks, filters and retention moved to /dirk_config > Logs, so one place configures every script instead of each one carrying its own copy.",
       "properties": {
         "enabled": {
           "type": "boolean",
-          "default": false,
-          "description": "Master switch for Discord webhook logging. When off, nothing is logged regardless of the per-event toggles."
-        },
-        "webhookUrl": {
-          "x-control": "secret",
-          "type": "string",
-          "default": "",
-          "x-serverOnly": true,
-          "description": "Discord webhook URL that logs are posted to. SERVER-ONLY - stripped from every client/admin-panel snapshot and never leaves the server. If blank, nothing is logged. Get one from Discord > Edit Channel > Integrations > Webhooks.",
-          "x-action": {
-            "label": "Test webhook",
-            "callback": "admin:testWebhook",
-            "icon": "send",
-            "sendSection": true
-          }
-        },
-        "username": {
-          "type": "string",
-          "default": "Dirk Fishing",
-          "description": "Display name the webhook posts under."
-        },
-        "avatarUrl": {
-          "type": "string",
-          "default": "",
-          "description": "Avatar image URL for the webhook messages (optional)."
-        },
-        "embedColor": {
-          "x-control": "color",
-          "type": "string",
-          "default": "#4AB569",
-          "description": "Default embed colour (hex) for log messages."
+          "default": true,
+          "description": "Report fishing events to dirk_lib's logging. Where they GO - the Logs page, Discord webhooks, an external service - is set once in /dirk_config > Logs and applies to every dirk script."
         },
         "suspiciousSaleThreshold": {
           "type": "number",
           "default": 0,
           "minimum": 0,
           "description": "If a single sale pays out more than this amount, the log entry is flagged with a warning (anti-exploit). 0 disables flagging. Requires the relevant sale event to be enabled."
-        },
-        "events": {
-          "type": "object",
-          "description": "Which events to log. All OFF by default. Nothing is logged unless 'enabled' is on and a webhook URL is set.",
-          "properties": {
-            "fishCaught": {
-              "type": "boolean",
-              "default": false,
-              "description": "A player catches a fish (species, weight, zone)."
-            },
-            "fishSold": {
-              "type": "boolean",
-              "default": false,
-              "description": "A player sells fish at the market (payout, quantity, species)."
-            },
-            "baitSold": {
-              "type": "boolean",
-              "default": false,
-              "description": "A player sells bait."
-            },
-            "equipmentBought": {
-              "type": "boolean",
-              "default": false,
-              "description": "A player buys from an equipment store (rods, reels, line, hooks, bait, tools - any store purchase)."
-            },
-            "permitBought": {
-              "type": "boolean",
-              "default": false,
-              "description": "A player buys a fishing permit."
-            },
-            "crabPotPlaced": {
-              "type": "boolean",
-              "default": false,
-              "description": "A player places a crab pot / trap."
-            },
-            "crabPotCollected": {
-              "type": "boolean",
-              "default": false,
-              "description": "A player collects a crab pot / trap."
-            },
-            "dailyChallenge": {
-              "type": "boolean",
-              "default": false,
-              "description": "A player completes a daily challenge."
-            },
-            "tournament": {
-              "type": "boolean",
-              "default": false,
-              "description": "Tournament events (a player wins or joins)."
-            }
-          }
         }
       }
     }

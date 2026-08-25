@@ -34,8 +34,11 @@ end
 -- callable exists even when no backend is configured — it just no-ops inside
 -- dirk_lib's VM). Consumers that used `lib.logger ~= nil` to detect "is an
 -- external sink configured?" should switch to `lib.logger.isConfigured()`,
--- which returns the active backend name ('datadog'|'loki'|'fivemanage') or nil
--- when off. No credential ever crosses this boundary.
+-- which returns the active destination ('datadog'|'loki'|'fivemanage'|'local')
+-- or nil when nothing at all will receive the line. 'local' means dirk_lib's
+-- own log table - the one the Logs page reads - which is a destination like
+-- any other, and the reason this predicate exists rather than a nil check on
+-- lib.logger itself. No credential ever crosses this boundary.
 lib.logger = setmetatable({
     isConfigured = function()
         local ok, r = pcall(function()

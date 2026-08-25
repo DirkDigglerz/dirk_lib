@@ -135,6 +135,8 @@ export type SettingColumn = {
   boundsFrom?: { path: string };
   /** which icon set an `icon` field's value belongs to - `x-iconSet` */
   iconSet?: 'lucide' | 'fontawesome';
+  /** a button beside this field that does something - see SettingEntry.action */
+  action?: { label: string; callback: string; icon?: string; sendSection?: boolean };
   /** which modal tab this field belongs to */
   tab?: string;
 };

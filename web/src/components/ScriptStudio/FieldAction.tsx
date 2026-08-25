@@ -43,10 +43,17 @@ const REASONS: Record<string, string> = {
 };
 
 export function FieldAction({
-  resource, entry, value, section, disabled,
+  resource, action, value, section, disabled,
 }: {
   resource: string;
-  entry: SettingEntry;
+  /**
+   * The action itself, rather than the setting carrying it.
+   *
+   * A row column can declare one too - testing a webhook you have just pasted
+   * into a route is exactly when the button is wanted - and a column is not a
+   * SettingEntry.
+   */
+  action: NonNullable<SettingEntry['action']>;
   value: unknown;
   /**
    * The whole section this setting sits in.
@@ -62,9 +69,6 @@ export function FieldAction({
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const [running, setRunning] = useState(false);
-
-  const action = entry.action;
-  if (!action) return null;
 
   const run = async () => {
     if (running || disabled) return;

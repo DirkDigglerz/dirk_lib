@@ -1,5 +1,6 @@
 import { alpha, Flex, Select, Text, TextInput, useMantineTheme } from '@mantine/core';
-import { QueryClientProvider, useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { facetTotal, formatBytes, useLogFacets, useLogHealth, useLogRows } from './logsData';
 import { studioQueryClient } from './studioQuery';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -8,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  fetchLogFacets, fetchLogs, MOCK_DELIVERY, MOCK_NOW, type LogLevel, type LogRow,
+  MOCK_DELIVERY, MOCK_NOW, type LogLevel, type LogRow,
 } from './mockLogs';
 import { HistoryPanel } from './HistoryModal';
 import { setValue, useStudio } from './store';
@@ -104,25 +105,15 @@ function EventsTab() {
   const deferredSearch = useDeferredValue(search);
   const deferredPlayer = useDeferredValue(player);
 
-  const facets = useQuery({
-    queryKey: ['logFacets', since],
-    queryFn: () => fetchLogFacets(since),
-  });
+  // The real table now, not the mock. Both hooks cache hard and neither
+  // polls: a log line does not change once written, and a page that refetches
+  // on a timer costs something while nobody is looking at it.
+  const facets = useLogFacets(resource, since);
 
-  const logs = useInfiniteQuery({
-    queryKey: ['logs', { since, resource, event, level, player: deferredPlayer, search: deferredSearch }],
-    initialPageParam: null as number | null,
-    queryFn: ({ pageParam }) => fetchLogs({
-      cursor: pageParam,
-      limit: 50,
-      since,
-      resource,
-      event,
-      level,
-      player: deferredPlayer,
-      search: deferredSearch,
-    }),
-    getNextPageParam: (last) => last.nextCursor,
+  const logs = useLogRows({
+    since, resource, event, level,
+    player: deferredPlayer,
+    search: deferredSearch,
   });
 
   const rows = useMemo(() => logs.data?.pages.flatMap((p) => p.rows) ?? [], [logs.data]);
@@ -131,12 +122,9 @@ function EventsTab() {
   // Reset the event filter when it cannot apply to the chosen resource.
   useEffect(() => { setEvent(null); }, [resource]);
 
-  const eventOptions = useMemo(() => {
-    const all = facets.data?.events ?? [];
-    if (!resource) return all;
-    // the mock facets are global; in game this comes back scoped to the filter
-    return all;
-  }, [facets.data, resource]);
+  // Events come back already scoped to the chosen resource - every script
+  // names its own, so an unscoped list is a thousand names nobody can read.
+  const eventOptions = useMemo(() => facets.data?.events ?? [], [facets.data]);
 
   // Infinite scroll: fetch the next page when the sentinel comes into view.
   const sentinel = useRef<HTMLDivElement | null>(null);
@@ -170,7 +158,7 @@ function EventsTab() {
         </Text>
         <FacetRow
           label={t('logsPage.all_resources', 'All resources')}
-          count={facets.data?.total}
+          count={facetTotal(facets.data)}
           active={resource === null}
           onClick={() => setResource(null)}
         />

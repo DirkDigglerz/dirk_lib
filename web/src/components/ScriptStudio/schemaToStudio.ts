@@ -343,6 +343,7 @@ function columnsFor(node: JsonSchema, rows: unknown[]): { columns: SettingColumn
      * permit, saying nothing about why they did nothing.
      */
     enabledWhen?: { path: string; equals?: unknown };
+    action?: { label: string; callback: string; icon?: string; sendSection?: boolean };
   };
   const rowControls = (node?.['x-rowControls'] ?? {}) as Record<string, RowControl>;
 
@@ -369,6 +370,7 @@ function columnsFor(node: JsonSchema, rows: unknown[]): { columns: SettingColumn
     }
     if (entry.anyLabel) target.anyLabel = entry.anyLabel;
     if (entry.iconSet) target.iconSet = entry.iconSet;
+    if (entry.action?.callback) target.action = entry.action;
     if (entry.enabledWhen?.path) {
       target.enabledWhen = {
         path: entry.enabledWhen.path,
