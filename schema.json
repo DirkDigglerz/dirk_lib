@@ -17,7 +17,15 @@
           "type": "string",
           "default": "DirkRP",
           "x-renamedFrom": "branding.serverName",
-          "description": "Server branding string displayed in NUIs that surface a server name."
+          "x-autoDefault": ["sv_projectName", "sv_hostname"],
+          "description": "Server branding string displayed in NUIs that surface a server name. Detected from your server.cfg (sv_projectName, then sv_hostname) until you type something here."
+        },
+        "primaryIdentifier": {
+          "type": "string",
+          "default": "license",
+          "x-renamedFrom": "advanced.primaryIdentifier",
+          "enum": ["license", "license2", "steam", "discord", "fivem", "ip"],
+          "description": "Which player identifier dirk_lib uses as the primary lookup key. Default 'license' works for the vast majority of servers — only change if your framework or txAdmin setup uses a different identifier."
         },
         "language": {
           "type": "string",
@@ -60,11 +68,13 @@
       "description": "Global UI theme and branding shared across every dirk_lib-powered NUI.",
       "properties": {
         "primaryColor": {
+          "x-control": "mantineColor",
           "type": "string",
           "default": "dirk",
           "description": "Mantine palette key used as the UI primary colour. Use 'dirk' to apply the custom palette defined below."
         },
         "primaryShade": {
+          "x-control": "shade",
           "type": "number",
           "default": 9,
           "minimum": 0,
@@ -302,6 +312,7 @@
       "description": "Discord bot credentials used by lib.discord for role lookups, member queries, and any other Discord-backed feature across dirk_lib consumers. Leave blank to disable — features that need it will surface a friendly 'configure in /dirk_lib' message instead of silently failing.",
       "properties": {
         "botToken": {
+          "x-control": "secret",
           "type": "string",
           "default": "",
           "x-serverOnly": true,
@@ -329,7 +340,8 @@
         "hostname": {
           "type": "string",
           "default": "",
-          "description": "Optional hostname label (defaults to sv_projectName)."
+          "x-autoDefault": ["sv_projectName", "sv_hostname"],
+          "description": "Hostname label attached to every log line. Detected from your server.cfg until you type something here."
         },
         "loki": {
           "type": "object",
@@ -346,6 +358,7 @@
               "description": "Basic-auth username. Leave blank for an unauthenticated push endpoint."
             },
             "password": {
+              "x-control": "secret",
               "type": "string",
               "default": "",
               "x-serverOnly": true,
@@ -363,6 +376,7 @@
           "description": "Datadog logs intake credentials. Only used when service = datadog.",
           "properties": {
             "apiKey": {
+              "x-control": "secret",
               "type": "string",
               "default": "",
               "x-serverOnly": true,
@@ -380,6 +394,7 @@
           "description": "Fivemanage logs credentials. Only used when service = fivemanage.",
           "properties": {
             "apiKey": {
+              "x-control": "secret",
               "type": "string",
               "default": "",
               "x-serverOnly": true,
@@ -388,21 +403,6 @@
           }
         }
       }
-    },
-
-    "advanced": {
-      "x-icon": "wrench",
-      "type": "object",
-      "description": "Low-level knobs most servers should leave alone.",
-      "properties": {
-        "primaryIdentifier": {
-          "type": "string",
-          "default": "license",
-          "enum": ["license", "license2", "steam", "discord", "fivem", "ip"],
-          "description": "Which player identifier dirk_lib uses as the primary lookup key. Default 'license' works for the vast majority of servers — only change if your framework or txAdmin setup uses a different identifier."
-        }
-      }
     }
-
   }
 }

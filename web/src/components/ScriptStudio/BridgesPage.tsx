@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { MOCK_BRIDGES, RESOURCE_REGISTRY, type BridgeRow } from './mockBridges';
+import { useChrome } from './studioLocale';
 
 /**
  * What dirk_lib connected to, and whether it took.
@@ -16,6 +17,7 @@ import { MOCK_BRIDGES, RESOURCE_REGISTRY, type BridgeRow } from './mockBridges';
  * place to look when something misbehaves.
  */
 export function BridgesPage() {
+  const t = useChrome();
   return (
     <Flex
       direction="column" gap="lg" p="md"
@@ -24,19 +26,19 @@ export function BridgesPage() {
     >
       <BridgeGroup
         icon={Box}
-        title="Dependencies"
+        title={t('bridgesPage.dependencies', 'Dependencies')}
         description="dirk_lib will not start without these"
         rows={MOCK_BRIDGES.dependencies}
       />
       <BridgeGroup
         icon={Layers}
-        title="Interface"
+        title={t('bridgesPage.interface', 'Interface')}
         description="Who draws notifications, progress bars and prompts"
         rows={MOCK_BRIDGES.interface}
       />
       <BridgeGroup
         icon={Plug}
-        title="Bridges"
+        title={t('bridgesPage.bridges', 'Bridges')}
         description="What each script detected, and whether it took"
         rows={MOCK_BRIDGES.bridges}
       />
@@ -84,6 +86,8 @@ function BridgeGroup({
   );
 }
 
+type Translate = (key: string, fallback: string) => string;
+
 type Verdict = {
   tone: 'ok' | 'bad';
   resolved: string;
@@ -91,8 +95,13 @@ type Verdict = {
   note: string;
 };
 
-/** What a given selection actually resolves to on this server. */
-function verdictFor(row: BridgeRow, value: string): Verdict {
+/**
+ * What a given selection actually resolves to on this server.
+ *
+ * Takes the translator rather than calling one: this is a plain function, not a
+ * component, so there is no hook to call here.
+ */
+function verdictFor(row: BridgeRow, value: string, t: Translate): Verdict {
   // server build / OneSync are not resources, so they carry their own verdict
   if (row.fixed) {
     return {
@@ -105,30 +114,37 @@ function verdictFor(row: BridgeRow, value: string): Verdict {
 
   if (value === 'auto') {
     const found = row.detected;
-    if (!found) return { tone: 'bad', resolved: 'nothing found', note: 'Auto detect found no supported resource' };
+    if (!found) {
+      return {
+        tone: 'bad',
+        resolved: t('bridge.nothingFound', 'nothing found'),
+        note: t('bridge.autoFoundNothing', 'Auto detect found no supported resource'),
+      };
+    }
     return {
       tone: 'ok',
       resolved: found,
       version: RESOURCE_REGISTRY[found]?.version,
-      note: 'Auto detected',
+      note: t('bridge.autoDetected', 'Auto detected'),
     };
   }
 
   const state = RESOURCE_REGISTRY[value];
   if (!state?.running) {
-    return { tone: 'bad', resolved: value, note: 'Forced, but not running on this server' };
+    return { tone: 'bad', resolved: value, note: t('bridge.forcedNotRunning', 'Forced, but not running on this server') };
   }
-  return { tone: 'ok', resolved: value, version: state.version, note: 'Forced, and running' };
+  return { tone: 'ok', resolved: value, version: state.version, note: t('bridge.forcedRunning', 'Forced, and running') };
 }
 
 function BridgeCard({ row }: { row: BridgeRow }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const RowIcon = ICONS[row.icon] ?? Plug;
 
   const [value, setValue] = useState(row.value);
   const [checking, setChecking] = useState(false);
-  const verdict = verdictFor(row, value);
+  const verdict = verdictFor(row, value, t);
   const bad = verdict.tone === 'bad';
   const statusColor = bad ? '#E0776B' : color;
 
@@ -174,7 +190,7 @@ function BridgeCard({ row }: { row: BridgeRow }) {
           <TextInput
             value={value}
             onChange={(e) => setValue(e.currentTarget.value)}
-            placeholder="auto"
+            placeholder={t('bridgesPage.auto', 'auto')}
             styles={{
               input: {
                 background: alpha(theme.colors.dark[9], 0.6),

@@ -15,6 +15,7 @@ import * as Lucide from 'lucide-react';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentType } from 'react';
 import portableJson from './fixtures/loadingPortable.json';
+import { useChrome } from './studioLocale';
 
 /**
  * Live design + component tiles for the hub.
@@ -87,6 +88,7 @@ export function LiveThumb({
   /** width ÷ height of the frame; designs and components both use 16:9 */
   ratio?: number;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
 
   // measure rather than assume: the cards stretch to fill their grid track, so a
@@ -158,7 +160,7 @@ export function LiveThumb({
       ) : boxW > 0 ? (
         <Flex align="center" justify="center" h="100%">
           <Text tt="uppercase" style={{ fontSize: '1.1vh', letterSpacing: '0.12em', color: 'rgba(255,255,255,0.25)' }}>
-            Blank canvas
+            {t('liveThumb.blank_canvas', 'Blank canvas')}
           </Text>
         </Flex>
       ) : null}

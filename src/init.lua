@@ -132,6 +132,11 @@ if context == 'client' then
     cb(lib.getLocales())
   end)
 
+  -- The same standard callbacks consumers get from the public init.lua.
+  -- dirk_lib boots from this file, not that one, so without this its own
+  -- panel is the only UI on the server missing them.
+  require('@dirk_lib.src.nuiBridge')(frameworkBridge)
+
   -- Master ACE for the Script Config tab banner. Reads the replicated
   -- convar — `setr` values are pushed to clients on connect.
   RegisterNuiCallback('GET_SCRIPT_CONFIG_MASTER_GROUP', function(_, cb)

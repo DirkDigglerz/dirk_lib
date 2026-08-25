@@ -1,5 +1,5 @@
 import { alpha, Flex, NumberInput, Text, TextInput, useMantineTheme } from '@mantine/core';
-import { Modal, fetchNui, isEnvBrowser } from 'dirk-cfx-react';
+import { Modal, fetchNui, isEnvBrowser, useItems } from 'dirk-cfx-react';
 import { motion } from 'framer-motion';
 import { Crosshair, Keyboard, MapPin, Navigation, Package, Palette, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -7,6 +7,7 @@ import { BLIP_COLORS, useInputStyles } from './Controls';
 import { StudioButton } from './ui';
 import { MOCK_ITEMS } from './mockData';
 import type { ControlType } from './types';
+import { useChrome } from './studioLocale';
 
 // Every non-list picker that opens a sub-view. Same shell for all of them so a
 // new picker type is a case here, not another modal to design.
@@ -29,6 +30,7 @@ const BLIP_SPRITES: { id: number; name: string }[] = [
 ];
 
 export function PickerDrawer({ type, label, help, value, onApply, onClose, disabled }: PickerProps) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const styles = useInputStyles();
@@ -55,12 +57,26 @@ export function PickerDrawer({ type, label, help, value, onApply, onClose, disab
 
   const meta = PICKER_META[type] ?? { icon: Palette, title: 'Pick a value' };
 
+  // The REAL inventory. Picking from MOCK_ITEMS meant that on a live server the
+  // item picker offered a fixture list - so it could not offer an item the
+  // server actually has, and would happily write one it does not.
+  const inventory = useItems();
+
   const items = useMemo(() => {
     if (type !== 'item') return [];
+    const all = Object.keys(inventory).length > 0
+      ? Object.values(inventory).map((item) => ({
+        name: item.name,
+        label: item.label || item.name,
+      }))
+      // A browser has no game to ask, and the picker still has to show
+      // something to design against.
+      : MOCK_ITEMS;
     const needle = query.trim().toLowerCase();
-    if (!needle) return MOCK_ITEMS;
-    return MOCK_ITEMS.filter((i) => i.name.toLowerCase().includes(needle) || i.label.toLowerCase().includes(needle));
-  }, [type, query]);
+    if (!needle) return all;
+    return all.filter((item) => item.name.toLowerCase().includes(needle)
+      || item.label.toLowerCase().includes(needle));
+  }, [type, query, inventory]);
 
   return (
     <Modal
@@ -94,16 +110,16 @@ export function PickerDrawer({ type, label, help, value, onApply, onClose, disab
               >
                 <Keyboard size="3vh" color={capturing ? color : 'rgba(255,255,255,0.35)'} />
                 {capturing ? (
-                  <Text ff="Akrobat Bold" size="sm" c={color}>Press any key...</Text>
+                  <Text ff="Akrobat Bold" size="sm" c={color}>{t('pickerDrawer.press_any_key', 'Press any key...')}</Text>
                 ) : (
                   <>
                     <Text ff="monospace" size="xl" c="rgba(255,255,255,0.9)">{String(draft)}</Text>
-                    <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.35)">Click to rebind</Text>
+                    <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.35)">{t('pickerDrawer.click_to_rebind', 'Click to rebind')}</Text>
                   </>
                 )}
               </motion.button>
               <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.3)">
-                Escape cancels the capture without changing the key.
+                {t('pickerDrawer.escape_cancels_the_capture_without_chang', 'Escape cancels the capture without changing the key.')}
               </Text>
             </Flex>
           )}
@@ -169,7 +185,7 @@ export function PickerDrawer({ type, label, help, value, onApply, onClose, disab
               <TextInput
                 value={query}
                 onChange={(e) => setQuery(e.currentTarget.value)}
-                placeholder="Search the inventory"
+                placeholder={t('pickerDrawer.search_the_inventory', 'Search the inventory')}
                 leftSection={<Search size="1.5vh" color="rgba(255,255,255,0.35)" />}
                 styles={styles}
                 style={{ width: '100%' }}
@@ -217,7 +233,7 @@ export function PickerDrawer({ type, label, help, value, onApply, onClose, disab
                 )}
               </Flex>
               <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.28)" pt="xxs">
-                In game this list is the live inventory, with real item images.
+                {t('pickerDrawer.in_game_this_list_is_the_live_inventory_', 'In game this list is the live inventory, with real item images.')}
               </Text>
             </>
           )}
@@ -263,7 +279,7 @@ export function PickerDrawer({ type, label, help, value, onApply, onClose, disab
                   }}
                 >
                   <Crosshair size="1.6vh" color={color} />
-                  <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.06em" c={color}>Place in world</Text>
+                  <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.06em" c={color}>{t('pickerDrawer.place_in_world', 'Place in world')}</Text>
                 </motion.button>
                 <motion.button
                   type="button"
@@ -282,7 +298,7 @@ export function PickerDrawer({ type, label, help, value, onApply, onClose, disab
                   }}
                 >
                   <Navigation size="1.6vh" color="rgba(255,255,255,0.5)" />
-                  <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.06em" c="rgba(255,255,255,0.6)">Teleport here</Text>
+                  <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.06em" c="rgba(255,255,255,0.6)">{t('pickerDrawer.teleport_here', 'Teleport here')}</Text>
                 </motion.button>
               </Flex>
 
@@ -299,9 +315,9 @@ export function PickerDrawer({ type, label, help, value, onApply, onClose, disab
           justify="flex-end" gap="xs" px="sm" py="xs"
           style={{ borderTop: `0.1vh solid ${alpha(theme.colors.dark[4], 0.4)}`, flexShrink: 0 }}
         >
-          <StudioButton label="Cancel" onClick={onClose} />
+          <StudioButton label={t('pickerDrawer.cancel', 'Cancel')} onClick={onClose} />
           <StudioButton
-            label="Apply"
+            label={t('pickerDrawer.apply', 'Apply')}
             primary
             disabled={disabled}
             onClick={() => { onApply(draft); onClose(); }}

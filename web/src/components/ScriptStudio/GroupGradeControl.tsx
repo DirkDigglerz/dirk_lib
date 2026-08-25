@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { StudioButton } from './ui';
+import { useChrome } from './studioLocale';
 
 type GradeMap = Record<string, number>;
 
@@ -27,6 +28,7 @@ export function GroupGradeControl({
   onChange: (next: GradeMap) => void;
   disabled?: boolean;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const [adding, setAdding] = useState(false);
@@ -105,7 +107,7 @@ export function GroupGradeControl({
       ))}
 
       {entries.length === 0 && !adding && (
-        <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">Nobody can revoke</Text>
+        <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">{t('groupGradeControl.nobody_can_revoke', 'Nobody can revoke')}</Text>
       )}
 
       {adding && (
@@ -129,12 +131,12 @@ export function GroupGradeControl({
             <GroupSelect.Name />
             <GroupSelect.Rank />
           </GroupSelect>
-          <StudioButton label="Cancel" onClick={() => setAdding(false)} />
+          <StudioButton label={t('groupGradeControl.cancel', 'Cancel')} onClick={() => setAdding(false)} />
         </Flex>
       )}
 
       {!disabled && !adding && (
-        <StudioButton label="Add group" icon={Plus} onClick={() => setAdding(true)} grow />
+        <StudioButton label={t('groupGradeControl.add_group', 'Add group')} icon={Plus} onClick={() => setAdding(true)} grow />
       )}
     </Flex>
   );

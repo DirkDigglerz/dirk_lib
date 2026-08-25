@@ -6,18 +6,18 @@ import {
   Image, LayoutTemplate, Library, Lightbulb, Link as LinkIcon, ListRestart, Lock,
   Map as MapIcon, MessageCircle, Music, Package, Palette, Plug, Radar,
   Redo2, RefreshCw, RotateCcw, ScrollText, Search, Shield, Shovel, SlidersHorizontal, Sprout,
-  Store, Target, TrendingUp, Trophy, Undo2, User, Users, Utensils, Waves, Wrench, X
+  Store, Target, TrendingUp, Trophy, Undo2, User, Users, Utensils, Waves, Wrench, X, ChevronRight,
 } from 'lucide-react';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import { Fragment, memo, startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useNuiEvent } from '../../hooks/useNuiEvent';
 import { fetchNui } from '../../utils/fetchNui';
-import { ControlsControl, SettingControl, isWideType } from './Controls';
+import { ControlsControl, SettingControl, controlSize, isWideType } from './Controls';
 import { ListRows } from './ListRows';
 import { SectionBody } from './SectionBody';
 import { HistoryModal } from './HistoryModal';
 import { LogsPage } from './LogsPage';
-import { applyLivePayload, type LivePayload } from './live';
+import { applyLivePayload, reloadFromServer, type LivePayload } from './live';
 import { HomePage } from './HomePage';
 import { problemsFor } from './validate';
 import { DiscordSetup } from './DiscordSetup';
@@ -37,35 +37,25 @@ import { PositionListControl } from './PositionListControl';
 import { WeightMapControl } from './WeightMapControl';
 import { RefListControl } from './RefListControl';
 import { MantineColorControl, ShadeControl } from './ThemeControls';
+import { CustomControl } from './CustomControl';
+import { FieldValidator } from './FieldValidator';
+import { Icon } from './Icon';
 import { PickerDrawer, opensPicker } from './PickerDrawer';
 import { Chip, StudioButton } from './ui';
 import {
   commitDraft, discardDraft, dirtyCount, effectiveValue, factoryReset,
   isEnabled, isModified, isStaged, matchesSearch, redo, revertToDefault, setValue, undo, useStudio,
 } from './store';
-import { sectionKey, settingKey, translate, useActiveLanguage, useBundles } from './studioLocale';
+import { loadLocales, sectionKey, settingKey, translate, useActiveLanguage, useBundles, useChrome } from './studioLocale';
 import type { SettingEntry, SettingGroup, StudioScript } from './types';
 
-const ICONS: Record<string, React.ElementType> = {
-  home: Home,
-  fish: Fish, sprout: Sprout, library: Library, 'sliders-horizontal': SlidersHorizontal,
-  palette: Palette, anchor: Anchor, map: MapIcon, store: Store, trophy: Trophy,
-  target: Target, utensils: Utensils, user: User, shield: Shield,
-  'scroll-text': ScrollText, droplets: Droplets, plug: Plug, banknote: Banknote,
-  shovel: Shovel, waves: Waves, users: Users, wrench: Wrench,
-  'message-circle': MessageCircle, 'trending-up': TrendingUp, radar: Radar,
-  box: Box, package: Package, gamepad: Gamepad2, car: Car,
-  // dirk_loading's sections
-  image: Image, music: Music, lightbulb: Lightbulb, link: LinkIcon, layout: LayoutTemplate,
-};
-
-export function Icon({ name, size, color }: { name: string; size: string; color: string }) {
-  const Cmp = ICONS[name] ?? SlidersHorizontal;
-  return <Cmp size={size} color={color} />;
-}
+// Icons resolve by name from the whole lucide set - see ./Icon. Re-exported
+// here because most of the panel already imports `Icon` from main.
+export { Icon };
 
 /** Wraps the matched run so a search hit is visible in place, like his does. */
 function Highlight({ text, query }: { text: string; query: string }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   if (!query) return <>{text}</>;
@@ -86,21 +76,39 @@ export default function ScriptStudio() {
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
 
+  const t = useChrome();
   const open = useStudio((s) => s.open);
   const scripts = useStudio((s) => s.scripts);
   const activeResource = useStudio((s) => s.activeResource);
-  const search = useStudio((s) => s.search);
-  // Typing stays instant; the 100+ row filter runs on the deferred value.
-  const deferredSearch = useDeferredValue(search);
   const canEdit = useStudio((s) => s.canEdit);
   const saving = useStudio((s) => s.saving);
+  const saveError = useStudio((s) => s.saveError);
   const activePage = useStudio((s) => s.activePage);
+  const shownList = useStudio((s) => s.shownList);
   const fullScreen = useStudio((s) => s.fullScreen);
+
+  // Which search box we are looking at. Each page owns one; a script's settings
+  // share one across their sections, because those scroll as a single list.
+  const searchKey = activePage ?? `script:${activeResource}`;
+  const search = useStudio((s) => s.searches[searchKey] ?? '');
+  const setSearch = useCallback((value: string) => {
+    useStudio.setState((state) => ({ searches: { ...state.searches, [searchKey]: value } }));
+  }, [searchKey]);
+  // Typing stays instant; the 100+ row filter runs on the deferred value.
+  const deferredSearch = useDeferredValue(search);
   const editingDesign = useStudio((s) => s.editingDesign);
   // Setting text comes from each script's own bundle; changing the language
   // setting re-renders every label immediately, no reopen.
   const language = useActiveLanguage();
   const bundles = useBundles();
+
+  // Bundles for whatever language is selected, fetched as it changes. Without
+  // this the panel resolved every label against an empty store and stayed in
+  // English however the language setting was set.
+  useEffect(() => {
+    if (!open) return;
+    void loadLocales(language);
+  }, [open, language, scripts]);
 
   // Live theme switching, the way the old per-resource panel had it: the shared
   // appearance settings feed dirk-cfx-react's settings store, which is what
@@ -134,6 +142,10 @@ export default function ScriptStudio() {
   const draft = useStudio((s) => s.draft[s.activeResource]) ?? {};
 
   const [activeGroup, setActiveGroup] = useState('');
+  /** Sections whose sub-blocks are showing in the rail. */
+  const [openGroups, setOpenGroups] = useState<Set<string>>(new Set());
+  /** The block currently being read, for the rail's sub-tree highlight. */
+  const [activeSubgroup, setActiveSubgroup] = useState<string | null>(null);
   // the pinned bar only shows once the real heading has scrolled out of view,
   // otherwise you read the same title twice
   const [headingGone, setHeadingGone] = useState(false);
@@ -142,6 +154,26 @@ export default function ScriptStudio() {
   const [jsonOpen, setJsonOpen] = useState(false);
   const [pickerEntry, setPickerEntry] = useState<SettingEntry | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  /**
+   * The pane's real height, published as a CSS variable.
+   *
+   * A workspace control has to fill what is ACTUALLY there. Sizing it in `vh`
+   * measures the viewport, and the panel is 84vh windowed — so a control asking
+   * for a slice of the viewport overflows a window it knows nothing about, and
+   * changing the panel's size silently breaks the arithmetic again.
+   */
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (!node) return;
+    const publish = () => {
+      node.style.setProperty('--studio-pane', `${node.clientHeight}px`);
+    };
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [open, activePage, fullScreen]);
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // In game the panel is opened by dirk_lib; in a browser it should just be
@@ -201,9 +233,86 @@ export default function ScriptStudio() {
     return map;
   }, [script, groupLabels, query]);
 
-  const visibleGroups = useMemo(
+  const populatedGroups = useMemo(
     () => (script?.groups ?? []).filter((g) => (byGroup.get(g.id)?.length ?? 0) > 0),
     [script, byGroup],
+  );
+
+  /**
+   * Sections that ARE a workspace - a map, a script's own editor.
+   *
+   * These are not part of the reading flow. A control that fills the pane
+   * cannot also flow with the page: scrolling would carry you through a whole
+   * screen of map to reach the next toggle, and the map would fight the page
+   * for the wheel. So they come out of the scroll entirely and are opened from
+   * the rail instead, one at a time.
+   */
+  const workspaceGroups = useMemo(() => {
+    const ids = new Set<string>();
+    for (const group of populatedGroups) {
+      const mine = byGroup.get(group.id) ?? [];
+      const workspaces = mine.filter((e) => controlSize(e.type) === 'workspace');
+      // Dominated by one, not merely containing one: a section with a map and a
+      // dozen settings still reads as settings.
+      if (workspaces.length > 0 && mine.length - workspaces.length <= 2) ids.add(group.id);
+    }
+    return ids;
+  }, [populatedGroups, byGroup]);
+
+  /** The scrolling stack: everything that is not a workspace. */
+  const visibleGroups = useMemo(
+    () => populatedGroups.filter((g) => !workspaceGroups.has(g.id)),
+    [populatedGroups, workspaceGroups],
+  );
+
+  /**
+   * The nested blocks inside each section.
+   *
+   * The schema walk already tags every setting with the object it came from -
+   * `yellowPages.businessAds` and `yellowPages.personalAds` are separate
+   * subgroups of one section - and the section body already draws a labelled
+   * divider between them. The rail was the only place that flattened it, so a
+   * section with five blocks was one undifferentiated entry and a long scroll.
+   */
+  const subgroupsByGroup = useMemo(() => {
+    const map = new Map<string, { id: string; label: string; count: number; list?: string }[]>();
+
+    for (const [groupId, groupEntries] of byGroup) {
+      // A section holding several LISTS already shows one at a time behind a
+      // tab strip - fishing's Equipment is seven of them. Those tabs are the
+      // section's real structure, so the rail names them: Equipment > Hooks,
+      // rather than Equipment, then find the strip, then find the tab.
+      const lists = groupEntries.filter((entry) => entry.type === 'list');
+      if (lists.length >= 2) {
+        map.set(groupId, lists.map((entry) => ({
+          id: entry.path,
+          label: entry.label,
+          count: Array.isArray(entry.value) ? entry.value.length : 0,
+          list: entry.path,
+        })));
+        continue;
+      }
+
+      // Otherwise the nested blocks, which the section body already separates
+      // with a labelled divider.
+      const seen = new Map<string, { id: string; label: string; count: number }>();
+      for (const entry of groupEntries) {
+        if (!entry.subgroup) continue;
+        const existing = seen.get(entry.subgroup.id);
+        if (existing) existing.count += 1;
+        else seen.set(entry.subgroup.id, { id: entry.subgroup.id, label: entry.subgroup.label, count: 1 });
+      }
+      if (seen.size > 0) map.set(groupId, [...seen.values()]);
+    }
+    return map;
+  }, [byGroup]);
+
+  /** The workspace section currently open, if any. */
+  const openWorkspace = useMemo(
+    () => (activeGroup && workspaceGroups.has(activeGroup)
+      ? populatedGroups.find((g) => g.id === activeGroup)
+      : undefined),
+    [activeGroup, workspaceGroups, populatedGroups],
   );
 
   // per-group modified counts drive the rail dots
@@ -233,7 +342,7 @@ export default function ScriptStudio() {
   }, [open, pickerEntry, resetOpen]);
 
   const handleClose = () => {
-    useStudio.setState({ open: false, search: '' });
+    useStudio.setState({ open: false, searches: {} });
     fetchNui('CLOSE_SCRIPT_STUDIO');
   };
 
@@ -353,6 +462,17 @@ export default function ScriptStudio() {
       // the pinned bar appears once the real heading has scrolled past
       const active = measured.find((item) => visibleGroups[item.index]?.id === current);
       setHeadingGone(active ? active.start + 44 < container.scrollTop : false);
+
+      // ...and which BLOCK inside it, so the rail's sub-tree follows the scroll
+      // the same way the section list does. Read from the DOM rather than the
+      // virtualiser, which only knows about whole sections.
+      const anchors = container.querySelectorAll<HTMLElement>('[data-subgroup]');
+      let block: string | null = null;
+      const top = container.getBoundingClientRect().top + 90;
+      for (const node of anchors) {
+        if (node.getBoundingClientRect().top <= top) block = node.dataset.subgroup ?? block;
+      }
+      setActiveSubgroup((prev) => (prev === block ? prev : block));
     };
 
     onScroll();
@@ -423,9 +543,47 @@ export default function ScriptStudio() {
    */
   // jumpTo re-enters itself after closing a page, so it reaches its own latest
   // identity through a ref rather than listing itself as a dependency
-  const jumpToRef = useRef<(groupId: string) => void>(() => {});
+  const jumpToRef = useRef<(groupId: string, subgroupId?: string) => void>(() => {});
 
-  const jumpTo = useCallback((groupId: string) => {
+  /**
+   * Scroll to a sub-block within its section.
+   *
+   * Handed to the SAME jump the rail uses rather than running a scroll of its
+   * own. A second `scrollIntoView` on top of that glide meant two animations
+   * pulling the container in different directions on the same frames, which
+   * read as a twitch and then nothing.
+   */
+  const jumpToSubgroup = useCallback((groupId: string, subgroupId: string, listPath?: string) => {
+    // A tabbed list is selected, not scrolled to - the strip swaps what the
+    // section shows, so there is no separate anchor to land on.
+    if (listPath) {
+      useStudio.setState({ activeList: listPath });
+    } else {
+      // Highlight it NOW rather than waiting for the scroll handler. That
+      // handler stands down while a jump is in flight - otherwise the rail
+      // would flick through every block on the way past - so after a click
+      // nothing marked the destination until you happened to scroll by hand.
+      setActiveSubgroup(subgroupId);
+    }
+    jumpToRef.current(groupId, listPath ? undefined : subgroupId);
+  }, []);
+
+  const jumpTo = useCallback((groupId: string, subgroupId?: string) => {
+    // Picking a section opens its sub-tree. Having to hit the chevron
+    // specifically made the tree feel like a separate control rather than part
+    // of the thing you just selected.
+    setOpenGroups((prev) => (prev.has(groupId) ? prev : new Set(prev).add(groupId)));
+
+    // A workspace section is not IN the scroll - it replaces it. Selecting one
+    // is a switch, not a jump, and there is nothing to scroll to.
+    if (workspaceGroups.has(groupId)) {
+      startTransition(() => {
+        useStudio.setState({ activePage: null, editingDesign: null });
+        setActiveGroup(groupId);
+      });
+      return;
+    }
+
     const index = visibleGroups.findIndex((group) => group.id === groupId);
     if (index < 0) return;
 
@@ -435,7 +593,7 @@ export default function ScriptStudio() {
     // has put the pane back.
     if (useStudio.getState().activePage) {
       useStudio.setState({ activePage: null, editingDesign: null });
-      requestAnimationFrame(() => requestAnimationFrame(() => jumpToRef.current(groupId)));
+      requestAnimationFrame(() => requestAnimationFrame(() => jumpToRef.current(groupId, subgroupId)));
       return;
     }
 
@@ -459,9 +617,18 @@ export default function ScriptStudio() {
     const modelOffset = () => clamp(virtualizer.getOffsetForIndex(index, 'start')?.[0] ?? from);
     const initialTarget = modelOffset;
 
-    /** how far the section is from where it should sit, or null if unrendered */
+    /**
+     * How far the target is from where it should sit, or null if unrendered.
+     *
+     * The target is the SUB-BLOCK when one was asked for, and the section
+     * otherwise. The coarse aim above is always the section - the virtualiser
+     * only knows section indices - and this correction walks the last bit,
+     * which is exactly the settle loop's job already.
+     */
     const realDelta = () => {
-      const el = container.querySelector<HTMLElement>(`[data-group-id="${CSS.escape(groupId)}"]`);
+      const el = (subgroupId
+        && container.querySelector<HTMLElement>(`[data-subgroup="${CSS.escape(subgroupId)}"]`))
+        || container.querySelector<HTMLElement>(`[data-group-id="${CSS.escape(groupId)}"]`);
       if (!el) return null;
       return el.getBoundingClientRect().top - container.getBoundingClientRect().top - pad;
     };
@@ -603,12 +770,9 @@ export default function ScriptStudio() {
               script={script}
               page={activePage ? PAGES.find((entry) => entry.id === activePage) : undefined}
               query={search}
-              onQuery={(v) => useStudio.setState({ search: v })}
+              onQuery={setSearch}
               onClose={handleClose}
-              onHistory={() => setHistoryOpen(true)}
-              onJson={() => setJsonOpen(true)}
               missingItems={activePage ? undefined : <MissingItemsButton script={script} />}
-              onReset={() => setResetOpen(true)}
               canEdit={canEdit}
             />
 
@@ -622,7 +786,7 @@ export default function ScriptStudio() {
                 scripts={scripts}
                 script={script}
                 groupLabels={groupLabels}
-                visibleGroups={visibleGroups}
+                visibleGroups={populatedGroups}
                 byGroup={byGroup}
                 modifiedByGroup={modifiedByGroup}
                 activeGroup={activeGroup}
@@ -630,6 +794,12 @@ export default function ScriptStudio() {
                 onPickScript={(resource) => startTransition(() => useStudio.setState({ activeResource: resource, activePage: null, editingDesign: null }))}
                 onPickPage={(id) => startTransition(() => useStudio.setState({ activePage: id, editingDesign: null }))}
                 onPickGroup={jumpTo}
+                onPickSubgroup={jumpToSubgroup}
+                subgroupsByGroup={subgroupsByGroup}
+                openGroups={openGroups}
+                activeSubgroup={activeSubgroup}
+                shownList={shownList}
+                setOpenGroups={setOpenGroups}
                 onHoverGroup={prefetchSection}
                 onLeaveGroup={cancelPrefetch}
               />
@@ -649,6 +819,48 @@ export default function ScriptStudio() {
                     <Text ff="Akrobat Bold" size="sm" c="rgba(255,255,255,0.35)">
                       {activePage} page is not built yet
                     </Text>
+                  </Flex>
+                ) : openWorkspace ? (
+                  // A workspace section REPLACES the scrolling stack. It fills
+                  // the pane, the page does not scroll behind it, and the wheel
+                  // belongs to the map rather than being fought over. You leave
+                  // it by picking something else in the rail.
+                  <Flex direction="column" flex={1} p="md" style={{ minHeight: 0, overflow: 'hidden' }}>
+                    <Flex align="flex-start" gap="xs" mb="0.4vh" style={{ flexShrink: 0 }}>
+                      <Flex align="center" gap="xs" h={HEADING_LINE} style={{ flexShrink: 0 }}>
+                        <Icon name={openWorkspace.icon} size="1.9vh" color={color} />
+                        <Text ff="Akrobat Bold" size="md" c="rgba(255,255,255,0.92)" lts="0.01em">
+                          {localisedGroup(openWorkspace).label}
+                        </Text>
+                      </Flex>
+                      {openWorkspace.description && (
+                        <Text
+                          ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.35)"
+                          style={{ flex: 1, minWidth: 0, lineHeight: HEADING_LINE }}
+                        >
+                          {localisedGroup(openWorkspace).description}
+                        </Text>
+                      )}
+                    </Flex>
+
+                    <Flex direction="column" flex={1} style={{ minHeight: 0 }}>
+                      <SectionBody
+                        resource={script.resource}
+                        entries={byGroup.get(openWorkspace.id) ?? []}
+                        query={query}
+                        renderRow={(entry, rowFilter) => (
+                          <SettingRow
+                            resource={script.resource}
+                            entry={entry}
+                            query={query}
+                            rowFilter={rowFilter}
+                            canEdit={canEdit}
+                            problems={problemsByPath.get(entry.path)}
+                            onDrill={openPicker}
+                          />
+                        )}
+                      />
+                    </Flex>
                   </Flex>
                 ) : (<>
                 <CurrentSection
@@ -682,7 +894,7 @@ export default function ScriptStudio() {
                         Nothing matches "{query}"
                       </Text>
                       <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.25)">
-                        Search covers names, paths, descriptions and options.
+                        {t('main.search_covers_names_paths_descriptions_a', 'Search covers names, paths, descriptions and options.')}
                       </Text>
                     </Flex>
                   )}
@@ -714,21 +926,28 @@ export default function ScriptStudio() {
                         paddingBottom: '3vh',
                       }}
                     >
-                      {/* flex-start, not center: a three-line description was
-                          dragging the icon and title down to the middle of it,
-                          so the heading stopped reading as a heading. */}
+                      {/* Icon and title share ONE line box, and the
+                          description's line-height is set to that same height.
+                          Top-aligned, the description's first line then sits
+                          dead centre against the title whether it wraps or
+                          not - no measuring, and nothing to detect.
+
+                          Centring the whole row pushed the title to the middle
+                          of a three-line description; top-aligning the raw text
+                          instead left a one-line description sitting high,
+                          because the two font sizes have different line boxes.
+                          Matching the boxes fixes both cases at once. */}
                       <Flex align="flex-start" gap="xs" mb="0.4vh">
-                        <Icon name={group.icon} size="1.9vh" color={color} />
-                        <Text
-                          ff="Akrobat Bold" size="md" c="rgba(255,255,255,0.92)" lts="0.01em"
-                          style={{ flexShrink: 0 }}
-                        >
-                          {localisedGroup(group).label}
-                        </Text>
+                        <Flex align="center" gap="xs" h={HEADING_LINE} style={{ flexShrink: 0 }}>
+                          <Icon name={group.icon} size="1.9vh" color={color} />
+                          <Text ff="Akrobat Bold" size="md" c="rgba(255,255,255,0.92)" lts="0.01em">
+                            {localisedGroup(group).label}
+                          </Text>
+                        </Flex>
                         {group.description && (
                           <Text
                             ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.35)"
-                            style={{ marginTop: '0.35vh', flex: 1, minWidth: 0 }}
+                            style={{ flex: 1, minWidth: 0, lineHeight: HEADING_LINE }}
                           >
                             {localisedGroup(group).description}
                           </Text>
@@ -769,6 +988,7 @@ export default function ScriptStudio() {
                 {!activePage && <SaveBar
                   dirty={dirty}
                   saving={saving}
+                  saveError={saveError && saveError.resource === script.resource ? saveError.message : null}
                   canEdit={canEdit}
                   problems={problems}
                   onShowProblem={(problem) => jumpTo(problem.group)}
@@ -778,6 +998,10 @@ export default function ScriptStudio() {
                   onRedo={() => redo(script.resource)}
                   onDiscard={() => discardDraft(script.resource)}
                   onSave={() => commitDraft(script.resource)}
+                  onJson={() => setJsonOpen(true)}
+                  onHistory={() => setHistoryOpen(true)}
+                  onReset={() => setResetOpen(true)}
+                  onRefresh={() => reloadFromServer()}
                 />}
               </Flex>
             </Flex>
@@ -815,7 +1039,17 @@ export default function ScriptStudio() {
                 onRevert={(changes) => {
                   for (const change of changes) {
                     const entry = script.entries.find((e) => e.path === change.path);
-                    if (entry) setValue(script.resource, entry, change.value);
+                    if (!entry) continue;
+                    // A log entry for a setting that had never been changed
+                    // carries NO previous value - `{path, new}` and nothing
+                    // else - because there was no override, only the default.
+                    // Undoing that means going back to the default, not
+                    // staging `undefined`: doing the latter left the row
+                    // holding a value that was neither the default nor a real
+                    // one, so it stayed marked modified with its revert button
+                    // still showing.
+                    if (change.value === undefined) revertToDefault(script.resource, entry);
+                    else setValue(script.resource, entry, change.value);
                   }
                   setHistoryOpen(false);
                 }}
@@ -827,9 +1061,12 @@ export default function ScriptStudio() {
           <AnimatePresence>
             {resetOpen && (
               <ConfirmModal
-                title="Factory reset"
-                description={`Every setting in ${script.label} goes back to how it shipped. Type the resource name to confirm — this stages the reset, you still have to save.`}
-                confirmLabel="Reset everything"
+                title={t('main.factory_reset', 'Factory reset')}
+                description={t(
+                  'main.factory_reset_body',
+                  'Every setting in %s goes back to how it shipped. Type the resource name to confirm — this stages the reset, you still have to save.',
+                ).replace('%s', script.label)}
+                confirmLabel={t('main.reset_everything', 'Reset everything')}
                 confirmText={script.resource}
                 onConfirm={() => { factoryReset(script.resource); setResetOpen(false); }}
                 onClose={() => setResetOpen(false)}
@@ -848,6 +1085,9 @@ export default function ScriptStudio() {
  * than inside it. Sticky-inside-the-scroller kept leaving a strip where rows
  * showed through the pane's padding; a sibling of the scroller cannot.
  */
+/** Line box shared by a section heading's title and its description. */
+const HEADING_LINE = '2.6vh';
+
 function CurrentSection({ group, show }: { group?: SettingGroup; show: boolean }) {
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
@@ -888,7 +1128,7 @@ function CurrentSection({ group, show }: { group?: SettingGroup; show: boolean }
 }
 
 function Header({
-  script, page, query, onQuery, onClose, onHistory, onJson, onReset,
+  script, page, query, onQuery, onClose,
   missingItems, canEdit,
 }: {
   script: StudioScript;
@@ -897,14 +1137,14 @@ function Header({
   query: string;
   onQuery: (v: string) => void;
   onClose: () => void;
-  onHistory: () => void;
-  onJson: () => void;
-  onReset: () => void;
   missingItems?: React.ReactNode;
   canEdit: boolean;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
+  const language = useActiveLanguage();
+  const bundles = useBundles();
   // Local input state so a keystroke never waits on the panel-wide filter.
   const [local, setLocal] = useState(query);
   useEffect(() => { setLocal(query); }, [query]);
@@ -932,14 +1172,18 @@ function Header({
             flexShrink: 0,
           }}
         >
-          <Icon name={page?.icon ?? script.icon} size="2.2vh" color={color} />
+          <SlidersHorizontal size="2.2vh" color={color} />
         </Flex>
         <Flex direction="column" style={{ minWidth: 0, lineHeight: 1.15 }}>
+          {/* Fixed. The title and icon used to change with whatever you had
+              open, so the one part of the window that should tell you WHERE
+              YOU ARE was the part that never held still - and the rail already
+              says which script is selected. */}
           <Text ff="Akrobat Bold" size="md" c="rgba(255,255,255,0.92)" truncate>
-            {page?.label ?? script.label}
+            {t('header.title', 'Script Studio')}
           </Text>
-          <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.3)" truncate>
-            {page ? 'dirk_lib' : script.resource}
+          <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)" truncate>
+            {t('header.description', 'Every dirk script, in one place')}
           </Text>
         </Flex>
       </Flex>
@@ -970,7 +1214,7 @@ function Header({
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
             }}
-            aria-label="Clear search"
+            aria-label={t('main.clear_search', 'Clear search')}
           >
             <X size="1.5vh" color="rgba(255,255,255,0.45)" />
           </motion.button>
@@ -1007,15 +1251,14 @@ function Header({
             }}
           >
             <Lock size="1.2vh" color="#E0B15F" />
-            <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.06em" c="#E0B15F">View only</Text>
+            <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.06em" c="#E0B15F">{t('main.view_only', 'View only')}</Text>
           </Flex>
         )}
+        {/* Only what acts on the WINDOW stays up here. History, Reset,
+            Refresh and the JSON editor all act on the SCRIPT you are editing,
+            so they sit with Save and Discard - the other controls that do. */}
         {missingItems}
-        {!page && <IconButton icon={Braces} label="View or import JSON" onClick={onJson} />}
-        <IconButton icon={History} label="Change history" onClick={onHistory} />
-        <IconButton icon={RotateCcw} label="Reset everything to defaults" danger onClick={canEdit ? onReset : undefined} />
-        <IconButton icon={RefreshCw} label="Refresh from server" />
-        <IconButton icon={X} label="Close" danger onClick={onClose} />
+        <IconButton icon={X} label={t('main.close', 'Close')} danger onClick={onClose} />
       </Flex>
     </Flex>
   );
@@ -1141,7 +1384,9 @@ const PAGES: { id: string; label: string; icon: string; band: 'access' | 'librar
  */
 function Sidebar({
   scripts, script, groupLabels, visibleGroups, byGroup, modifiedByGroup, activeGroup, activePage,
-  onPickScript, onPickPage, onPickGroup, onHoverGroup, onLeaveGroup,
+  onPickScript, onPickPage, onPickGroup, onPickSubgroup,
+  subgroupsByGroup, openGroups, setOpenGroups, activeSubgroup, shownList,
+  onHoverGroup, onLeaveGroup,
 }: {
   scripts: StudioScript[];
   script: StudioScript;
@@ -1154,9 +1399,21 @@ function Sidebar({
   onPickScript: (resource: string) => void;
   onPickPage: (id: string) => void;
   onPickGroup: (groupId: string) => void;
+  onPickSubgroup: (groupId: string, subgroupId: string, listPath?: string) => void;
+  subgroupsByGroup: Map<string, { id: string; label: string; count: number; list?: string }[]>;
+  openGroups: Set<string>;
+  activeSubgroup: string | null;
+  shownList: string | null;
+  setOpenGroups: React.Dispatch<React.SetStateAction<Set<string>>>;
   onHoverGroup: (index: number) => void;
   onLeaveGroup: () => void;
 }) {
+  const t = useChrome();
+  // The shared band's sections belong to dirk_lib, not to whatever
+  // script is selected, so the rail resolves them against their own
+  // bundle rather than the active one's.
+  const language = useActiveLanguage();
+  const bundles = useBundles();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
 
@@ -1228,7 +1485,7 @@ function Sidebar({
                   >
                     <Icon name="layout" size="1.4vh" color={color} />
                     <Text ff="Akrobat SemiBold" size="sm" c={color} style={{ flex: 1, minWidth: 0 }} truncate>
-                      Design
+                      {t('main.design', 'Design')}
                     </Text>
                     <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.25)">5</Text>
                   </motion.button>
@@ -1242,7 +1499,15 @@ function Sidebar({
                   const isActive = !activePage && group.id === activeGroup;
                   const count = byGroup.get(group.id)?.length ?? 0;
                   const modified = modifiedByGroup.get(group.id) ?? 0;
+                  // A section with several nested blocks - Yellow Pages holds
+                  // Business Ads, Personal Ads, Featured, Calls and Categories -
+                  // is a tree, and the rail was flattening it. The blocks are
+                  // already known from the schema walk; they just had nowhere to
+                  // appear.
+                  const subs = subgroupsByGroup.get(group.id) ?? [];
+                  const isOpen = openGroups.has(group.id);
                   return (
+                    <Fragment key={group.id}>
                     <motion.button
                       key={group.id}
                       type="button"
@@ -1274,7 +1539,76 @@ function Sidebar({
                       {modified > 0 && (
                         <Flex w="0.6vh" h="0.6vh" style={{ background: color, borderRadius: '50%', flexShrink: 0 }} />
                       )}
+                      {subs.length > 1 && (
+                        <motion.div
+                          onClick={(event) => {
+                            // Expanding is not selecting: clicking the chevron
+                            // should open the tree without also jumping the pane.
+                            event.stopPropagation();
+                            setOpenGroups((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(group.id)) next.delete(group.id);
+                              else next.add(group.id);
+                              return next;
+                            });
+                          }}
+                          animate={{ rotate: isOpen ? 90 : 0 }}
+                          transition={{ duration: 0.14 }}
+                          style={{ display: 'flex', flexShrink: 0, cursor: 'pointer' }}
+                        >
+                          <ChevronRight size="1.2vh" color="rgba(255,255,255,0.3)" />
+                        </motion.div>
+                      )}
                     </motion.button>
+
+                    <AnimatePresence initial={false}>
+                      {isOpen && subs.length > 1 && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.16 }}
+                          style={{ overflow: 'hidden' }}
+                        >
+                          {subs.map((sub) => {
+                            // A tabbed list is "current" when the section body
+                            // is showing it; a block is current when it is the
+                            // one scrolled to.
+                            const subActive = isActive && (sub.list
+                              ? shownList === sub.list
+                              : activeSubgroup === sub.id);
+                            return (
+                            <motion.button
+                              key={sub.id}
+                              type="button"
+                              onClick={() => onPickSubgroup(group.id, sub.id, sub.list)}
+                              whileTap={{ scale: 0.99 }}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: '0.6vh',
+                                padding: '0.35vh 0.7vh 0.35vh 2.6vh',
+                                background: subActive ? alpha(color, 0.08) : 'transparent',
+                                border: 'none',
+                                borderLeft: `0.1vh solid ${subActive ? color : alpha(theme.colors.dark[4], 0.6)}`,
+                                marginLeft: '1.4vh',
+                                cursor: 'pointer', textAlign: 'left', width: 'calc(100% - 1.4vh)',
+                              }}
+                            >
+                              <Text
+                                ff="Akrobat SemiBold" size="xs"
+                                c={subActive ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.4)'}
+                                style={{ flex: 1, minWidth: 0 }}
+                                truncate
+                              >
+                                {sub.label}
+                              </Text>
+                              <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.2)">{sub.count}</Text>
+                            </motion.button>
+                            );
+                          })}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    </Fragment>
                   );
                 })}
               </Flex>
@@ -1309,7 +1643,7 @@ function Sidebar({
           c={active ? color : 'rgba(255,255,255,0.7)'}
           style={{ flex: 1, minWidth: 0 }}
         >
-          {page.label}
+          {t(`page.${page.id}`, page.label)}
         </Text>
       </motion.button>
     );
@@ -1335,7 +1669,7 @@ function Sidebar({
             lands, not a member of any category. */}
         {renderPage({ id: 'home', label: 'Overview', icon: 'home' })}
 
-        <RailLabel>Scripts</RailLabel>
+        <RailLabel>{t('main.scripts', 'Scripts')}</RailLabel>
         {userScripts.map(renderScript)}
 
         {/* GENERIC is the shared layer, and there is only ever one shared
@@ -1344,7 +1678,7 @@ function Sidebar({
             Its sections sit directly under the band instead. */}
         {sharedScripts.length > 0 && (
           <>
-            <RailLabel>Generic</RailLabel>
+            <RailLabel>{t('main.generic', 'Generic')}</RailLabel>
             {sharedScripts.map((entry) => (
               <Fragment key={entry.resource}>
                 {entry.groups.map((group) => (
@@ -1352,7 +1686,14 @@ function Sidebar({
                     key={`${entry.resource}:${group.id}`}
                     resource={entry.resource}
                     group={group}
-                    label={groupLabels.get(group.id) ?? group.label}
+                    // Resolved against the SHARED script's own bundle, not the
+                    // active one. `groupLabels` only holds whichever script is
+                    // selected, so these sections came out in English the
+                    // moment you were looking at anything other than dirk_lib.
+                    label={translate(
+                      bundles, language, entry.resource,
+                      sectionKey(group.id, 'label'), group.label,
+                    )}
                     count={entry.entries.filter((e) => e.group === group.id).length}
                     active={!activePage && script.resource === entry.resource && activeGroup === group.id}
                     onClick={() => {
@@ -1371,10 +1712,10 @@ function Sidebar({
           </>
         )}
 
-        <RailLabel>Access</RailLabel>
+        <RailLabel>{t('main.access', 'Access')}</RailLabel>
         {PAGES.filter((page) => page.band === 'access').map(renderPage)}
 
-        <RailLabel>Library</RailLabel>
+        <RailLabel>{t('main.library', 'Library')}</RailLabel>
         {PAGES.filter((page) => page.band === 'library').map(renderPage)}
       </Flex>
 
@@ -1390,6 +1731,7 @@ function Sidebar({
 }
 
 function RailLabel({ children }: { children: React.ReactNode }) {
+  const t = useChrome();
   return (
     <Text
       ff="Akrobat Bold" size="xs" tt="uppercase" lts="0.16em"
@@ -1415,6 +1757,7 @@ const SettingRow = memo(function SettingRow({
 }) {
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
+  const t = useChrome();
   // subscribing to the draft keeps this row live as the value changes
   const staged = useStudio((s) => s.draft[resource]?.[entry.path]);
   // ...and keeps the master-switch check live too: flipping `theme.useOverride`
@@ -1465,13 +1808,13 @@ const SettingRow = memo(function SettingRow({
           </Text>
 
           {modified && (
-            <Chip label="Modified" color={color} dot />
+            <Chip label={t('main.modified', 'Modified')} color={color} dot />
           )}
           {entry.restartRequired && (
-            <Chip label="Restart required" color="#E0B15F" icon={RotateCcw} />
+            <Chip label={t('main.restart_required', 'Restart required')} color="#E0B15F" icon={RotateCcw} />
           )}
           {entry.serverOnly && (
-            <Chip label="Server only" color="#4CC3DE" icon={Lock} />
+            <Chip label={t('main.server_only', 'Server only')} color="#4CC3DE" icon={Lock} />
           )}
         </Flex>
 
@@ -1496,6 +1839,15 @@ const SettingRow = memo(function SettingRow({
               <Text ff="Akrobat Bold" size="xxs" c="#ef4444">{problem}</Text>
             </Flex>
           ))}
+          {/* Whether the value actually WORKS, as opposed to whether it is
+              in range - only the service behind an API key can answer that. */}
+          {entry.validateWith && (
+            <FieldValidator
+              callback={entry.validateWith}
+              value={value}
+              disabled={!canEdit}
+            />
+          )}
           {!live && entry.enabledWhen && (
             <Flex align="center" gap="0.4vh">
               <Lock size="1.1vh" color="#E0B15F" />
@@ -1526,7 +1878,7 @@ const SettingRow = memo(function SettingRow({
         <Flex w="3vh" justify="flex-end" style={{ flexShrink: 0 }}>
           {modified && canEdit && (
             <Tooltip
-              label="Back to default"
+              label={t('main.back_to_default', 'Back to default')}
               position="top"
               withArrow
               zIndex={10000}
@@ -1555,7 +1907,7 @@ const SettingRow = memo(function SettingRow({
                   cursor: 'pointer',
                   color: 'rgba(255,255,255,0.55)',
                 }}
-                aria-label="Back to default"
+                aria-label={t('main.back_to_default', 'Back to default')}
               >
                 <ListRestart size="1.5vh" />
               </motion.button>
@@ -1565,7 +1917,17 @@ const SettingRow = memo(function SettingRow({
       </Flex>
 
       {wide && (
-        entry.type === 'weightMap' ? (
+        // The owning script's own editor, before any built-in - it was chosen
+        // deliberately, so nothing here should second-guess it.
+        entry.type === 'custom' ? (
+          <CustomControl
+            resource={resource}
+            component={entry.component ?? ''}
+            value={value}
+            canEdit={canEdit}
+            onChange={(next) => setValue(resource, entry, next)}
+          />
+        ) : entry.type === 'weightMap' ? (
           <WeightMapControl
             resource={resource}
             value={value}
@@ -1661,11 +2023,14 @@ const SettingRow = memo(function SettingRow({
 });
 
 function SaveBar({
-  dirty, saving, canEdit, onDiscard, onSave, onUndo, onRedo, canUndo, canRedo,
+  dirty, saving, saveError, canEdit, onDiscard, onSave, onUndo, onRedo, canUndo, canRedo,
+  onJson, onHistory, onReset, onRefresh,
   problems, onShowProblem,
 }: {
   dirty: number;
   saving: boolean;
+  /** why the last save was refused, or null */
+  saveError: string | null;
   canEdit: boolean;
   problems: { path: string; label: string; group: string; message: string }[];
   onShowProblem: (problem: { group: string }) => void;
@@ -1675,7 +2040,13 @@ function SaveBar({
   onRedo: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  /** absent on the built-in pages, which have no JSON to show */
+  onJson?: () => void;
+  onHistory: () => void;
+  onReset: () => void;
+  onRefresh: () => void;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
 
@@ -1744,8 +2115,26 @@ function SaveBar({
               transition={{ duration: 0.15 }}
             >
               <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.3)">
-                Changes are staged until you save.
+                {t('main.changes_are_staged_until_you_save', 'Changes are staged until you save.')}
               </Text>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* A refused save used to look identical to a successful one - the
+            chips cleared either way and nothing said why. */}
+        <AnimatePresence initial={false}>
+          {saveError && (
+            <motion.div
+              key="saveError"
+              initial={{ opacity: 0, x: -6 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.6vh' }}
+            >
+              <AlertTriangle size="1.4vh" color="#ef4444" />
+              <Text ff="Akrobat Bold" size="xs" c="#ef4444">{saveError}</Text>
             </motion.div>
           )}
         </AnimatePresence>
@@ -1755,12 +2144,21 @@ function SaveBar({
         {/* Step back and forward through staged edits, as the old config panel
             did. Sits beside Discard because it is the same kind of decision -
             what happens to what you have changed but not yet saved. */}
-        <StepButton icon={Undo2} label="Undo" onClick={onUndo} disabled={!canUndo || saving || !canEdit} />
-        <StepButton icon={Redo2} label="Redo" onClick={onRedo} disabled={!canRedo || saving || !canEdit} />
+        {/* Moved down from the header: these act on the script being edited,
+            which is what this bar is for. */}
+        {onJson && <StepButton icon={Braces} label={t('main.view_or_import_json', 'View or import JSON')} onClick={onJson} />}
+        <StepButton icon={History} label={t('main.change_history', 'Change history')} onClick={onHistory} />
+        <StepButton icon={RefreshCw} label={t('main.refresh_from_server', 'Refresh from server')} onClick={onRefresh} />
+        <StepButton icon={RotateCcw} label={t('main.reset_everything_to_defaults', 'Reset everything to defaults')} onClick={canEdit ? onReset : undefined} disabled={!canEdit} danger />
 
         <Flex w="0.1vh" h="2.4vh" style={{ background: alpha(theme.colors.dark[4], 0.6), flexShrink: 0 }} />
 
-        <StudioButton label="Discard" onClick={onDiscard} disabled={dirty === 0 || saving} />
+        <StepButton icon={Undo2} label={t('main.undo', 'Undo')} onClick={onUndo} disabled={!canUndo || saving || !canEdit} />
+        <StepButton icon={Redo2} label={t('main.redo', 'Redo')} onClick={onRedo} disabled={!canRedo || saving || !canEdit} />
+
+        <Flex w="0.1vh" h="2.4vh" style={{ background: alpha(theme.colors.dark[4], 0.6), flexShrink: 0 }} />
+
+        <StudioButton label={t('main.discard', 'Discard')} onClick={onDiscard} disabled={dirty === 0 || saving} />
         <StudioButton
           label={saving ? 'Saving...' : 'Save changes'}
           primary
@@ -1774,10 +2172,18 @@ function SaveBar({
 
 /** Square icon button sized to sit in the row of StudioButtons. */
 function StepButton({
-  icon: Icon, label, onClick, disabled,
-}: { icon: React.ElementType; label: string; onClick: () => void; disabled?: boolean }) {
+  icon: Icon, label, onClick, disabled, danger,
+}: {
+  icon: React.ElementType;
+  label: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
   const theme = useMantineTheme();
-  const color = theme.colors[theme.primaryColor][5];
+  // Reset stays red now that it sits in a row of ordinary actions - it is the
+  // one button here you cannot take back with Undo.
+  const accent = danger ? '#ef4444' : theme.colors[theme.primaryColor][5];
 
   return (
     <Tooltip
@@ -1800,13 +2206,13 @@ function StepButton({
         type="button"
         onClick={onClick}
         disabled={disabled}
-        whileHover={disabled ? undefined : { background: alpha(color, 0.14) }}
+        whileHover={disabled ? undefined : { background: alpha(accent, 0.14) }}
         whileTap={disabled ? undefined : { scale: 0.94 }}
         style={{
           aspectRatio: '1 / 1', height: '3.2vh',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'transparent',
-          border: `0.1vh solid ${alpha(theme.colors.dark[4], 0.55)}`,
+          border: `0.1vh solid ${alpha(danger ? accent : theme.colors.dark[4], danger ? 0.4 : 0.55)}`,
           borderRadius: theme.radius.xs,
           cursor: disabled ? 'not-allowed' : 'pointer',
           opacity: disabled ? 0.35 : 1,
@@ -1814,7 +2220,7 @@ function StepButton({
         }}
         aria-label={label}
       >
-        <Icon size="1.5vh" color="rgba(255,255,255,0.7)" />
+        <Icon size="1.5vh" color={danger ? accent : 'rgba(255,255,255,0.7)'} />
       </motion.button>
     </Tooltip>
   );

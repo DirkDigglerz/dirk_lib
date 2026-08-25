@@ -15,8 +15,21 @@ export type LivePayload = {
   icon: string;
   version: string;
   shared?: boolean;
-  schema: Record<string, unknown>;
+  /**
+   * The schema as TEXT, straight off disk.
+   *
+   * Lua tables have no key order, so a schema decoded server-side and
+   * re-encoded for the NUI came back with its sections and settings in
+   * whatever order `pairs` produced — different on every restart. Parsing the
+   * original text here keeps the order the schema was written in.
+   */
+  schemaJson?: string;
+  /** `x-autoDefault` values the server resolved from its convars, by path. */
+  autoDefaults?: Record<string, unknown>;
+  /** Pre-1.2.81 servers, and the browser mock, still send a decoded object. */
+  schema?: Record<string, unknown>;
   values?: Record<string, unknown>;
+  clientVersion?: number;
 };
 
 /**
@@ -28,16 +41,57 @@ export type LivePayload = {
  * in dirk_lib.
  */
 export function toStudioScripts(payload: LivePayload[]): StudioScript[] {
-  return payload.map((entry) => schemaToStudio(entry.schema, {
-    resource: entry.resource,
-    label: entry.label,
-    icon: entry.icon,
-    version: entry.version,
-    shared: entry.shared,
-    // The server's stored values ARE the overrides — everything else is the
-    // schema's default, which the walk fills in.
-    overrides: flatten(entry.values ?? {}),
+  return payload.map((entry) => ({
+    ...schemaToStudio(readSchema(entry), {
+      resource: entry.resource,
+      label: entry.label,
+      icon: entry.icon,
+      version: entry.version,
+      shared: entry.shared,
+      // The server's stored values ARE the overrides — everything else is the
+      // schema's default, which the walk fills in.
+      overrides: flatten(entry.values ?? {}),
+    }),
+    // Kept nested and untouched, because a save edits a copy of this rather
+    // than rebuilding a section from flattened leaves.
+    serverValues: entry.values ?? {},
+    clientVersion: entry.clientVersion,
   }));
+}
+
+/**
+ * The schema to render: the raw text where the server sent it, the decoded
+ * object otherwise.
+ *
+ * Detected defaults arrive separately (a path -> value map) because they are
+ * resolved from convars server-side and cannot be in the file. They are
+ * written onto the parsed schema here so the rest of the panel sees one thing:
+ * a schema whose defaults are the defaults actually in force.
+ */
+function readSchema(entry: LivePayload): Record<string, unknown> {
+  let schema: Record<string, unknown>;
+  if (entry.schemaJson) {
+    try {
+      schema = JSON.parse(entry.schemaJson) as Record<string, unknown>;
+    } catch {
+      schema = entry.schema ?? {};
+    }
+  } else {
+    schema = entry.schema ?? {};
+  }
+
+  for (const [path, value] of Object.entries(entry.autoDefaults ?? {})) {
+    const parts = path.split('.');
+    let node: Record<string, unknown> | undefined = schema;
+    for (const part of parts) {
+      const properties = node?.properties as Record<string, unknown> | undefined;
+      node = properties?.[part] as Record<string, unknown> | undefined;
+      if (!node) break;
+    }
+    if (node) node.default = value;
+  }
+
+  return schema;
 }
 
 /** `{a:{b:1}}` -> `{'a.b': 1}`, the shape the converter's overrides expect. */
@@ -87,5 +141,32 @@ export function applyLivePayload(payload: LivePayload[], focus?: string) {
     draft: {},
     undoStack: {},
     redoStack: {},
+  });
+}
+
+/**
+ * Re-read every script from the server, discarding nothing that is staged.
+ *
+ * The Refresh button used to be decorative - it had no handler at all. It
+ * matters when someone else has saved while this panel was open: the values on
+ * screen are then a snapshot of a config that has moved on, and the stored
+ * version would reject the next save as a conflict.
+ */
+export async function reloadFromServer() {
+  if (isEnvBrowser()) return;
+  const payload = await fetchNui<LivePayload[]>('GET_SCRIPT_STUDIO', undefined, []);
+  if (!Array.isArray(payload) || payload.length === 0) return;
+
+  const state = useStudio.getState();
+  const scripts = toStudioScripts(payload);
+
+  useStudio.setState({
+    scripts,
+    // Whatever you were looking at, and whatever you had staged, survives -
+    // this is a re-read, not a reset.
+    activeResource: scripts.some((s) => s.resource === state.activeResource)
+      ? state.activeResource
+      : scripts[0]?.resource ?? '',
+    saveError: null,
   });
 }

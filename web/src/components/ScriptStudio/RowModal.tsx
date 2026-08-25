@@ -9,6 +9,7 @@ import { FieldRow } from './FieldRow';
 import { PickerDrawer } from './PickerDrawer';
 import { ItemArt, StudioButton } from './ui';
 import type { SettingColumn, SettingEntry } from './types';
+import { useChrome } from './studioLocale';
 
 type Row = Record<string, unknown>;
 
@@ -36,6 +37,7 @@ export function RowModal({
   onClose: () => void;
   disabled?: boolean;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const [draft, setDraft] = useState<Row>(() => JSON.parse(JSON.stringify(row)));
@@ -158,10 +160,10 @@ export function RowModal({
             align="center" justify="space-between" px="sm" py="xs"
             style={{ borderTop: `0.1vh solid ${alpha(theme.colors.dark[4], 0.4)}`, flexShrink: 0 }}
           >
-            <StudioButton label="Delete" danger icon={Trash2} onClick={onDelete} disabled={disabled} />
+            <StudioButton label={t('rowModal.delete', 'Delete')} danger icon={Trash2} onClick={onDelete} disabled={disabled} />
             <Flex gap="xs">
-              <StudioButton label="Cancel" onClick={onClose} />
-              <StudioButton label="Save entry" primary onClick={() => onSave(draft)} disabled={disabled} />
+              <StudioButton label={t('rowModal.cancel', 'Cancel')} onClick={onClose} />
+              <StudioButton label={t('rowModal.save_entry', 'Save entry')} primary onClick={() => onSave(draft)} disabled={disabled} />
             </Flex>
           </Flex>
         </Flex>

@@ -29,6 +29,12 @@ export type ControlType =
   | 'control'
   | 'controls'
   | 'item'
+  /** one framework job or gang, picked from the server's real list */
+  | 'group'
+  /** the owning script supplies the editor; see `x-component` */
+  | 'custom'
+  /** a lucide icon, picked by looking at it rather than typed */
+  | 'icon'
   | 'list'
   | 'zones'
   | 'palette'
@@ -49,9 +55,33 @@ export type ControlType =
   | 'rows'
   | 'object';
 
-export type SettingOption = { value: string; label: string };
+export type SettingOption = {
+  /**
+   * lucide icon name and hex colour for this value, from `x-enumIcons` /
+   * `x-enumColors`.
+   *
+   * dirk_lib cannot know that a place category of "fuel" is a blue pump - that
+   * is the owning script's knowledge, so it travels in the schema. Carried on
+   * the option itself so one annotation serves both the picker (a grid of real
+   * pins instead of a dropdown of words) and the map (markers in the script's
+   * own colours).
+   */
+  icon?: string;
+  color?: string; value: string; label: string };
 
 export type SettingColumn = {
+  /** see SettingEntry.validateWith */
+  validateWith?: string;
+  /**
+   * This column holds an inventory item because the SCHEMA said so
+   * (`x-installItem` / `x-installItemList`), not because the control was
+   * inferred as an item picker.
+   *
+   * The missing-items audit uses this and nothing else. Auditing by rendered
+   * control meant any row with a `name` field got scraped, so dirk_phone was
+   * told the job names "realestate" and "ambulance" were missing items.
+   */
+  installItem?: boolean;
   key: string;
   /** schema constraints, checked before a save is allowed */
   required?: boolean;
@@ -86,6 +116,32 @@ export type RowTab = { id: string; label: string; icon: string; keys: string[] }
 export type EnabledWhen = Condition & { path: string; equals?: unknown };
 
 export type SettingEntry = {
+  /** declared with `x-installItem`; see SettingColumn.installItem */
+  installItem?: boolean;
+  /**
+   * NUI callback that says whether a typed value is actually valid, from
+   * `x-validateWith`.
+   *
+   * Range checks catch a number out of bounds; only the service behind an API
+   * key can say the key works. Without this a revoked token looks exactly like
+   * a good one until something silently fails much later.
+   */
+  validateWith?: string;
+  /**
+   * How this array draws on the map: an outline per row, or a pin per row.
+   * Only set for a path listed in `x-mapPaths`.
+   */
+  mapShape?: 'polygon' | 'marker';
+  /** the map colour this layer was given in `x-mapPaths` */
+  mapColor?: string;
+  /**
+   * Path to a component the OWNING resource ships, from `x-component`.
+   *
+   * Read out of that resource by Lua and evaluated in the panel, so a script
+   * can render something only it understands without a line of its code
+   * living in dirk_lib.
+   */
+  component?: string;
   path: string;
   /** schema constraints, checked before a save is allowed */
   required?: boolean;
@@ -144,4 +200,17 @@ export type StudioScript = {
   designs?: boolean;
   groups: SettingGroup[];
   entries: SettingEntry[];
+  /**
+   * The config exactly as the server holds it, nested.
+   *
+   * Kept alongside the flat `entries` because a save sends whole SECTIONS, and
+   * rebuilding a section out of flat leaves would silently drop anything the
+   * schema does not describe. Saving edits a copy of this instead.
+   */
+  serverValues?: Record<string, unknown>;
+  /**
+   * Config version this panel was opened against. Sent back on save so a stale
+   * panel is rejected rather than quietly overwriting someone else's change.
+   */
+  clientVersion?: number;
 };

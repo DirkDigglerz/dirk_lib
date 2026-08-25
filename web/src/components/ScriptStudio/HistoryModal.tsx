@@ -1,11 +1,23 @@
-import { alpha, Flex, Text, TextInput, useMantineTheme } from '@mantine/core';
+import { alpha, Flex, Select, Text, TextInput, useMantineTheme } from '@mantine/core';
 import { Modal } from 'dirk-cfx-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown, ChevronRight, History, Search, Undo2, User } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { QueryClientProvider, useInfiniteQuery } from '@tanstack/react-query';
 import { fetchNui, isEnvBrowser } from 'dirk-cfx-react';
+import { studioQueryClient } from './studioQuery';
 import { MOCK_HISTORY, type HistoryChange, type HistoryEntry } from './mockHistory';
 import { StudioButton } from './ui';
+import { useChrome } from './studioLocale';
+
+/** One page of the change log, as the server hands it over. */
+type HistoryPage = {
+  items?: HistoryEntry[];
+  /** what pre-1.2.81 builds called it */
+  entries?: HistoryEntry[];
+  total?: number;
+  nextOffset?: number | null;
+};
 
 /**
  * Who changed what, when - and the way back.
@@ -24,7 +36,34 @@ import { StudioButton } from './ui';
  * config edits and game events are both "what happened here", and having them
  * in two separate places meant looking twice.
  */
-export function HistoryPanel({
+export function HistoryPanel(props: {
+  resource: string;
+  canEdit: boolean;
+  onRevert?: (changes: { path: string; value: unknown }[]) => void;
+  onStats?: (stats: { saves: number; changes: number }) => void;
+  footer?: React.ReactNode;
+}) {
+  return (
+    <QueryClientProvider client={studioQueryClient}>
+      <HistoryPanelInner {...props} />
+    </QueryClientProvider>
+  );
+}
+
+/**
+ * How the server should order the log. Ordering happens THERE, so it holds
+ * across pages rather than just re-arranging the page you can see.
+ */
+const SORTS: { value: string; label: string }[] = [
+  { value: 'newest', label: 'Newest first' },
+  { value: 'oldest', label: 'Oldest first' },
+  { value: 'changes', label: 'Most changes' },
+  { value: 'admin', label: 'By admin' },
+];
+
+const PAGE = 25;
+
+function HistoryPanelInner({
   resource, canEdit, onRevert, onStats, footer,
 }: {
   resource: string;
@@ -35,105 +74,151 @@ export function HistoryPanel({
   onStats?: (stats: { saves: number; changes: number }) => void;
   footer?: React.ReactNode;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
 
   const [query, setQuery] = useState('');
   const [pathFilter, setPathFilter] = useState('');
   const [adminFilter, setAdminFilter] = useState('');
+  const [sort, setSort] = useState<string>('newest');
   const [expanded, setExpanded] = useState<number | null>(0);
 
-  // The real change log lives on the server and is already filtered and paged
-  // there. Reading MOCK_HISTORY unconditionally meant a live panel showed
-  // invented edits by people who do not exist on that server.
-  const [entries, setEntries] = useState<HistoryEntry[]>(
-    () => (isEnvBrowser() ? MOCK_HISTORY[resource] ?? [] : []),
-  );
+  // Typing stays instant; the fetch waits for the deferred value, so a
+  // keystroke does not become a round trip.
+  const search = useDeferredValue(query);
+  const path = useDeferredValue(pathFilter);
+  const admin = useDeferredValue(adminFilter);
 
-  useEffect(() => {
-    if (isEnvBrowser()) {
-      setEntries(MOCK_HISTORY[resource] ?? []);
-      return;
-    }
-    let live = true;
-    fetchNui<{ entries?: HistoryEntry[] }>('GET_SCRIPT_CONFIG_HISTORY', { resource, limit: 100 }, { entries: [] })
-      .then((result) => { if (live) setEntries(result?.entries ?? []); })
-      .catch(() => { if (live) setEntries([]); });
-    return () => { live = false; };
-  }, [resource]);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const p = pathFilter.trim().toLowerCase();
-    const a = adminFilter.trim().toLowerCase();
-
-    return entries.filter((entry) => {
-      if (a && !(entry.admin?.name ?? '').toLowerCase().includes(a)) return false;
-      if (p && !entry.changes.some((c) => c.path.toLowerCase().includes(p))) return false;
-      if (q) {
-        const hay = [
-          entry.admin?.name ?? '', entry.at_utc,
-          ...entry.changes.flatMap((c) => [c.path, String(c.old), String(c.new)]),
-        ].join(' ').toLowerCase();
-        if (!hay.includes(q)) return false;
+  // Filtering, ordering and paging all happen on the SERVER, and react-query
+  // caches each page - going back to a filter you already used costs nothing.
+  const { data, isLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ['scriptConfigHistory', resource, { search, path, admin, sort }],
+    initialPageParam: 0,
+    queryFn: async ({ pageParam }) => {
+      const offset = pageParam as number;
+      if (isEnvBrowser()) {
+        const all = MOCK_HISTORY[resource] ?? [];
+        return {
+          items: all.slice(offset, offset + PAGE),
+          total: all.length,
+          nextOffset: offset + PAGE < all.length ? offset + PAGE : null,
+        };
       }
-      return true;
-    });
-  }, [entries, query, pathFilter, adminFilter]);
+      const reply = await fetchNui<HistoryPage>('GET_SCRIPT_STUDIO_HISTORY', {
+        resource, offset, limit: PAGE, query: search, path, admin, sort,
+      }, { items: [], total: 0, nextOffset: null });
+      // The server calls them `items`. Reading only `entries` is why a real
+      // change log always came back empty however much was in it.
+      return {
+        items: reply?.items ?? reply?.entries ?? [],
+        total: reply?.total ?? 0,
+        nextOffset: reply?.nextOffset ?? null,
+      };
+    },
+    getNextPageParam: (last) => last.nextOffset ?? undefined,
+  });
 
-  const totalChanges = filtered.reduce((sum, e) => sum + e.changes.length, 0);
+  const entries = useMemo(
+    () => (data?.pages ?? []).flatMap((page) => page.items),
+    [data],
+  );
+  const total = data?.pages?.[0]?.total ?? 0;
+  const totalChanges = entries.reduce((sum, entry) => sum + entry.changes.length, 0);
 
   useEffect(() => {
-    onStats?.({ saves: filtered.length, changes: totalChanges });
-  }, [filtered.length, totalChanges, onStats]);
+    onStats?.({ saves: total, changes: totalChanges });
+  }, [total, totalChanges, onStats]);
+
+  const filtering = !!(search || path || admin);
 
   return (
     <Flex direction="column" flex={1} style={{ minHeight: 0 }}>
-        {/* filters */}
-        <Flex
-          gap="xs" p="sm"
-          style={{ borderBottom: `0.1vh solid ${alpha(theme.colors.dark[4], 0.4)}`, flexShrink: 0 }}
-        >
-          <FilterInput
-            value={query} onChange={setQuery}
-            placeholder="Search values, paths or admins" icon={Search} grow
+      {/* filters */}
+      <Flex
+        gap="xs" p="sm"
+        style={{ borderBottom: `0.1vh solid ${alpha(theme.colors.dark[4], 0.4)}`, flexShrink: 0 }}
+      >
+        <FilterInput
+          value={query} onChange={setQuery}
+          placeholder={t('historyModal.search_values_paths_or_admins', 'Search values, paths or admins')} icon={Search} grow
+        />
+        <FilterInput value={pathFilter} onChange={setPathFilter} placeholder={t('historyModal.filter_by_path', 'Filter by path')} width="24vh" />
+        <FilterInput value={adminFilter} onChange={setAdminFilter} placeholder={t('historyModal.filter_by_admin', 'Filter by admin')} icon={User} width="20vh" />
+        <Select
+          data={SORTS}
+          value={sort}
+          onChange={(next) => setSort(next ?? 'newest')}
+          allowDeselect={false}
+          comboboxProps={{ zIndex: 10800 }}
+          styles={{
+            input: {
+              background: alpha(theme.colors.dark[9], 0.75),
+              border: `0.1vh solid ${alpha(theme.colors.dark[4], 0.55)}`,
+              color: 'rgba(255,255,255,0.9)',
+              fontFamily: 'Akrobat SemiBold',
+              fontSize: '1.4vh',
+              height: '3.4vh',
+              minHeight: '3.4vh',
+              width: '19vh',
+            },
+            dropdown: { background: theme.colors.dark[8], border: `0.1vh solid ${theme.colors.dark[6]}` },
+          }}
+        />
+      </Flex>
+
+      {/* entries */}
+      <Flex direction="column" gap="xs" p="sm" className="studio-scroll" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
+        {entries.map((entry, index) => (
+          <EntryCard
+            key={`${entry.at_unix}-${index}`}
+            entry={entry}
+            open={expanded === index}
+            canEdit={canEdit}
+            onToggle={() => setExpanded(expanded === index ? null : index)}
+            onRevertAll={() => onRevert?.(entry.changes.map((change) => ({ path: change.path, value: change.old })))}
+            onRevertOne={(change) => onRevert?.([{ path: change.path, value: change.old }])}
           />
-          <FilterInput value={pathFilter} onChange={setPathFilter} placeholder="Filter by path" width="30vh" />
-          <FilterInput value={adminFilter} onChange={setAdminFilter} placeholder="Filter by admin" icon={User} width="26vh" />
-        </Flex>
+        ))}
 
-        {/* entries */}
-        <Flex direction="column" gap="xs" p="sm" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
-          {filtered.map((entry, index) => (
-            <EntryCard
-              key={entry.at_unix}
-              entry={entry}
-              open={expanded === index}
-              canEdit={canEdit}
-              onToggle={() => setExpanded(expanded === index ? null : index)}
-              onRevertAll={() => onRevert?.(entry.changes.map((c) => ({ path: c.path, value: c.old })))}
-              onRevertOne={(change) => onRevert?.([{ path: change.path, value: change.old }])}
+        {hasNextPage && (
+          <Flex justify="center" py="xs">
+            <StudioButton
+              label={isFetchingNextPage ? 'Loading...' : 'Load more'}
+              onClick={() => fetchNextPage()}
+              disabled={isFetchingNextPage}
             />
-          ))}
+          </Flex>
+        )}
 
-          {filtered.length === 0 && (
-            <Flex direction="column" align="center" justify="center" gap="xs" py="xl">
-              <History size="3vh" color="rgba(255,255,255,0.18)" />
-              <Text ff="Akrobat Bold" size="sm" c="rgba(255,255,255,0.4)">
-                {entries.length === 0 ? 'Nothing has been changed yet' : 'No change matches those filters'}
-              </Text>
-            </Flex>
+        {entries.length === 0 && (
+          <Flex direction="column" align="center" justify="center" gap="xs" py="xl">
+            <History size="3vh" color="rgba(255,255,255,0.18)" />
+            <Text ff="Akrobat Bold" size="sm" c="rgba(255,255,255,0.4)">
+              {isLoading ? 'Reading the change log\u2026'
+                : isError ? 'Could not read the change log'
+                  : filtering ? 'No change matches those filters'
+                    : 'Nothing has been changed yet'}
+            </Text>
+          </Flex>
+        )}
+      </Flex>
+
+      <Flex
+        align="center" justify="space-between" px="sm" py="xs"
+        style={{ borderTop: `0.1vh solid ${alpha(theme.colors.dark[4], 0.4)}`, flexShrink: 0 }}
+      >
+        <Flex align="center" gap="sm">
+          <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">
+            {t('historyModal.reverting_stages_the_change_review_it_th', 'Reverting stages the change - review it, then Save like any other edit.')}
+          </Text>
+          {total > 0 && (
+            <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.25)">
+              {entries.length} of {total}
+            </Text>
           )}
         </Flex>
-
-        <Flex
-          align="center" justify="space-between" px="sm" py="xs"
-          style={{ borderTop: `0.1vh solid ${alpha(theme.colors.dark[4], 0.4)}`, flexShrink: 0 }}
-        >
-          <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">
-            Reverting stages the change - review it, then Save like any other edit.
-          </Text>
-          {footer}
-        </Flex>
+        {footer}
+      </Flex>
     </Flex>
   );
 }
@@ -147,6 +232,7 @@ export function HistoryModal({
   onRevert: (changes: { path: string; value: unknown }[]) => void;
   onClose: () => void;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const [stats, setStats] = useState({ saves: 0, changes: 0 });
@@ -156,7 +242,7 @@ export function HistoryModal({
 
   return (
     <Modal
-      title="Change history"
+      title={t('historyModal.change_history', 'Change history')}
       icon={History}
       iconColor={color}
       description={`Every saved change to ${resource}`}
@@ -171,7 +257,7 @@ export function HistoryModal({
         canEdit={canEdit}
         onRevert={onRevert}
         onStats={onStats}
-        footer={<StudioButton label="Close" onClick={onClose} />}
+        footer={<StudioButton label={t('historyModal.close', 'Close')} onClick={onClose} />}
       />
     </Modal>
   );
@@ -187,6 +273,7 @@ function EntryCard({
   onRevertAll: () => void;
   onRevertOne: (change: HistoryChange) => void;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const isConsole = entry.admin?.name === 'console';
@@ -199,6 +286,10 @@ function EntryCard({
         border: `0.1vh solid ${alpha(theme.colors.dark[5], open ? 0.6 : 0.35)}`,
         borderRadius: theme.radius.xs,
         overflow: 'hidden',
+        // A flex column SHRINKS its children before it scrolls, so past a
+        // certain number of saves every row squashed instead of the list
+        // getting longer. The rows are a fixed size; the container scrolls.
+        flexShrink: 0,
       }}
     >
       <Flex
@@ -294,7 +385,7 @@ function EntryCard({
                     }}
                   >
                     <Undo2 size="1.2vh" />
-                    <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.05em" c="inherit">Revert</Text>
+                    <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.05em" c="inherit">{t('historyModal.revert', 'Revert')}</Text>
                   </motion.button>
                 </Flex>
               ))}
@@ -372,7 +463,11 @@ function FilterInput({
 }
 
 function formatValue(value: unknown): string {
-  if (value === null || value === undefined) return 'none';
+  // A change to a setting that had never been overridden carries no previous
+  // value at all, so "none" would read as "it was empty" when it was actually
+  // whatever the script ships.
+  if (value === undefined) return 'default';
+  if (value === null) return 'none';
   if (typeof value === 'boolean') return value ? 'on' : 'off';
   if (value === '') return 'empty';
   return String(value);

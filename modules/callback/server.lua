@@ -69,7 +69,15 @@ lib.callback = setmetatable({}, {
   end
 })
 
-lib.callback.await = function(event,playerId, ...)
+--- Same ox_lib delay-slot tolerance as the client side: ox writes
+--- `await(event, playerId, delay, ...)`, dirk_lib has no timeout, and a
+--- leading `false` there would otherwise arrive as the callback's first
+--- argument. See modules/callback/client.lua for the full note.
+lib.callback.await = function(event, playerId, ...)
+  local first = ...
+  if first == false then
+    return triggerClientCallback(_, event, playerId, nil, select(2, ...))
+  end
   return triggerClientCallback(_, event, playerId, nil, ...)
 end
 

@@ -200,7 +200,11 @@
       ]
     }
   ],
-  "x-mapPaths": ["zones", "depthOverride", "seaBoundary"],
+  "x-mapPaths": [
+    { "path": "zones", "shape": "polygon" },
+    { "path": "depthOverride", "shape": "polygon", "color": "#f59e0b" },
+    { "path": "seaBoundary", "shape": "polygon", "color": "#3b82f6" }
+  ],
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "description": "dirk_fishing script settings schema. Defines structure, types, constraints and default values. Used by Lua at runtime and TypeScript at build time.",
@@ -319,6 +323,7 @@
           }
         },
         "fishFinderTabletModel": {
+          "x-control": "model",
           "type": "string",
           "default": "prop_cs_tablet",
           "description": "Prop model held when using the fish finder. Ensure it is streamed if changed."
@@ -843,8 +848,10 @@
       },
       "properties": {
         "useOverride":  { "type": "boolean", "default": false, "description": "Master switch — when off this resource follows the global dirk_lib theme." },
-        "primaryColor": { "type": "string",  "default": "dirk", "description": "Mantine palette name (or 'custom' to use the customTheme stops)." },
-        "primaryShade": { "type": "integer", "default": 5, "minimum": 0, "maximum": 9, "description": "Shade index 0-9 within the active palette." },
+        "primaryColor": {
+          "x-control": "mantineColor", "type": "string",  "default": "dirk", "description": "Mantine palette name (or 'custom' to use the customTheme stops)." },
+        "primaryShade": {
+          "x-control": "shade", "type": "integer", "default": 5, "minimum": 0, "maximum": 9, "description": "Shade index 0-9 within the active palette." },
         "customTheme":  {
           "type": "array",
           "default": ["#f0f4ff","#d9e3ff","#bfcfff","#a6bbff","#8ca7ff","#7393ff","#5a7fff","#406bff","#2547ff","#0b33ff"],
@@ -1007,6 +1014,7 @@
                 "type": "string"
               },
               "description": {
+                "x-control": "text",
                 "type": "string"
               },
               "weight": {
@@ -1339,6 +1347,7 @@
                 "type": "string"
               },
               "description": {
+                "x-control": "text",
                 "type": "string"
               },
               "strength": {
@@ -1355,6 +1364,7 @@
                 "maxItems": 2
               },
               "model": {
+                "x-control": "model",
                 "type": "string"
               },
               "lvlRequired": {
@@ -1536,6 +1546,7 @@
                 "type": "string"
               },
               "description": {
+                "x-control": "text",
                 "type": "string"
               },
               "strength": {
@@ -1682,6 +1693,7 @@
                 "type": "string"
               },
               "description": {
+                "x-control": "text",
                 "type": "string"
               },
               "strength": {
@@ -1810,6 +1822,7 @@
                 "type": "string"
               },
               "description": {
+                "x-control": "text",
                 "type": "string"
               },
               "strength": {
@@ -2006,6 +2019,7 @@
                 "type": "string"
               },
               "description": {
+                "x-control": "text",
                 "type": "string"
               },
               "lvlRequired": {
@@ -2339,6 +2353,7 @@
                 "type": "string"
               },
               "description": {
+                "x-control": "text",
                 "type": "string"
               },
               "weight": {
@@ -2452,6 +2467,7 @@
                 "type": "string"
               },
               "description": {
+                "x-control": "text",
                 "type": "string"
               },
               "capacity": {
@@ -2459,6 +2475,7 @@
                 "minimum": 1
               },
               "model": {
+                "x-control": "model",
                 "type": "string"
               },
               "lvlRequired": {
@@ -2532,6 +2549,7 @@
             "type": "string"
           },
           "description": {
+            "x-control": "text",
             "type": "string"
           },
           "infoUnlockLvl": {
@@ -3930,6 +3948,7 @@
       ]
     },
     "zones": {
+      "x-rowControls": {"description": "text"},
       "x-validateRows": {"permitPrice": [{"when": {"path": "self.permitRequired", "equals": true}, "must": {"isSet": true}, "message": "Needed when this zone requires a permit"}], "permitInterval": [{"when": {"path": "self.permitRequired", "equals": true}, "must": {"isSet": true}, "message": "Needed when this zone requires a permit"}]},
       "type": "array",
       "x-arrayKey": "name",
@@ -5418,6 +5437,7 @@
       ]
     },
     "stores": {
+      "x-rowControls": {"description": "text", "blip.color": "blipColor", "blip.sprite": "blipSprite", "blip.display": "blipDisplay", "categories.description": "text"},
       "x-validateRows": {"stock.variance": [{"must": {"ascending": true}, "message": "Minimum variance is above the maximum"}], "stock.name": [{"must": {"anyOf": [{"path": "self.name", "isSet": true}, {"path": "self.ref", "isSet": true}]}, "message": "A stock line needs an item or a reference"}]},
       "type": "array",
       "x-arrayKey": "id",
@@ -7888,6 +7908,7 @@
             "description": "Species that count toward this tournament. Empty = any species."
           },
           "location": {
+            "x-control": "coords",
             "type": "string",
             "description": "Optional fishing zone name. Leave blank for any location."
           },
@@ -8219,6 +8240,7 @@
           "description": "Master switch for Discord webhook logging. When off, nothing is logged regardless of the per-event toggles."
         },
         "webhookUrl": {
+          "x-control": "secret",
           "type": "string",
           "default": "",
           "x-serverOnly": true,
@@ -8235,6 +8257,7 @@
           "description": "Avatar image URL for the webhook messages (optional)."
         },
         "embedColor": {
+          "x-control": "color",
           "type": "string",
           "default": "#4AB569",
           "description": "Default embed colour (hex) for log messages."

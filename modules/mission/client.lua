@@ -20,7 +20,7 @@ end
 ---@param groupId string
 ---@param stepId string
 function mission.completeStep(groupId, stepId)
-  lib.callback.await('dirk_lib:mission:completeStep', false, groupId, stepId)
+  lib.callback.await('dirk_lib:mission:completeStep', groupId, stepId)
 end
 
 --- Fail current step (tells server)
@@ -28,7 +28,7 @@ end
 ---@param stepId string
 ---@param reason? string
 function mission.failStep(groupId, stepId, reason)
-  lib.callback.await('dirk_lib:mission:failStep', false, groupId, stepId, reason)
+  lib.callback.await('dirk_lib:mission:failStep', groupId, stepId, reason)
 end
 
 -- Listen for step start from server

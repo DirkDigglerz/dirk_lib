@@ -5,6 +5,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useInputStyles } from './Controls';
 import { StudioButton } from './ui';
+import { useChrome } from './studioLocale';
 
 type Row = Record<string, unknown>;
 
@@ -24,6 +25,7 @@ export function KeyValueControl({
   onChange: (next: Row) => void;
   disabled?: boolean;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const styles = useInputStyles(true);
@@ -124,7 +126,7 @@ export function KeyValueControl({
       ))}
 
       {pairs.length === 0 && (
-        <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">Nothing set</Text>
+        <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">{t('mapControls.nothing_set', 'Nothing set')}</Text>
       )}
 
       {!disabled && (
@@ -133,11 +135,11 @@ export function KeyValueControl({
             value={newKey}
             onChange={(e) => setNewKey(e.currentTarget.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-            placeholder="New key"
+            placeholder={t('mapControls.new_key', 'New key')}
             styles={{ ...styles, input: { ...styles.input, fontFamily: 'monospace' } }}
             style={{ flex: 1 }}
           />
-          <StudioButton label="Add" icon={Plus} onClick={add} />
+          <StudioButton label={t('mapControls.add', 'Add')} icon={Plus} onClick={add} />
         </Flex>
       )}
     </Flex>
@@ -156,6 +158,7 @@ export function GroupsControl({
   onChange: (next: string[]) => void;
   disabled?: boolean;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
 
   // NOT `useFrameworkGroups(selectAllGroups)` - that selector spreads jobs and
@@ -193,7 +196,7 @@ export function GroupsControl({
         disabled={disabled}
         searchable
         clearable
-        placeholder="Pick a job or gang, or type an ACE group"
+        placeholder={t('mapControls.pick_a_job_or_gang_or_type_an_ace_group', 'Pick a job or gang, or type an ACE group')}
         comboboxProps={{ zIndex: 10800 }}
         styles={{
           input: {
@@ -221,7 +224,7 @@ export function GroupsControl({
         }}
       />
       <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.28)">
-        Checked with IsPlayerAceAllowed, so a job name and an ACE group both work.
+        {t('mapControls.checked_with_isplayeraceallowed_so_a_job', 'Checked with IsPlayerAceAllowed, so a job name and an ACE group both work.')}
       </Text>
     </Flex>
   );

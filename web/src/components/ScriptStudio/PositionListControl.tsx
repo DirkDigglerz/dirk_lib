@@ -7,6 +7,7 @@ import { AnimatePresence } from 'framer-motion';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { StudioButton } from './ui';
+import { useChrome } from './studioLocale';
 
 type Position = { x: number; y: number; z: number; w?: number };
 
@@ -27,6 +28,7 @@ export function PositionListControl({
   onChange: (next: Position[]) => void;
   disabled?: boolean;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
@@ -84,12 +86,12 @@ export function PositionListControl({
       ))}
 
       {rows.length === 0 && (
-        <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">No positions set</Text>
+        <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">{t('positionListControl.no_positions_set', 'No positions set')}</Text>
       )}
 
       {!disabled && (
         <StudioButton
-          label="Add position"
+          label={t('positionListControl.add_position', 'Add position')}
           icon={Plus}
           onClick={() => onChange([...rows, { ...ZERO }])}
           grow
@@ -99,7 +101,7 @@ export function PositionListControl({
       <AnimatePresence>
         {confirmDelete !== null && rows[confirmDelete] && (
           <ConfirmModal
-            title="Remove position"
+            title={t('positionListControl.remove_position', 'Remove position')}
             description={`Position #${confirmDelete + 1} is removed when you save.`}
             confirmLabel="Remove"
             onConfirm={() => {

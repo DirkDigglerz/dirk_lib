@@ -4,9 +4,15 @@ import { motion } from 'framer-motion';
 import { ItemArt } from './ui';
 import { ChevronRight, Crosshair, Eye, EyeOff, Keyboard, MapPin, Package, PackagePlus } from 'lucide-react';
 import { useState } from 'react';
-import { AccountSelect, BlipDisplaySelect, ControlMultiSelect, ControlSelect, FiveMKeyBindInput, fetchNui } from 'dirk-cfx-react';
+import {
+  AccountSelect, BlipDisplaySelect, ControlMultiSelect, ControlSelect, FiveMKeyBindInput,
+  GroupSelect, fetchNui,
+} from 'dirk-cfx-react';
+import { Icon } from './Icon';
+import { IconPicker } from './IconPicker';
 import { ModelControl } from './ModelControl';
 import type { ControlType, SettingColumn, SettingEntry } from './types';
+import { useChrome } from './studioLocale';
 
 // One dispatch, keyed by the schema's control type. Adding a control here is
 // what "x-control" buys us: every script's panel gains it at once.
@@ -40,6 +46,21 @@ export function useInputStyles(compact?: boolean) {
       paddingInline: '0.9vh',
     },
     section: { width: '2.6vh' },
+  };
+}
+
+/**
+ * Input styles for a control with a swatch or icon in its LEFT section.
+ *
+ * The section is 2.6vh wide but the input's own padding is 0.9vh, so the text
+ * starts underneath it - a colour input read as its hex value sandwiched into
+ * its own preview swatch. The padding has to clear the section, not the border.
+ */
+export function useLeftSectionStyles(compact?: boolean) {
+  const base = useInputStyles(compact);
+  return {
+    ...base,
+    input: { ...base.input, paddingLeft: '3.2vh' },
   };
 }
 
@@ -110,9 +131,11 @@ function textareaInput(input: Record<string, unknown>) {
 }
 
 export function SettingControl({ type, value, onChange, entry, column, disabled, onDrill, compact }: ControlProps) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const styles = useInputStyles(compact);
+  const swatchStyles = useLeftSectionStyles(compact);
   const suffix = entry?.suffix ?? column?.suffix;
   const min = entry?.min ?? column?.min;
   const max = entry?.max ?? column?.max;
@@ -160,6 +183,61 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
       );
 
     case 'enum':
+      // When the schema styles its values (`x-enumIcons` / `x-enumColors`),
+      // show the real thing rather than a dropdown of words: for a place
+      // category the colour and icon ARE the setting, and a grid of the actual
+      // pins is what the old hand-built panel gave you.
+      if ((options ?? []).some((option) => option.icon || option.color)) {
+        return (
+          <ControlShell width="34vh">
+            <Flex gap="0.4vh" wrap="wrap" justify="flex-end" style={{ flex: 1 }}>
+              {(options ?? []).map((option) => {
+                const active = option.value === value;
+                const hex = option.color ?? theme.colors[theme.primaryColor][5];
+                return (
+                  <Tooltip
+                    key={option.value}
+                    label={option.label}
+                    position="top"
+                    withArrow
+                    zIndex={10800}
+                    styles={{
+                      tooltip: {
+                        background: alpha(theme.colors.dark[7], 0.95),
+                        border: '0.1vh solid rgba(255,255,255,0.1)',
+                        color: 'rgba(255,255,255,0.75)',
+                        fontFamily: 'Akrobat Bold',
+                        fontSize: '1.2vh',
+                        padding: '0.4vh 0.7vh',
+                      },
+                    }}
+                  >
+                    <motion.button
+                      type="button"
+                      onClick={() => !disabled && onChange(option.value)}
+                      whileTap={disabled ? undefined : { scale: 0.9 }}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        aspectRatio: '1 / 1', height: '2.6vh',
+                        background: hex,
+                        border: `0.2vh solid ${active ? '#ffffff' : alpha('#000000', 0.35)}`,
+                        borderRadius: '50%',
+                        boxShadow: active ? `0 0 0.7vh ${hex}` : 'none',
+                        opacity: disabled ? 0.4 : active ? 1 : 0.55,
+                        cursor: disabled ? 'not-allowed' : 'pointer',
+                      }}
+                      aria-label={option.label}
+                    >
+                      <Icon name={option.icon ?? 'map-pin'} size="1.45vh" color="#ffffff" />
+                    </motion.button>
+                  </Tooltip>
+                );
+              })}
+            </Flex>
+          </ControlShell>
+        );
+      }
+
       return (
         <ControlShell>
           <Select
@@ -189,7 +267,7 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
             format="hex"
             withEyeDropper={false}
             popoverProps={{ zIndex: 10800 }}
-            styles={styles}
+            styles={swatchStyles}
             style={{ flex: 1 }}
           />
         </ControlShell>
@@ -235,7 +313,7 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
             value={typeof value === 'string' ? value : ''}
             onChange={(e) => onChange(e.currentTarget.value)}
             disabled={disabled}
-            placeholder="not set"
+            placeholder={t('controls.not_set', 'not set')}
             visibilityToggleIcon={({ reveal }) => (reveal
               ? <EyeOff size="1.6vh" color="rgba(255,255,255,0.6)" />
               : <Eye size="1.6vh" color="rgba(255,255,255,0.6)" />)}
@@ -292,6 +370,36 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
         </ControlShell>
       );
 
+    // One framework job or gang, declared with `x-groupPicker`. A plain text
+    // box here is a silent failure waiting to happen: a typo makes, say, a
+    // business nobody can ever staff, and nothing ever says so.
+    case 'group':
+      return (
+        <ControlShell width="40vh">
+          <GroupSelect
+            value={{ name: typeof value === 'string' ? value : '', grade: 0 }}
+            onChange={(next) => onChange(next.name ?? '')}
+            style={{ flex: 1 }}
+          >
+            <GroupSelect.Name />
+          </GroupSelect>
+        </ControlShell>
+      );
+
+    // A lucide icon. This was a text box, which asked you to know that the
+    // icon called "fuel" exists and is spelled that way. Nobody knows that;
+    // they know what a fuel pump looks like.
+    case 'icon':
+      return (
+        <ControlShell width="46vh">
+          <IconPicker
+            value={value}
+            onChange={(next) => onChange(next)}
+            disabled={disabled}
+          />
+        </ControlShell>
+      );
+
     case 'account':
       // dirk_lib knows the framework's real account list; the picker asks it.
       return (
@@ -301,6 +409,9 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
             value={typeof value === 'string' ? value : null}
             onChange={(next) => onChange(next)}
             disabled={disabled}
+            // No comboboxProps here: AccountSelect's props are a closed union
+            // in dirk-cfx-react, so its dropdown is raised by the
+            // .mantine-Combobox-dropdown rule in index.css instead.
             style={{ flex: 1 }}
           />
         </ControlShell>
@@ -354,7 +465,7 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
             </Text>
             <Flex align="center" gap="xxs" style={{ flexShrink: 0 }}>
               <Crosshair size="1.4vh" color={color} />
-              <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.05em" c={color}>Place</Text>
+              <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.05em" c={color}>{t('controls.place', 'Place')}</Text>
             </Flex>
           </PickerButton>
         </ControlShell>
@@ -368,7 +479,7 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
             value={typeof value === 'string' ? value : ''}
             onChange={(e) => onChange(e.currentTarget.value)}
             disabled={disabled}
-            placeholder="HH:MM"
+            placeholder={t('controls.hh_mm', 'HH:MM')}
             styles={{ ...styles, input: { ...styles.input, fontFamily: 'monospace', textAlign: 'center' } }}
             style={{ flex: 1 }}
           />
@@ -412,7 +523,7 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
         <ControlShell>
           {name && (
             <Tooltip
-              label="Give yourself one"
+              label={t('controls.give_yourself_one', 'Give yourself one')}
               position="top"
               withArrow
               zIndex={10500}
@@ -444,7 +555,7 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
                   borderRadius: theme.radius.xs,
                   cursor: 'pointer', color: 'rgba(255,255,255,0.55)', flexShrink: 0,
                 }}
-                aria-label="Give yourself one"
+                aria-label={t('controls.give_yourself_one', 'Give yourself one')}
               >
                 <PackagePlus size="1.5vh" />
               </motion.button>
@@ -472,7 +583,7 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
               {rows.length} {rows.length === 1 ? 'entry' : 'entries'}
             </Text>
             <Flex align="center" gap="xxs" style={{ flexShrink: 0 }}>
-              <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.05em" c={color}>Edit</Text>
+              <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.05em" c={color}>{t('controls.edit', 'Edit')}</Text>
               <ChevronRight size="1.5vh" color={color} />
             </Flex>
           </PickerButton>
@@ -497,11 +608,52 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
 }
 
 /** Wide types get their own full-width row instead of a right-hand control. */
+/**
+ * How much room a control needs.
+ *
+ *   inline    - a row. A toggle, a number, a dropdown.
+ *   wide      - the full row width, and it FLOWS with the page scroll.
+ *   workspace - a map, a canvas, an editor. It does not want to flow; it wants
+ *               to FIT. Left to itself it either picks a magic height or grows
+ *               past the bottom of the window.
+ *
+ * The third one had no name until now, so every workspace control guessed its
+ * own number - 56vh here, 48vh there, nothing at all in a script's own
+ * component - and a map ended up taller than the window with the page
+ * scrolling behind it.
+ */
+export type ControlSize = 'inline' | 'wide' | 'workspace';
+
+/**
+ * The height a workspace control fills.
+ *
+ * Simply all of it. A workspace section replaces the scrolling stack with a
+ * definite-height flex column, so the control fills its parent and needs no
+ * arithmetic at all.
+ *
+ * It was briefly a `vh` figure, which was wrong twice over: `vh` measures the
+ * VIEWPORT, and the panel is 84vh when windowed — so a control taking a slice
+ * of the viewport overflowed a window it knew nothing about. Giving the
+ * container a real height removes the sum rather than correcting it.
+ */
+export const PANE_HEIGHT = '100%';
+
+export function controlSize(type: ControlType): ControlSize {
+  // A map or a script's own editor claims the pane.
+  if (type === 'zones' || type === 'custom') return 'workspace';
+  return isWideType(type) ? 'wide' : 'inline';
+}
+
 export function isWideType(type: ControlType): boolean {
   return type === 'list' || type === 'zones' || type === 'palette'
     || type === 'controls' || type === 'keyvalue' || type === 'groups'
     || type === 'keybindMap' || type === 'mantineColor' || type === 'shade'
-    || type === 'groupGrades' || type === 'refs' || type === 'weekdays' || type === 'positions' || type === 'pickList' || type === 'weightMap';
+    || type === 'groupGrades' || type === 'refs' || type === 'weekdays' || type === 'positions' || type === 'pickList' || type === 'weightMap'
+    // A script's own editor gets the full row width and renders inline in the
+    // section, with the same scroll, rail and save bar as everything else.
+    || type === 'custom'
+    // the grid needs the row width to be worth looking at
+    || type === 'icon';
 }
 
 /** Array of numeric control ids - the library's own multi picker. */

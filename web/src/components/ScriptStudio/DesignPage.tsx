@@ -9,6 +9,7 @@ import {
   loadingManifest,
 } from './LiveThumb';
 import { useStudio } from './store';
+import { useChrome } from './studioLocale';
 
 /**
  * The design surface, in two modes.
@@ -57,6 +58,7 @@ export function DesignPage({ resource }: { resource: string }) {
 /* ─────────────────────────────────────────────────────────── browse ────── */
 
 function BrowseMode({ resource }: { resource: string }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const [q, setQ] = useState('');
@@ -96,13 +98,13 @@ function BrowseMode({ resource }: { resource: string }) {
       <Flex align="center" gap="sm" wrap="wrap">
         <Flex align="center" gap="xs" style={{ flex: 1, minWidth: 0 }}>
           <LayoutTemplate size="2vh" color={color} />
-          <Text ff="Akrobat Bold" size="sm" tt="uppercase" lts="0.06em" c="white">Designs</Text>
+          <Text ff="Akrobat Bold" size="sm" tt="uppercase" lts="0.06em" c="white">{t('designPage.designs', 'Designs')}</Text>
           <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.3)">{designs.length}</Text>
         </Flex>
         <TextInput
           value={q}
           onChange={(e) => setQ(e.currentTarget.value)}
-          placeholder="Search designs and components…"
+          placeholder={t('designPage.search_designs_and_components', 'Search designs and components…')}
           size="xs"
           leftSection={<Search size="1.4vh" />}
           style={{ width: '34vh' }}
@@ -116,7 +118,7 @@ function BrowseMode({ resource }: { resource: string }) {
           }}
         >
           <Plus size="1.5vh" />
-          <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.05em">New design</Text>
+          <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.05em">{t('designPage.new_design', 'New design')}</Text>
         </UnstyledButton>
       </Flex>
 
@@ -148,7 +150,7 @@ function BrowseMode({ resource }: { resource: string }) {
                       background: color, padding: '0.35vh 0.55vh 0.25vh', borderRadius: '0.35vh',
                     }}
                   >
-                    Active
+                    {t('designPage.active', 'Active')}
                   </Text>
                 )}
                 {/* Two intents, two targets. A bare click on the card can only mean
@@ -169,7 +171,7 @@ function BrowseMode({ resource }: { resource: string }) {
                           fontSize: '1.05vh', letterSpacing: '0.05em', textTransform: 'uppercase',
                         }}
                       >
-                        Use this
+                        {t('designPage.use_this', 'Use this')}
                       </UnstyledButton>
                     )}
                     <UnstyledButton
@@ -182,7 +184,7 @@ function BrowseMode({ resource }: { resource: string }) {
                       }}
                     >
                       <Pencil size="1.3vh" />
-                      Edit
+                      {t('designPage.edit', 'Edit')}
                     </UnstyledButton>
                   </Flex>
                 )}
@@ -208,11 +210,11 @@ function BrowseMode({ resource }: { resource: string }) {
       </Box>
 
       <Flex align="center" gap="xs" mt="xs">
-        <Text ff="Akrobat Bold" size="sm" tt="uppercase" lts="0.06em" c="white">Components</Text>
+        <Text ff="Akrobat Bold" size="sm" tt="uppercase" lts="0.06em" c="white">{t('designPage.components', 'Components')}</Text>
         <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.3)">{compCount}</Text>
       </Flex>
       <Text size="xxs" c="rgba(255,255,255,0.4)" mt="-0.7vh">
-        Ready-made pieces. Drag one in, fill its settings — no need to build from rectangles.
+        {t('designPage.ready_made_pieces_drag_one_in_fill_its_s', 'Ready-made pieces. Drag one in, fill its settings — no need to build from rectangles.')}
       </Text>
 
       {compGroups.map(([category, list]) => (
@@ -279,6 +281,7 @@ function BrowseMode({ resource }: { resource: string }) {
 /* ─────────────────────────────────────────────────────────── edit ────── */
 
 function EditorMode({ resource, id }: { resource: string; id: string }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const design = loadingDesigns.find((d) => d.id === id);
@@ -299,12 +302,12 @@ function EditorMode({ resource, id }: { resource: string; id: string }) {
           }}
         >
           <ArrowLeft size="1.4vh" />
-          <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.05em">Designs</Text>
+          <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.05em">{t('designPage.designs', 'Designs')}</Text>
         </UnstyledButton>
         <Flex align="center" gap="0.5vh" style={{ minWidth: 0 }}>
           <Text size="xxs" c="rgba(255,255,255,0.4)">{resource}</Text>
           <Text size="xxs" c="rgba(255,255,255,0.2)">›</Text>
-          <Text size="xxs" c="rgba(255,255,255,0.4)">Designs</Text>
+          <Text size="xxs" c="rgba(255,255,255,0.4)">{t('designPage.designs', 'Designs')}</Text>
           <Text size="xxs" c="rgba(255,255,255,0.2)">›</Text>
           <Text ff="Akrobat Bold" size="xxs" c="white">{design?.name ?? 'New design'}</Text>
         </Flex>
@@ -312,7 +315,7 @@ function EditorMode({ resource, id }: { resource: string; id: string }) {
 
       <Flex direction="column" align="center" justify="center" gap="sm" style={{ flex: 1, padding: '4vh' }}>
         <LayoutTemplate size="5vh" color={color} />
-        <Text ff="Akrobat Bold" size="md" c="white" tt="uppercase" lts="0.06em">Studio opens here</Text>
+        <Text ff="Akrobat Bold" size="md" c="white" tt="uppercase" lts="0.06em">{t('designPage.studio_opens_here', 'Studio opens here')}</Text>
         <Text size="xs" c="rgba(255,255,255,0.55)" ta="center" maw="60vh" style={{ lineHeight: 1.6 }}>
           Full width, no rail — the canvas takes the panel. Layers left, inspector and components right,
           this header carrying the breadcrumb and the save bar.

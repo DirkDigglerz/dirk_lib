@@ -7,6 +7,7 @@ import { RowModal } from './RowModal';
 import { useItems } from 'dirk-cfx-react';
 import { ItemArt, StudioButton } from './ui';
 import type { SettingColumn, SettingEntry } from './types';
+import { useChrome } from './studioLocale';
 
 type Row = Record<string, unknown>;
 
@@ -27,6 +28,7 @@ export function ListRows({
   /** panel-wide search, so a query narrows the rows as well as the sections */
   rowFilter?: string;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
 
@@ -107,7 +109,7 @@ export function ListRows({
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
               }}
-              aria-label="Clear filter"
+              aria-label={t('listRows.clear_filter', 'Clear filter')}
             >
               <X size="1.3vh" color="rgba(255,255,255,0.45)" />
             </motion.button>
@@ -176,8 +178,8 @@ export function ListRows({
               </Flex>
 
               <Flex align="center" gap="xxs" style={{ flexShrink: 0 }}>
-                <RowIconButton icon={Pencil} label="Edit" onClick={() => setEditing(index)} disabled={disabled} />
-                <RowIconButton icon={Trash2} label="Delete" danger onClick={() => setConfirmDelete(index)} disabled={disabled} />
+                <RowIconButton icon={Pencil} label={t('listRows.edit', 'Edit')} onClick={() => setEditing(index)} disabled={disabled} />
+                <RowIconButton icon={Trash2} label={t('listRows.delete', 'Delete')} danger onClick={() => setConfirmDelete(index)} disabled={disabled} />
               </Flex>
             </Flex>
           </motion.div>
@@ -192,7 +194,7 @@ export function ListRows({
           }}
         >
           <List size="1.6vh" color="rgba(255,255,255,0.25)" />
-          <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.3)">Nothing here yet</Text>
+          <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.3)">{t('listRows.nothing_here_yet', 'Nothing here yet')}</Text>
         </Flex>
       )}
 
@@ -208,8 +210,8 @@ export function ListRows({
             {page * PAGE + 1}–{Math.min((page + 1) * PAGE, visible.length)} of {visible.length}
           </Text>
           <Flex gap="xxs">
-            <StudioButton label="Prev" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} />
-            <StudioButton label="Next" onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} disabled={page >= pageCount - 1} />
+            <StudioButton label={t('listRows.prev', 'Prev')} onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} />
+            <StudioButton label={t('listRows.next', 'Next')} onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} disabled={page >= pageCount - 1} />
           </Flex>
         </Flex>
       )}

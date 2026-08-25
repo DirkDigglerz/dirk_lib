@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { FieldRow } from './FieldRow';
 import { ItemArt, StudioButton } from './ui';
 import type { SettingColumn } from './types';
+import { useChrome } from './studioLocale';
 
 type Row = Record<string, unknown>;
 
@@ -27,6 +28,7 @@ export function NestedRowModal({
   onClose: () => void;
   disabled?: boolean;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const [draft, setDraft] = useState<Row>(() => JSON.parse(JSON.stringify(row)));
@@ -75,7 +77,7 @@ export function NestedRowModal({
 
           {children.length === 0 && (
             <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.35)">
-              Nothing to edit on this entry.
+              {t('nestedRowModal.nothing_to_edit_on_this_entry', 'Nothing to edit on this entry.')}
             </Text>
           )}
         </Flex>
@@ -84,10 +86,10 @@ export function NestedRowModal({
           align="center" justify="space-between" px="sm" py="xs"
           style={{ borderTop: `0.1vh solid ${alpha(theme.colors.dark[4], 0.4)}`, flexShrink: 0 }}
         >
-          <StudioButton label="Remove" danger disabled={disabled} onClick={onDelete} />
+          <StudioButton label={t('nestedRowModal.remove', 'Remove')} danger disabled={disabled} onClick={onDelete} />
           <Flex align="center" gap="xs">
-            <StudioButton label="Cancel" onClick={onClose} />
-            <StudioButton label="Done" primary disabled={disabled} onClick={() => onSave(draft)} />
+            <StudioButton label={t('nestedRowModal.cancel', 'Cancel')} onClick={onClose} />
+            <StudioButton label={t('nestedRowModal.done', 'Done')} primary disabled={disabled} onClick={() => onSave(draft)} />
           </Flex>
         </Flex>
       </Flex>

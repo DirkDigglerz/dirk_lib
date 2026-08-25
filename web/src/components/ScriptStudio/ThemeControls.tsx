@@ -5,6 +5,7 @@ import { Check, RefreshCw } from 'lucide-react';
 import { useMemo } from 'react';
 import { effectiveValue, setValue, useStudio } from './store';
 import { StudioButton } from './ui';
+import { useChrome } from './studioLocale';
 
 /**
  * The theme trio lives under a different parent in every script - fishing calls
@@ -58,6 +59,7 @@ export function MantineColorControl({
   /** this control's own setting path, used to find its sibling stops */
   path?: string;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const current = typeof value === 'string' ? value : 'dirk';
   const isCustom = current === 'custom';
@@ -157,7 +159,7 @@ export function MantineColorControl({
       {isCustom && customEntry && (
         <Flex align="center" gap="xs" wrap="wrap">
           <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.08em" c="rgba(255,255,255,0.35)">
-            Base
+            {t('themeControls.base', 'Base')}
           </Text>
           <ColorInput
             value={base}
@@ -181,7 +183,7 @@ export function MantineColorControl({
             style={{ width: '20vh' }}
           />
           <StudioButton
-            label="Regenerate shades"
+            label={t('themeControls.regenerate_shades', 'Regenerate shades')}
             icon={RefreshCw}
             disabled={disabled}
             onClick={() => writeStops(generateColors(base))}
@@ -191,8 +193,8 @@ export function MantineColorControl({
 
       <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.28)">
         {isCustom
-          ? 'Pick a base colour, then fine-tune any shade under Primary Shade.'
-          : 'A Mantine palette name — pick “custom” to build your own from a base colour.'}
+          ? t('theme.customHint', 'Pick a base colour, then fine-tune any shade under Primary Shade.')
+          : t('theme.paletteHint', 'A Mantine palette name — pick “custom” to build your own from a base colour.')}
       </Text>
     </Flex>
   );
@@ -215,6 +217,7 @@ export function ShadeControl({
   /** this control's own setting path, used to find its sibling palette */
   path?: string;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const current = typeof value === 'number' ? value : 5;
 
@@ -272,8 +275,9 @@ export function ShadeControl({
       </Flex>
       <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.28)">
         {active === 'custom'
-          ? `Shade ${current} of your custom palette.`
-          : `Shade ${current} of the ${active} palette.`}
+          ? t('theme.shadeCustom', 'Shade %s of your custom palette.').replace('%s', String(current))
+          : t('theme.shadeNamed', 'Shade %s of the %s palette.')
+            .replace('%s', String(current)).replace('%s', String(active))}
       </Text>
     </Flex>
   );

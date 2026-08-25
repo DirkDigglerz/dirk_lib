@@ -255,6 +255,10 @@ end
 -- directly - so server-only values keep travelling through the one path that
 -- checks who is asking, instead of a new one that would have to re-implement
 -- the check.
+-- Convar-detected schema defaults (`x-autoDefault`). Shared with the
+-- scriptConfig engine so both sides agree on what a default is.
+local collectAutoDefaults = require '@dirk_lib.src.autoDefaults'
+
 lib.callback.register('dirk_lib:getScriptStudio', function(source)
   local out = {}
   local total = GetNumResources()
@@ -272,6 +276,15 @@ lib.callback.register('dirk_lib:getScriptStudio', function(source)
         if rawSchema then
           local ok, schema = pcall(json.decode, rawSchema)
           if ok and type(schema) == 'table' then
+            -- Same pass the engine runs, so a detected default (a server name
+            -- read from server.cfg, say) reads the same in the panel as it
+            -- does at runtime. Without it the panel would call an untouched
+            -- setting "Modified" against a default nothing actually uses.
+            --
+            -- Collected as a path->value map rather than applied to `schema`,
+            -- because `schema` is NOT what gets sent: see below.
+            local autoDefaults = {}
+            collectAutoDefaults(schema, nil, autoDefaults)
             -- A script NAMES ITSELF in its own schema. Hardcoding
             -- `name == 'dirk_lib'` here was exactly the per-script knowledge
             -- inside dirk_lib that this design exists to avoid - and it left
@@ -283,7 +296,16 @@ lib.callback.register('dirk_lib:getScriptStudio', function(source)
               icon     = schema['x-icon'] or 'sliders-horizontal',
               version  = GetResourceMetadata(name, 'version', 0) or 'dev',
               shared   = schema['x-shared'] == true,
-              schema   = schema,
+              -- The RAW text, not the decoded table.
+              --
+              -- Lua tables have no key order, so decoding the schema here and
+              -- re-encoding it for the NUI shuffled every section and every
+              -- setting into whatever order `pairs` felt like — which is why
+              -- the shared settings tabs came out in a different order each
+              -- restart. JSON.parse on the other side keeps the order the
+              -- schema was written in, which is the order the author meant.
+              schemaJson   = rawSchema,
+              autoDefaults = next(autoDefaults) and autoDefaults or nil,
             }
           end
         end
@@ -412,8 +434,59 @@ lib.callback.register('dirk_lib:getOnlinePlayers', function(source)
   return out
 end)
 
+-- ── Vehicle spawning (the catalogue's "Spawn it" button) ─────────────────
+-- The SERVER creates the vehicle, not the client. A client-side spawn would
+-- have meant trusting the asking client, and the permission check would have
+-- been advice rather than a gate. Here nothing exists unless this callback
+-- decides it should, and the client only ever gets a network id back.
+--
+-- Gated by the same access model as editing a config: master ACE, or a
+-- per-resource override that grants dirk_lib.
+
+lib.callback.register('dirk_lib:spawnVehicle', function(source, payload)
+  if source == 0 then return false, 'NoPermission' end
+  if not canEditResource(source, 'dirk_lib') then return false, 'NoPermission' end
+
+  local model = type(payload) == 'table' and payload.model or nil
+  if type(model) ~= 'string' or model == '' or #model > 32 or model:find('[^%w_]') then
+    return false, 'BadModel'
+  end
+
+  local ped = GetPlayerPed(source)
+  if not ped or ped == 0 then return false, 'NoPed' end
+
+  local coords  = GetEntityCoords(ped)
+  local heading = GetEntityHeading(ped)
+  -- Vectors have to be unpacked for the native, and the numbers have to stay
+  -- floats or CreateVehicle refuses without saying so.
+  local vehicle = CreateVehicle(joaat(model), coords.x + 0.0, coords.y + 0.0, coords.z + 0.0, heading + 0.0, true, true)
+  if not vehicle or vehicle == 0 then return false, 'SpawnFailed' end
+
+  -- The entity is created but not necessarily assigned to an owner yet, so
+  -- give it a moment before handing over its network id.
+  local tries = 0
+  while not DoesEntityExist(vehicle) and tries < 50 do
+    Wait(10)
+    tries = tries + 1
+  end
+  if not DoesEntityExist(vehicle) then return false, 'SpawnFailed' end
+
+  -- A plate is what every vehicle-keys resource keys off, so one is set here
+  -- rather than left to whatever the game picked - the client cannot hand out
+  -- keys for a plate the server did not decide on.
+  local plate
+  local ok, generated = pcall(function() return lib.vehicle.generatePlate() end)
+  if ok and type(generated) == 'string' and generated ~= '' then
+    plate = generated
+    SetVehicleNumberPlateText(vehicle, plate)
+  else
+    plate = GetVehicleNumberPlateText(vehicle)
+  end
+
+  return true, nil, { netId = NetworkGetNetworkIdFromEntity(vehicle), plate = plate }
+end)
+
 -- (Master group + registered-resources lookups for the Script Config tab
 -- live entirely client-side now — convars replicate via `setr` and resource
 -- metadata is readable from a client NUI callback. See init.lua's
 -- GET_SCRIPT_CONFIG_MASTER_GROUP / GET_SCRIPT_CONFIG_RESOURCES handlers.)
-

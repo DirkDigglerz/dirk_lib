@@ -1,10 +1,11 @@
 import { alpha, Flex, Text, Textarea, useMantineTheme } from '@mantine/core';
-import { Modal } from 'dirk-cfx-react';
+import { Modal, copyToClipboard } from 'dirk-cfx-react';
 import { AlertTriangle, Braces, Check, Copy } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { effectiveValue, setValue } from './store';
 import { StudioButton } from './ui';
 import type { StudioScript } from './types';
+import { useChrome } from './studioLocale';
 
 /**
  * Paste a whole config in, or copy one out.
@@ -21,6 +22,7 @@ export function JsonModal({
   canEdit: boolean;
   onClose: () => void;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
 
@@ -32,14 +34,15 @@ export function JsonModal({
   const check = useMemo(() => validate(text, script), [text, script]);
 
   const copy = () => {
-    navigator.clipboard?.writeText(text).catch(() => { /* NUI clipboard */ });
+    copyToClipboard(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 1600);
   };
 
   const apply = () => {
     if (!check.ok) return;
-    const flat = flatten(check.parsed as Record<string, unknown>);
+    const known = new Set(script.entries.map((entry) => entry.path));
+    const flat = flatten(check.parsed as Record<string, unknown>, known);
     let changed = 0;
     for (const entry of script.entries) {
       if (!(entry.path in flat)) continue;
@@ -54,7 +57,7 @@ export function JsonModal({
 
   return (
     <Modal
-      title="Config as JSON"
+      title={t('jsonModal.config_as_json', 'Config as JSON')}
       icon={Braces}
       iconColor={color}
       description={script.resource}
@@ -111,7 +114,7 @@ export function JsonModal({
               <>
                 <Check size="1.5vh" color={color} />
                 <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.45)">
-                  Valid — every path matches this script's schema.
+                  {t('jsonModal.valid_every_path_matches_this_script_s_s', 'Valid — every path matches this script\'s schema.')}
                 </Text>
               </>
             )}
@@ -129,9 +132,9 @@ export function JsonModal({
           </Text>
           <Flex gap="xs">
             <StudioButton label={copied ? 'Copied' : 'Copy'} icon={copied ? Check : Copy} onClick={copy} />
-            <StudioButton label="Reset to current" onClick={() => setText(JSON.stringify(current, null, 2))} />
+            <StudioButton label={t('jsonModal.reset_to_current', 'Reset to current')} onClick={() => setText(JSON.stringify(current, null, 2))} />
             <StudioButton
-              label="Stage import"
+              label={t('jsonModal.stage_import', 'Stage import')}
               primary
               disabled={!canEdit || !check.ok}
               onClick={apply}
@@ -159,7 +162,7 @@ function validate(text: string, script: StudioScript): Check {
   }
 
   const known = new Set(script.entries.map((entry) => entry.path));
-  const unknown = Object.keys(flatten(parsed as Record<string, unknown>))
+  const unknown = Object.keys(flatten(parsed as Record<string, unknown>, known))
     .filter((path) => !known.has(path));
 
   return { ok: true, parsed, unknown };
@@ -182,24 +185,40 @@ function buildObject(script: StudioScript): Record<string, unknown> {
 }
 
 /**
- * Nested object -> dot paths. Stops at arrays and at any object that holds no
- * further objects, so a list or a coords pair stays one value rather than
- * exploding into `zones.0.x`.
+ * Nested object -> dot paths, split exactly where the SETTINGS are.
+ *
+ * The depth is decided by `known`, not guessed from shape. The old rule stopped
+ * at any object holding no further objects, which cut one level too early for
+ * something like `logger.loki.endpoint`: the tree collapsed to `logger.loki`,
+ * that is not a setting path, and an untouched default config therefore
+ * reported nine paths as "not in this schema and will be ignored". The same
+ * mismatch meant Apply silently skipped those settings, because it looked them
+ * up by their real path and the flattened map did not have one.
  */
-function flatten(node: Record<string, unknown>, prefix = ''): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
+function flatten(
+  node: Record<string, unknown>,
+  known: Set<string>,
+  prefix = '',
+  out: Record<string, unknown> = {},
+): Record<string, unknown> {
   for (const [key, value] of Object.entries(node)) {
     const path = prefix ? `${prefix}.${key}` : key;
-    const isPlainObject = value !== null && typeof value === 'object' && !Array.isArray(value);
-    const hasNestedObjects = isPlainObject
-      && Object.values(value as Record<string, unknown>)
-        .some((child) => child !== null && typeof child === 'object' && !Array.isArray(child));
 
-    if (isPlainObject && hasNestedObjects) {
-      Object.assign(out, flatten(value as Record<string, unknown>, path));
-    } else {
+    // A setting stops the walk, whatever shape it holds - a coords pair and a
+    // key/value map are single values however object-like they look.
+    if (known.has(path)) {
       out[path] = value;
+      continue;
     }
+
+    // Not a setting itself, but settings may live below it.
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      flatten(value as Record<string, unknown>, known, path, out);
+      continue;
+    }
+
+    // A leaf that is not a setting: genuinely not in this schema.
+    out[path] = value;
   }
   return out;
 }

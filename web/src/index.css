@@ -83,3 +83,34 @@ code {
   --mantine-z-index-overlay: 10700;
   --mantine-z-index-max: 11000;
 }
+
+/*
+ * Dropdowns must clear the Script Studio window.
+ *
+ * The panel sits at z-index 9990. Mantine portals a dropdown to <body> with an
+ * inline z-index of 300, so any select that does not pass its own
+ * comboboxProps opens BEHIND the whole window. Most of ours do pass it - but
+ * dirk-cfx-react's AccountSelect takes a closed prop union with no way in, so
+ * the fix cannot live at the call site.
+ *
+ * !important because the value it beats is an inline style. Nothing in this
+ * NUI is meant to sit above an open dropdown, so raising all of them is safe.
+ */
+.mantine-Combobox-dropdown,
+.mantine-Select-dropdown,
+.mantine-MultiSelect-dropdown,
+.mantine-Autocomplete-dropdown {
+  z-index: 10800 !important;
+}
+
+/*
+ * A scrolling column must not squash its rows.
+ *
+ * Flex children shrink before their container scrolls, so a list past a certain
+ * length compresses every row instead of getting longer — the change history
+ * did exactly that once there were enough saves in it. Rows are a fixed size;
+ * the container is the thing that scrolls.
+ */
+.studio-scroll > * {
+  flex-shrink: 0;
+}

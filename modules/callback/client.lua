@@ -71,7 +71,23 @@ lib.callback = setmetatable({}, {
 })
 
 
+--- ox_lib's signature is `await(event, delay, ...)`, where `delay` is a
+--- timeout in ms or `false` for none. dirk_lib has no timeout, so it never had
+--- that slot - which means `await(event, false, payload)` quietly delivered
+--- `false` as the callback's FIRST argument and the real payload as its
+--- second. Every such call looked fine and did nothing, because handlers
+--- written as `function(src, payload)` saw `payload == false` and bailed on
+--- their own type check.
+---
+--- Muscle memory writes the ox form, so accept it: a leading `false` is the
+--- ox delay slot and is dropped. Only `false` - a leading number could be a
+--- real argument, and no callback in practice takes the literal `false` as its
+--- first.
 lib.callback.await = function(event, ...)
+  local first = ...
+  if first == false then
+    return triggerServerCallback(_, event, nil, select(2, ...))
+  end
   return triggerServerCallback(_, event, nil, ...)
 end
 

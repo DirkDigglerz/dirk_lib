@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { RefreshCw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { StudioButton } from './ui';
+import { useChrome } from './studioLocale';
 
 /**
  * A Mantine colour tuple: exactly 10 shades, generated from one root colour and
@@ -18,6 +19,7 @@ export function PaletteControl({
   onChange: (next: string[]) => void;
   disabled?: boolean;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const accent = theme.colors[theme.primaryColor][5];
 
@@ -87,7 +89,7 @@ export function PaletteControl({
       <Flex align="flex-end" gap="xs" wrap="wrap">
         <Flex direction="column" gap="0.3vh" style={{ width: '24vh' }}>
           <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.1em" c="rgba(255,255,255,0.35)">
-            Generate from
+            {t('paletteControl.generate_from', 'Generate from')}
           </Text>
           <ColorInput
             value={root}
@@ -110,9 +112,9 @@ export function PaletteControl({
             }}
           />
         </Flex>
-        <StudioButton label="Regenerate shades" icon={RefreshCw} onClick={regenerate} disabled={disabled} />
+        <StudioButton label={t('paletteControl.regenerate_shades', 'Regenerate shades')} icon={RefreshCw} onClick={regenerate} disabled={disabled} />
         <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)" style={{ paddingBottom: '0.9vh' }}>
-          Overwrites all ten, then tweak any of them by hand.
+          {t('paletteControl.overwrites_all_ten_then_tweak_any_of_the', 'Overwrites all ten, then tweak any of them by hand.')}
         </Text>
       </Flex>
 
@@ -196,7 +198,7 @@ export function PaletteControl({
                         },
                       }}
                     />
-                    <StudioButton label="Done" onClick={closeShade} grow />
+                    <StudioButton label={t('paletteControl.done', 'Done')} onClick={closeShade} grow />
                   </Flex>
                 </Portal>
               )}

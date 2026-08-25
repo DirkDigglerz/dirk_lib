@@ -5,6 +5,7 @@ import { useInputStyles } from './Controls';
 import { effectiveValue, useStudio } from './store';
 import { ItemArt } from './ui';
 import type { SettingEntry } from './types';
+import { useChrome } from './studioLocale';
 
 type Row = Record<string, unknown>;
 
@@ -28,6 +29,7 @@ export function RefListControl({
   onChange: (next: Row[]) => void;
   disabled?: boolean;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const styles = useInputStyles();
   const items = useItems();
@@ -79,7 +81,7 @@ export function RefListControl({
 
             <Flex direction="column" gap="0.2vh" style={{ flex: 1, minWidth: 0 }}>
               <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.1em" c="rgba(255,255,255,0.35)">
-                Shown as
+                {t('refListControl.shown_as', 'Shown as')}
               </Text>
               <TextInput
                 value={String(row.label ?? '')}
@@ -93,11 +95,11 @@ export function RefListControl({
       })}
 
       {rows.length === 0 && (
-        <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">Nothing referenced</Text>
+        <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">{t('refListControl.nothing_referenced', 'Nothing referenced')}</Text>
       )}
 
       <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.28)">
-        These follow the items configured elsewhere in this script — change the item there and it changes here.
+        {t('refListControl.these_follow_the_items_configured_elsewh', 'These follow the items configured elsewhere in this script — change the item there and it changes here.')}
       </Text>
     </Flex>
   );

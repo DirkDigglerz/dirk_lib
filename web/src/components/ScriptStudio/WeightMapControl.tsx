@@ -7,6 +7,7 @@ import { useInputStyles } from './Controls';
 import { SliderControl } from './RichControls';
 import { effectiveValue, useStudio } from './store';
 import { ItemArt, StudioButton } from './ui';
+import { useChrome } from './studioLocale';
 
 type WeightMap = Record<string, number>;
 
@@ -37,6 +38,7 @@ export function WeightMapControl({
   sourcePath?: string;
   sourceKey?: string;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const styles = useInputStyles();
   const items = useItems();
@@ -132,7 +134,7 @@ export function WeightMapControl({
 
       {rows.length === 0 && !adding && (
         <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">
-          Nothing set
+          {t('weightMapControl.nothing_set', 'Nothing set')}
         </Text>
       )}
 
@@ -156,7 +158,7 @@ export function WeightMapControl({
                 styles={styles}
                 style={{ flex: 1 }}
               />
-              <StudioButton label="Cancel" onClick={() => setAdding(null)} />
+              <StudioButton label={t('weightMapControl.cancel', 'Cancel')} onClick={() => setAdding(null)} />
             </Flex>
           </motion.div>
         )}

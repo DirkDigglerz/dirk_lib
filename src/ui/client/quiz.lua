@@ -29,7 +29,7 @@ RegisterNuiCallback('submitQuiz', function(data,cb)
 end)
 
 lib.startQuiz = function(quiz_id)
-  local can_start, quiz_info = lib.callback.await('dirk_lib:quiz:start', false, quiz_id)
+  local can_start, quiz_info = lib.callback.await('dirk_lib:quiz:start', quiz_id)
   if can_start then
     openQuizUI(quiz_id, quiz_info)
   end

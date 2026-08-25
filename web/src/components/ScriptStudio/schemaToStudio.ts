@@ -80,14 +80,68 @@ function looksLikeCoords(value: unknown, node: JsonSchema): boolean {
   return false;
 }
 
+/** Every control the panel can render, for validating `x-control`. */
+const CONTROL_TYPES = new Set<string>([
+  'boolean', 'number', 'integer', 'percent', 'string', 'secret', 'weekdays',
+  'text', 'enum', 'enumList', 'pickList', 'color', 'blipColor', 'blipSprite',
+  'blipDisplay', 'ped', 'vehicle', 'coords', 'positions', 'time', 'keybind',
+  'control', 'controls', 'item', 'list', 'zones', 'palette', 'slider', 'range',
+  'group',
+  'tags', 'model', 'account', 'accounts', 'mantineColor', 'shade', 'keyvalue',
+  'icon',
+  'custom',
+  'keybindMap', 'groupGrades', 'weightMap',
+]);
+
+/**
+ * Annotations that NAME the control outright.
+ *
+ * These are read before any name matching, and that ordering is the whole
+ * point. `x-secret` used to be ignored entirely, so `apiKeys.fivemanageKey`
+ * fell past the credential rule (which wanted the key to end in "apiKey") into
+ * the keybind rule (which only wanted it to end in "key") - and a Fivemanage
+ * API token was configured by pressing a button on the keyboard.
+ *
+ * A schema that states what a field IS must never lose to a guess about what
+ * it might be called. `x-itemPicker` and `x-vector4` were documented and never
+ * read either; they are honoured here now.
+ */
+const EXPLICIT_CONTROLS: { flag: string; control: ControlType }[] = [
+  { flag: 'x-secret', control: 'secret' },
+  { flag: 'x-itemPicker', control: 'item' },
+  { flag: 'x-installItem', control: 'item' },
+  { flag: 'x-vector4', control: 'coords' },
+  { flag: 'x-keybind', control: 'keybind' },
+  { flag: 'x-groupPicker', control: 'group' },
+  { flag: 'x-iconPicker', control: 'icon' },
+];
+
 /**
  * Best guess at which control a value wants. Order matters: explicit schema
- * hints beat key naming, key naming beats raw JSON type.
+ * annotations beat key naming, key naming beats raw JSON type - and the first
+ * of those is absolute, not a tiebreak.
  */
 export function inferControl(key: string, node: JsonSchema, value: unknown, inItemList = false): ControlType {
   const lower = key.toLowerCase();
 
-  if (node?.['x-installItem'] || inItemList) return 'item';
+  // 1. What the schema SAYS. Nothing below can override this.
+  //
+  // `x-control` names a control directly - the escape hatch for anything the
+  // rules below get wrong, so a script never has to rename a field to be
+  // rendered properly.
+  // Naming a component is itself the declaration - `x-control: "custom"` is
+  // then optional rather than a second thing to remember.
+  if (typeof node?.['x-component'] === 'string') return 'custom';
+
+  const declared = node?.['x-control'];
+  if (typeof declared === 'string' && CONTROL_TYPES.has(declared)) return declared as ControlType;
+
+  for (const { flag, control } of EXPLICIT_CONTROLS) {
+    if (node?.[flag]) return control;
+  }
+
+  // 2. Everything else is inference.
+  if (inItemList) return 'item';
   if (Array.isArray(node?.enum) || Array.isArray(node?.['x-enum'])) return 'enum';
 
   // A two-number array IS a range, whether or not it happens to ship a default.
@@ -120,50 +174,27 @@ export function inferControl(key: string, node: JsonSchema, value: unknown, inIt
   // an array constrained to a fixed set of members
   if (node?.type === 'array' && Array.isArray(node.items?.enum ?? node.items?.['x-enum'])) return 'enumList';
 
-  // Descriptions are prose - the old panel gave these a Textarea and a
-  // single-line box hides everything past the first few words
-  if (/^(description|notes?|blurb)$/.test(lower) && typeof value !== 'number') return 'text';
+  // ── NO NAME GUESSING BELOW THIS LINE ──────────────────────────────────
+  //
+  // There used to be a run of rules here that picked a control from what the
+  // key was CALLED: `/account$/` -> an account picker, `/model$/` -> a model
+  // picker, `/^notes?$/` -> a textarea, and a dozen more. They were wrong in
+  // ways nobody could predict from the schema: `maxBackupsPerAccount` is a
+  // number and got an account picker; `defaultSync.notes` is a boolean and got
+  // a textarea. Every fix was another guard on another regex.
+  //
+  // Every field that relied on one now declares `x-control` instead - taken
+  // from what those rules actually produced, so the migration changed nothing
+  // except the two that were wrong. What is left reads the DATA (a hex string
+  // is a colour, a {_key} object is a keybind, an array of {x,y} is a polygon),
+  // which is a fact about the value rather than a guess about English.
 
-  // ["cash","bank"] - the same thing `permitAccounts` holds, just named for
-  // what the store does with it
-  if (/^paymentmethods$/.test(lower)) return 'accounts';
-
-  // blip objects carry their own sprite/colour/display trio
-  if (/sprite/.test(lower)) return 'blipSprite';
-  // `display` is a blip visibility mode (2/3/4/5/6/8/9/10), not a free number -
-  // the old fishing panel used BlipDisplaySelect here and typing 7 does nothing
-  if (/^display$/.test(lower) && typeof value === 'number') return 'blipDisplay';
-  if (/^blip$/.test(lower)) return 'blipColor';
-  if (/colou?r/.test(lower)) {
-    if (typeof value === 'number') return 'blipColor';
-    // theme.primaryColor holds a Mantine palette name ("dirk") or "custom" -
-    // a hex picker would write a value the theme system cannot use
-    if (/^primary/.test(lower) && typeof value === 'string' && !value.startsWith('#')) {
-      return 'mantineColor';
-    }
-    return 'color';
-  }
-  if (/^primaryshade$/.test(lower)) return 'shade';
-  // iconColors.{equipment,fishMarket,zone} are hex strings whose OWN key says
-  // nothing about colour - judge the value, not just the name.
+  // A hex string is a colour whatever the field is called - iconColors.zone
+  // says nothing about colour in its own name.
   if (typeof value === 'string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(value)) return 'color';
-  if (/ped(model)?s?$/.test(lower)) return 'ped';
-  // ...TabletModel, propModel, etc - a world model, not a ped
-  if (/model$/.test(lower)) return 'model';
-  if (/vehicle/.test(lower)) return 'vehicle';
-  if (/account$/.test(lower)) return 'account';
-  if (/(coords?|position|location|pos)$/.test(lower) || looksLikeCoords(value, node)) return 'coords';
-  // Credentials, before the keybind rule below - `apiKey` ends in "key" and was
-  // being handed a KEYBIND PICKER, so a Datadog API key was configured by
-  // pressing a button on the keyboard. These are also the values worth masking:
-  // an admin panel is often open on a stream.
-  if (/(token|password|secret|apikey|webhookurl)$/.test(lower)) return 'secret';
-
-  if (/(key|keybind)$/.test(lower) && typeof value === 'string') return 'keybind';
   // { _type, _key } is the library's keybind shape
   if (value && typeof value === 'object' && '_key' in (value as object)) return 'keybind';
-  if (/control$/.test(lower) && typeof value === 'number') return 'control';
-  if (/(time|hours?)$/.test(lower) && typeof value === 'string' && /^\d{1,2}:\d{2}$/.test(value)) return 'time';
+  if (looksLikeCoords(value, node)) return 'coords';
 
   const type = node?.type ?? typeofValue(value);
   if (type === 'object' && !node?.properties && value && typeof value === 'object' && !Array.isArray(value)) {
@@ -203,9 +234,18 @@ function enumOptions(node: JsonSchema): { value: string; label: string }[] | und
   // is fine for `cut`/`crush`, and useless for locale codes - "Zh-TW" tells
   // nobody it is Traditional Chinese.
   const labels = (node?.['x-enumLabels'] ?? {}) as Record<string, string>;
+  // Icons and colours for the same values. The owning script knows what its
+  // categories LOOK like; dirk_lib does not and should not.
+  const icons = (node?.['x-enumIcons'] ?? {}) as Record<string, string>;
+  const colors = (node?.['x-enumColors'] ?? {}) as Record<string, string>;
   return raw.map((v: unknown) => {
     const value = String(v);
-    return { value, label: labels[value] ?? humanise(value) };
+    return {
+      value,
+      label: labels[value] ?? humanise(value),
+      icon: icons[value],
+      color: colors[value],
+    };
   });
 }
 
@@ -235,6 +275,11 @@ function columnsFor(node: JsonSchema, rows: unknown[]): { columns: SettingColumn
   // inside a row: `x-validateRows: { "stock.variance": [...] }` - which matters
   // because `stores` has BOTH a `name` and a `stock[].name`.
   const rowRules = (node?.['x-validateRows'] ?? {}) as Record<string, ValidationRule[]>;
+  // Controls for those same columns, for the same reason: several of fishing's
+  // arrays declare no `items` schema at all - their shape comes from the
+  // default rows - so there is no per-field node to put `x-control` on. Keyed
+  // by column, dotted to reach inside a nested object: `"blip.color"`.
+  const rowControls = (node?.['x-rowControls'] ?? {}) as Record<string, string>;
   const keys = itemProps ? Object.keys(itemProps) : Object.keys(sample);
   const columns: SettingColumn[] = [];
   const template: Record<string, unknown> = {};
@@ -243,7 +288,16 @@ function columnsFor(node: JsonSchema, rows: unknown[]): { columns: SettingColumn
     const child: JsonSchema = itemProps?.[key] ?? {};
     const value = sample[key];
     const isItemKey = /name$|^item$/.test(key);
-    const column = buildColumn(key, child, value, (installList && key === arrayKey) || (itemRow && isItemKey));
+    const declaredItem = installList && key === arrayKey;
+    const column = buildColumn(
+      key,
+      // An x-rowControls entry is the same statement `x-control` makes, just
+      // written where there is room for it.
+      rowControls[key] ? { ...child, 'x-control': rowControls[key] } : child,
+      value,
+      declaredItem || (itemRow && isItemKey),
+      declaredItem,
+    );
     if (requiredKeys.has(key)) column.required = true;
     if (rowRules[key]) column.validate = [...(column.validate ?? []), ...rowRules[key]!];
     columns.push(column);
@@ -251,6 +305,13 @@ function columnsFor(node: JsonSchema, rows: unknown[]): { columns: SettingColumn
   }
 
   // dotted keys, resolved against the columns just built
+  for (const [dotted, control] of Object.entries(rowControls)) {
+    if (!dotted.includes('.')) continue;
+    const [parent, child] = dotted.split('.');
+    const target = columns.find((c) => c.key === parent)?.columns?.find((c) => c.key === child);
+    if (target && CONTROL_TYPES.has(control)) target.type = control as SettingColumn['type'];
+  }
+
   for (const [key, rules] of Object.entries(rowRules)) {
     if (!key.includes('.')) continue;
     const parts = key.split('.');
@@ -271,7 +332,13 @@ function columnsFor(node: JsonSchema, rows: unknown[]): { columns: SettingColumn
  * numbers is a range, a list of strings is a tag set, a list of objects is a
  * nested table, and a bounded 0..n float is a slider.
  */
-function buildColumn(key: string, child: JsonSchema, value: unknown, isItem: boolean): SettingColumn {
+function buildColumn(
+  key: string,
+  child: JsonSchema,
+  value: unknown,
+  isItem: boolean,
+  declaredItem = false,
+): SettingColumn {
   // Rows written before a field existed simply do not carry it, and the editor
   // showed those blank - fish[].minigameType is declared `default: "cut"` and
   // only the eight crustaceans store "crush", so every other species opened
@@ -279,6 +346,11 @@ function buildColumn(key: string, child: JsonSchema, value: unknown, isItem: boo
   // the row editor can show what the server will actually use.
   const built = buildColumnInner(key, child, value, isItem);
   const out: SettingColumn = child.default !== undefined ? { ...built, default: child.default } : built;
+  // Only a DECLARED item counts for the install audit. `isItem` also covers the
+  // reward-pool heuristic, which is right for rendering a picker and wrong for
+  // telling someone their inventory is missing an entry.
+  if (declaredItem || child['x-installItem']) out.installItem = true;
+  if (child['x-validateWith']) out.validateWith = child['x-validateWith'];
   // constraints ride along so a row editor can be validated the same way a
   // top-level setting is
   if (typeof child.minItems === 'number') out.minItems = child.minItems;
@@ -457,7 +529,78 @@ function defaultForControl(control: ControlType): unknown {
   }
 }
 
-function rowLabelKey(columns: SettingColumn[], arrayKey?: string): string | undefined {
+/**
+ * Which field titles a row in a list.
+ *
+ * `x-itemTitle` names it outright and wins - it was documented and never read,
+ * so a schema that said "title these rows by `name`" was still guessed at.
+ * Everything after it is the guess, in descending order of confidence.
+ */
+/** One entry of `x-mapPaths` in its long form. */
+type MapPathSpec = { path: string; color?: string; shape?: 'polygon' | 'marker' };
+
+/** The declared map paths, plus the styling declared alongside them. */
+type MapMeta = Set<string> & {
+  colors: Map<string, string>;
+  shapes: Map<string, 'polygon' | 'marker'>;
+};
+
+/**
+ * Outline or pin?
+ *
+ * A row carrying an array of {x,y} is a boundary. A row carrying x and y
+ * directly is a single point. The second is by far the more common geographic
+ * shape in FiveM - every store, ATM, garage and spawn list - and used to draw
+ * nothing at all, because the map only knew how to render polygons.
+ */
+function detectMapShape(rows: unknown[]): 'polygon' | 'marker' {
+  const sample = rows.find((row) => row && typeof row === 'object' && !Array.isArray(row)) as
+    Record<string, unknown> | undefined;
+  if (!sample) return 'polygon';
+
+  const hasOutline = Object.values(sample).some((value) => Array.isArray(value)
+    && value.length > 2
+    && typeof (value[0] as { x?: unknown })?.x === 'number');
+  if (hasOutline) return 'polygon';
+
+  if (typeof sample.x === 'number' && typeof sample.y === 'number') return 'marker';
+  return 'polygon';
+}
+
+/**
+ * Sections that are a WORKSPACE go last, in their declared order among
+ * themselves.
+ *
+ * A workspace control fills the pane, so one sitting in the middle of the
+ * running order means scrolling through a full screen of map to reach the next
+ * toggle. Putting them at the end keeps the ordinary settings as one continuous
+ * read, and a map is somewhere you go rather than something you scroll past.
+ *
+ * This is the one place the panel overrides the order a schema declared. The
+ * rail still lists them, so nothing is hidden - it is the reading order that
+ * changes, not the contents.
+ */
+function orderGroups(groups: SettingGroup[], entries: SettingEntry[]): SettingGroup[] {
+  const isWorkspace = (id: string) => {
+    const mine = entries.filter((entry) => entry.group === id);
+    if (mine.length === 0) return false;
+    // Dominated by one, rather than merely containing one: a section with a map
+    // and a dozen settings still reads as settings.
+    const workspaces = mine.filter((entry) => entry.type === 'zones' || entry.type === 'custom');
+    return workspaces.length > 0 && mine.length - workspaces.length <= 2;
+  };
+
+  const ordinary = groups.filter((g) => !isWorkspace(g.id));
+  const workspaces = groups.filter((g) => isWorkspace(g.id));
+  return [...ordinary, ...workspaces];
+}
+
+function rowLabelKey(
+  columns: SettingColumn[],
+  arrayKey?: string,
+  itemTitle?: string,
+): string | undefined {
+  if (itemTitle && columns.some((column) => column.key === itemTitle)) return itemTitle;
   const stringCols = columns.filter((c) => c.type === 'string');
   const label = stringCols.find((c) => c.key === 'label' || c.key === 'name');
   if (label) return label.key;
@@ -522,7 +665,12 @@ export function schemaToStudio(schema: JsonSchema, meta: StudioMeta): StudioScri
   const groups: SettingGroup[] = [];
   const entries: SettingEntry[] = [];
   const overrides = meta.overrides ?? {};
-  const mapPaths = new Set(meta.mapPaths ?? []);
+  const mapPaths: MapMeta = Object.assign(new Set(meta.mapPaths ?? []), {
+    colors: new Map<string, string>(),
+    shapes: new Map<string, 'polygon' | 'marker'>(),
+  });
+  const mapColors = mapPaths.colors;
+  const mapShapes = mapPaths.shapes;
 
   const topLevel: JsonSchema = schema?.properties ?? {};
 
@@ -532,8 +680,19 @@ export function schemaToStudio(schema: JsonSchema, meta: StudioMeta): StudioScri
   // to supply it - a script that ships its own layout just works.
   const sections = meta.sections ?? (schema?.['x-sections'] as StudioMeta['sections']);
   const rowTabs = meta.rowTabs ?? collectRowTabs(topLevel);
-  const declaredMapPaths = (schema?.['x-mapPaths'] as string[]) ?? [];
-  for (const path of declaredMapPaths) mapPaths.add(path);
+  // `x-mapPaths` takes either a bare path or `{ path, color, shape }`. The
+  // colour matters: ZoneMap used to pick one by matching the path against
+  // 'seaBoundary' and 'depthOverride' by name - fishing's field names, hardcoded
+  // inside dirk_lib, which is exactly the per-script knowledge that must live in
+  // the owning schema.
+  const declaredMapPaths = (schema?.['x-mapPaths'] as (string | MapPathSpec)[]) ?? [];
+  for (const declared of declaredMapPaths) {
+    const spec = typeof declared === 'string' ? { path: declared } : declared;
+    if (!spec?.path) continue;
+    mapPaths.add(spec.path);
+    if (spec.color) mapColors.set(spec.path, spec.color);
+    if (spec.shape) mapShapes.set(spec.path, spec.shape);
+  }
 
   siblingLists = new Set(
     Object.entries(topLevel)
@@ -657,7 +816,10 @@ export function schemaToStudio(schema: JsonSchema, meta: StudioMeta): StudioScri
     icon: meta.icon,
     version: meta.version,
     shared: meta.shared,
-    groups: groups.filter((g) => g.id !== MANAGED_ELSEWHERE && entries.some((e) => e.group === g.id)),
+    groups: orderGroups(
+      groups.filter((g) => g.id !== MANAGED_ELSEWHERE && entries.some((e) => e.group === g.id)),
+      entries,
+    ),
     entries,
   };
 }
@@ -669,7 +831,7 @@ function walkObject(
   serverOnly: boolean,
   out: SettingEntry[],
   overrides: Record<string, unknown>,
-  mapPaths: Set<string>,
+  mapPaths: MapMeta,
   subgroup: SettingEntry['subgroup'],
   rowTabs?: StudioMeta['rowTabs'],
 ) {
@@ -714,6 +876,11 @@ function walkObject(
       max: child?.maximum,
       options: enumOptions(child),
       serverOnly: childServerOnly || undefined,
+      // Declared, not inferred - the missing-items audit reads this.
+      installItem: child?.['x-installItem'] ? true : undefined,
+      // A NUI callback that says whether the typed value actually works.
+      validateWith: child?.['x-validateWith'],
+      component: child?.['x-component'],
     });
   }
 }
@@ -725,13 +892,32 @@ function buildListEntry(
   group: string,
   serverOnly: boolean,
   overrides: Record<string, unknown>,
-  mapPaths: Set<string>,
+  mapPaths: MapMeta,
   subgroup?: SettingEntry['subgroup'],
   rowTabs?: StudioMeta['rowTabs'],
 ): SettingEntry {
   const fallback = Array.isArray(node?.default) ? node.default : [];
   const value = path in overrides ? overrides[path] : fallback;
   const rows = Array.isArray(value) ? value : [];
+
+  // FIRST, before any shape rule. An array is where a custom editor is most
+  // likely to be wanted, and this function never consults inferControl - it
+  // decides its own type - so a declared component would otherwise be carried
+  // on the entry and never actually rendered.
+  if (typeof node?.['x-component'] === 'string') {
+    return {
+      path,
+      label: humanise(key),
+      help: node?.description,
+      type: 'custom',
+      group,
+      subgroup,
+      default: fallback,
+      value,
+      component: node['x-component'],
+      serverOnly: serverOnly || undefined,
+    };
+  }
 
   const numericRows = rows.length > 0 && rows.every((r) => typeof r === 'number');
   const namedControls = /(control|key)/i.test(key);
@@ -856,9 +1042,17 @@ function buildListEntry(
     label: humanise(key),
     help: node?.description,
     type: mapPaths.has(path) ? 'zones' : 'list',
+    // A row holding sibling numeric x and y IS a point - a store, an ATM, a
+    // spawn - and is drawn as a pin. A row holding an array of those is an
+    // outline. Detecting it means a place list needs no extra annotation, and
+    // `x-mapPaths` can still override when the rows are empty on a fresh
+    // install and there is nothing to judge.
+    mapShape: mapPaths.has(path) ? (mapPaths.shapes.get(path) ?? detectMapShape(rows)) : undefined,
+    mapColor: mapPaths.has(path) ? mapPaths.colors.get(path) : undefined,
+    component: node?.['x-component'],
     group,
     subgroup,
-    rowLabelKey: rowLabelKey(columns, node?.['x-arrayKey']),
+    rowLabelKey: rowLabelKey(columns, node?.['x-arrayKey'], node?.['x-itemTitle']),
     rowItemKey: rowItemKey(columns),
     rowTabs: rowTabs?.[path],
     columns,

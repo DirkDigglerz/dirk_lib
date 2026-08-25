@@ -1,3 +1,4 @@
+import { fetchNui, isEnvBrowser } from 'dirk-cfx-react';
 import { create } from 'zustand';
 import { MOCK_LOCALES } from './mockLocales';
 import { MOCK_SCRIPTS } from './mockData';
@@ -20,7 +21,14 @@ type StudioState = {
   fullScreen: boolean;
   /** resource -> language -> key -> text, supplied by each script */
   locales: LocaleBundles;
-  search: string;
+  /**
+   * Search text, per surface (a page id, or `script:<resource>`).
+   *
+   * A single panel-wide box meant a search for "sanchez" in Vehicles was still
+   * applied when you clicked Items, which just looks like an empty list. Each
+   * surface keeps its own text and finds it again when you come back.
+   */
+  searches: Record<string, string>;
   /** resource -> path -> staged change */
   draft: Record<string, Record<string, DraftValue>>;
   /**
@@ -32,8 +40,27 @@ type StudioState = {
   undoStack: Record<string, Record<string, DraftValue>[]>;
   redoStack: Record<string, Record<string, DraftValue>[]>;
   saving: boolean;
+  /** why the last save was refused, or null */
+  saveError: SaveError | null;
   /** path of the list currently opened in the drill-in pane */
   drillPath: string | null;
+  /**
+   * Which tabbed list the rail asked for, by path.
+   *
+   * A section holding several lists shows one at a time behind a tab strip.
+   * The rail can now name one directly - Equipment > Hooks rather than
+   * Equipment, then find the strip, then find the tab - so the request has to
+   * reach the section body, which owns that selection.
+   */
+  activeList: string | null;
+  /**
+   * Which tabbed list the section body is CURRENTLY showing.
+   *
+   * `activeList` is a request and is cleared once taken; this is the answer,
+   * and it is what lets the rail highlight the child you are actually looking
+   * at rather than the last one you clicked.
+   */
+  shownList: string | null;
   /**
    * Id of the design currently open in the editor, or null while browsing.
    *
@@ -51,13 +78,20 @@ export const useStudio = create<StudioState>(() => ({
   activeResource: MOCK_SCRIPTS[0]?.resource ?? '',
   activePage: null,
   fullScreen: false,
-  locales: MOCK_LOCALES,
-  search: '',
+  // Empty in game, mock in a browser. Seeding the mock unconditionally meant
+  // `loadLocales` saw English already present for every script and skipped the
+  // fetch entirely - so the real bundles never arrived and the panel stayed in
+  // English whatever the language setting said.
+  locales: isEnvBrowser() ? MOCK_LOCALES : {},
+  searches: {},
   draft: {},
   undoStack: {},
   redoStack: {},
   saving: false,
+  saveError: null,
   drillPath: null,
+  activeList: null,
+  shownList: null,
   editingDesign: null,
 }));
 
@@ -211,24 +245,85 @@ export function dirtyCount(resource: string): number {
 }
 
 /**
- * PHASE 0: commits the draft into the local mock so the panel behaves like a
- * real save (values persist, chips settle). The real build swaps this for the
- * gated callback - nothing else in the UI changes.
+ * Writes a value into a nested object at a dot-path, creating what it needs.
+ * `null` for the value deletes the key, which is how "back to default" reaches
+ * the server: an absent key means "no override", not "override with nothing".
  */
-export async function commitDraft(resource: string) {
-  useStudio.setState({ saving: true });
-  // Once written, the pre-save drafts describe a server state that is gone.
-  useStudio.setState((state) => ({
-    undoStack: { ...state.undoStack, [resource]: [] },
-    redoStack: { ...state.redoStack, [resource]: [] },
-  }));
-  await new Promise((r) => setTimeout(r, 450));
+function writePath(root: Record<string, unknown>, path: string, value: unknown, remove: boolean) {
+  const parts = path.split('.');
+  let node = root;
+  for (let i = 0; i < parts.length - 1; i += 1) {
+    const key = parts[i];
+    const next = node[key];
+    // A leaf where a branch should be (or nothing at all) gets replaced, not
+    // merged into - the schema says this path has children.
+    node[key] = (next && typeof next === 'object' && !Array.isArray(next))
+      ? { ...(next as Record<string, unknown>) }
+      : {};
+    node = node[key] as Record<string, unknown>;
+  }
+  const last = parts[parts.length - 1];
+  if (remove) delete node[last];
+  else node[last] = value;
+}
+
+/** Deep copy that is enough for config data (plain objects, arrays, scalars). */
+function clone<T>(value: T): T {
+  return (value === undefined ? value : JSON.parse(JSON.stringify(value))) as T;
+}
+
+/**
+ * Everything this save has to send: the top-level sections the admin touched,
+ * each as its COMPLETE current value.
+ *
+ * A section delta rather than the whole config, so one changed toggle does not
+ * rewrite every setting the script has - and complete sections rather than
+ * changed leaves, because the server replaces a supplied section wholesale and
+ * that is what makes a deletion inside one actually propagate.
+ */
+function buildSavePayload(script: StudioScript, staged: Record<string, DraftValue>) {
+  const sections = new Set(Object.keys(staged).map((path) => path.split('.')[0]));
+  const payload: Record<string, unknown> = {};
+
+  for (const section of sections) {
+    // Start from what the server already holds so anything the schema does not
+    // describe survives the round trip.
+    payload[section] = clone(
+      (script.serverValues?.[section] as Record<string, unknown> | undefined) ?? {},
+    );
+  }
+
+  for (const [path, change] of Object.entries(staged)) {
+    const section = path.split('.')[0];
+    const root = payload as Record<string, unknown>;
+    if (change.kind === 'reset') {
+      // Dropping the key returns the path to the shipped default - which is
+      // also what stops a default being written as an override row.
+      writePath(root, path, undefined, true);
+    } else {
+      writePath(root, path, change.value, false);
+    }
+  }
+
+  return payload;
+}
+
+/**
+ * Applies the draft to the local model. Used after a successful save, and on
+ * its own in the browser where there is no server to save to.
+ */
+function applyStagedLocally(resource: string) {
   useStudio.setState((state) => {
     const staged = state.draft[resource] ?? {};
     const scripts = state.scripts.map((script) => {
       if (script.resource !== resource) return script;
+      const serverValues = clone(script.serverValues ?? {});
+      for (const [path, change] of Object.entries(staged)) {
+        writePath(serverValues, path, change.kind === 'reset' ? undefined : change.value, change.kind === 'reset');
+      }
       return {
         ...script,
+        serverValues,
         entries: script.entries.map((entry) => {
           const change = staged[entry.path];
           if (!change) return entry;
@@ -238,6 +333,80 @@ export async function commitDraft(resource: string) {
     });
     return { scripts, draft: { ...state.draft, [resource]: {} }, saving: false };
   });
+}
+
+/** What went wrong, in words, when a save is refused. */
+const SAVE_FAILURES: Record<string, string> = {
+  NoPermission: 'You do not have permission to save this script',
+  VersionConflict: 'Someone else changed this script - reopen the panel to see it',
+  NotReady: 'That script is still starting up',
+  InvalidPayload: 'The server rejected the payload',
+  NoResource: 'The server did not recognise that script',
+  CallbackFailed: 'No response from that script',
+};
+
+/** Set when a save fails, cleared when the next one starts. */
+export type SaveError = { resource: string; message: string };
+
+/**
+ * Saves the staged draft for one script.
+ *
+ * In a browser there is no server, so the draft is applied locally and the
+ * panel behaves the same - which is what keeps design work possible without a
+ * running server.
+ */
+export async function commitDraft(resource: string): Promise<boolean> {
+  const state = useStudio.getState();
+  const script = state.scripts.find((s) => s.resource === resource);
+  const staged = state.draft[resource] ?? {};
+  if (!script || Object.keys(staged).length === 0) return true;
+
+  useStudio.setState({ saving: true, saveError: null });
+  // Once written, the pre-save drafts describe a server state that is gone.
+  useStudio.setState((s) => ({
+    undoStack: { ...s.undoStack, [resource]: [] },
+    redoStack: { ...s.redoStack, [resource]: [] },
+  }));
+
+  if (isEnvBrowser()) {
+    await new Promise((r) => setTimeout(r, 450));
+    applyStagedLocally(resource);
+    return true;
+  }
+
+  type SaveReply = { success?: boolean; _error?: string; meta?: { client_version?: number } };
+  const failed: SaveReply = { success: false, _error: 'CallbackFailed' };
+  const reply = await fetchNui<SaveReply>(
+    'SAVE_SCRIPT_STUDIO',
+    {
+      resource,
+      data: buildSavePayload(script, staged),
+      expectedVersion: script.clientVersion,
+    },
+    failed,
+  ).catch(() => failed);
+
+  if (!reply?.success) {
+    const code = reply?._error ?? 'CallbackFailed';
+    useStudio.setState({
+      saving: false,
+      saveError: { resource, message: SAVE_FAILURES[code] ?? `Save failed (${code})` },
+    });
+    return false;
+  }
+
+  applyStagedLocally(resource);
+  // The version moves on with every write; keeping the old one would make the
+  // NEXT save look stale.
+  const nextVersion = reply.meta?.client_version;
+  if (nextVersion !== undefined) {
+    useStudio.setState((s) => ({
+      scripts: s.scripts.map((entry) => (entry.resource === resource
+        ? { ...entry, clientVersion: nextVersion }
+        : entry)),
+    }));
+  }
+  return true;
 }
 
 /** Factory reset - every path in the script back to shipped defaults. */

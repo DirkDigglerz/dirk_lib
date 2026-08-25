@@ -1,5 +1,6 @@
 import { alpha, Flex, Text, useMantineTheme } from '@mantine/core';
 import { Gamepad2, Wrench } from 'lucide-react';
+import { useChrome } from './studioLocale';
 
 /**
  * Minigames — placeholder.
@@ -19,6 +20,7 @@ import { Gamepad2, Wrench } from 'lucide-react';
  * games land - nothing else has to move when they do.
  */
 export function MinigamesPage() {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
 
@@ -36,7 +38,7 @@ export function MinigamesPage() {
         <Gamepad2 size="3.4vh" color={color} />
       </Flex>
 
-      <Text ff="Akrobat Bold" size="lg" c="rgba(255,255,255,0.9)">Minigames</Text>
+      <Text ff="Akrobat Bold" size="lg" c="rgba(255,255,255,0.9)">{t('minigamesPage.minigames', 'Minigames')}</Text>
 
       <Text ff="Akrobat SemiBold" size="sm" c="rgba(255,255,255,0.45)" ta="center" style={{ maxWidth: '72vh' }}>
         Every minigame dirk_lib provides, its settings, and a play button to try the

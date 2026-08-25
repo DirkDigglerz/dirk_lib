@@ -7,6 +7,7 @@ import { NestedRowModal } from './NestedRowModal';
 import { useItems } from 'dirk-cfx-react';
 import { ItemArt, StudioButton } from './ui';
 import type { SettingColumn } from './types';
+import { useChrome } from './studioLocale';
 
 type Row = Record<string, unknown>;
 
@@ -28,6 +29,7 @@ export function NestedRows({
   onChange: (next: unknown) => void;
   disabled?: boolean;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
@@ -130,7 +132,7 @@ export function NestedRows({
       ))}
 
       {rows.length === 0 && (
-        <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">Nothing here yet</Text>
+        <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">{t('nestedRows.nothing_here_yet', 'Nothing here yet')}</Text>
       )}
 
       <StudioButton

@@ -11,6 +11,7 @@ import {
 } from './mockAdmins';
 import { useStudio } from './store';
 import { StudioButton } from './ui';
+import { useChrome } from './studioLocale';
 
 /**
  * Who can open Script Studio, and what they may touch.
@@ -21,6 +22,7 @@ import { StudioButton } from './ui';
  * else is managed on this page.
  */
 export function AdminsPage({ canEdit }: { canEdit: boolean }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const scripts = useStudio((s) => s.scripts);
@@ -54,7 +56,7 @@ export function AdminsPage({ canEdit }: { canEdit: boolean }) {
       {/* the route back in */}
       <Block
         icon={Lock}
-        title="Config file"
+        title={t('adminsPage.config_file', 'Config file')}
         description="Server-side, survives updates, cannot be revoked from this panel"
       >
         <Flex direction="column" gap="xxs">
@@ -67,10 +69,10 @@ export function AdminsPage({ canEdit }: { canEdit: boolean }) {
       {/* the day-to-day list */}
       <Block
         icon={Users}
-        title="Panel admins"
+        title={t('adminsPage.panel_admins', 'Panel admins')}
         description="Added here, stored in the database"
         action={canEdit && (
-          <StudioButton label="Add admin" icon={UserPlus} primary onClick={() => setAdding(true)} />
+          <StudioButton label={t('adminsPage.add_admin', 'Add admin')} icon={UserPlus} primary onClick={() => setAdding(true)} />
         )}
       >
         <Flex direction="column" gap="xxs">
@@ -86,7 +88,7 @@ export function AdminsPage({ canEdit }: { canEdit: boolean }) {
           ))}
           {grouped.panel.length === 0 && (
             <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.3)">
-              Nobody has been added here yet.
+              {t('adminsPage.nobody_has_been_added_here_yet', 'Nobody has been added here yet.')}
             </Text>
           )}
         </Flex>
@@ -102,7 +104,7 @@ export function AdminsPage({ canEdit }: { canEdit: boolean }) {
         )}
         {revoking && (
           <ConfirmModal
-            title="Revoke access"
+            title={t('adminsPage.revoke_access', 'Revoke access')}
             description={`${revoking.name} loses access to Script Studio immediately. Anything they already saved stays.`}
             confirmLabel="Revoke"
             onConfirm={() => {
@@ -140,6 +142,7 @@ const LEVELS: { value: AceGrantLevel; label: string; icon?: React.ElementType; c
  * cannot take it away.
  */
 function AceBlock({ canEdit }: { canEdit: boolean }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const [grants, setGrants] = useState<AceGrant[]>(MOCK_ACE_GRANTS);
@@ -161,7 +164,7 @@ function AceBlock({ canEdit }: { canEdit: boolean }) {
   return (
     <Block
       icon={Shield}
-      title="ACE groups"
+      title={t('adminsPage.ace_groups', 'ACE groups')}
       description="Stored here and re-applied on every start — no server.cfg edits"
     >
       <Flex direction="column" gap="xxs">
@@ -189,7 +192,7 @@ function AceBlock({ canEdit }: { canEdit: boolean }) {
 
               {grant.fromCfg ? (
                 <Flex align="center" gap="xs" style={{ flex: 1 }}>
-                  <Pill icon={ShieldCheck} label="Can edit" color={color} />
+                  <Pill icon={ShieldCheck} label={t('adminsPage.can_edit', 'Can edit')} color={color} />
                   <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">
                     granted in server.cfg — cannot be changed here
                   </Text>
@@ -236,7 +239,7 @@ function AceBlock({ canEdit }: { canEdit: boolean }) {
               )}
 
               {!grant.fromCfg && canEdit && (
-                <RowButton icon={Trash2} label="Remove" danger onClick={() => remove(grant.principal)} />
+                <RowButton icon={Trash2} label={t('adminsPage.remove', 'Remove')} danger onClick={() => remove(grant.principal)} />
               )}
             </Flex>
           );
@@ -248,13 +251,13 @@ function AceBlock({ canEdit }: { canEdit: boolean }) {
               value={adding}
               onChange={(e) => setAdding(e.currentTarget.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-              placeholder="Add a group, e.g. group.headadmin"
+              placeholder={t('adminsPage.add_a_group_e_g_group_headadmin', 'Add a group, e.g. group.headadmin')}
               styles={inputStyles(theme, true)}
               style={{ flex: 1, maxWidth: '44vh' }}
             />
-            <StudioButton label="Add group" onClick={add} />
+            <StudioButton label={t('adminsPage.add_group', 'Add group')} onClick={add} />
             <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.28)">
-              FiveM cannot list groups, so they are added by name.
+              {t('adminsPage.fivem_cannot_list_groups_so_they_are_add', 'FiveM cannot list groups, so they are added by name.')}
             </Text>
           </Flex>
         )}
@@ -300,6 +303,7 @@ function AdminRow({
   onEdit?: () => void;
   onRevoke?: () => void;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const editLevel = entry.level === 'edit';
@@ -356,8 +360,8 @@ function AdminRow({
 
       {!locked && canEdit && (
         <Flex align="center" gap="xxs" style={{ flexShrink: 0 }}>
-          <RowButton icon={Pencil} label="Edit access" onClick={onEdit} />
-          <RowButton icon={Trash2} label="Revoke" danger onClick={onRevoke} />
+          <RowButton icon={Pencil} label={t('adminsPage.edit_access', 'Edit access')} onClick={onEdit} />
+          <RowButton icon={Trash2} label={t('adminsPage.revoke', 'Revoke')} danger onClick={onRevoke} />
         </Flex>
       )}
     </Flex>
@@ -420,6 +424,7 @@ function AdminModal({
   onSave: (next: AdminEntry) => void;
   onClose: () => void;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const scripts = useStudio((s) => s.scripts);
@@ -472,7 +477,7 @@ function AdminModal({
                 <TextInput
                   value={query}
                   onChange={(e) => setQuery(e.currentTarget.value)}
-                  placeholder="Search online players"
+                  placeholder={t('adminsPage.search_online_players', 'Search online players')}
                   leftSection={<Search size="1.4vh" color="rgba(255,255,255,0.35)" />}
                   styles={inputStyles(theme)}
                   style={{ width: '100%' }}
@@ -517,31 +522,31 @@ function AdminModal({
 
           {/* what */}
           <Flex direction="column" gap="sm" p="sm" flex={1} className="studio-scroll" style={{ overflowY: 'auto', minHeight: 0 }}>
-            <Field label="Name">
+            <Field label={t('adminsPage.name', 'Name')}>
               <TextInput value={name} onChange={(e) => setName(e.currentTarget.value)}
-                placeholder="Shown in logs" styles={inputStyles(theme)} style={{ width: '100%' }} />
+                placeholder={t('adminsPage.shown_in_logs', 'Shown in logs')} styles={inputStyles(theme)} style={{ width: '100%' }} />
             </Field>
 
-            <Field label="Identifier" hint="Server-side only — never sent to a regular player">
+            <Field label={t('adminsPage.identifier', 'Identifier')} hint="Server-side only — never sent to a regular player">
               <TextInput value={identifier} onChange={(e) => setIdentifier(e.currentTarget.value)}
-                placeholder="license2:..." styles={inputStyles(theme, true)} style={{ width: '100%' }} />
+                placeholder={t('adminsPage.license2', 'license2:...')} styles={inputStyles(theme, true)} style={{ width: '100%' }} />
             </Field>
 
-            <Field label="Level">
+            <Field label={t('adminsPage.level', 'Level')}>
               <Flex gap="xs">
-                <Choice active={level === 'edit'} icon={ShieldCheck} label="Can edit"
+                <Choice active={level === 'edit'} icon={ShieldCheck} label={t('adminsPage.can_edit', 'Can edit')}
                   description="Change and save settings" onClick={() => setLevel('edit')} />
-                <Choice active={level === 'view'} icon={Eye} label="View only"
+                <Choice active={level === 'view'} icon={Eye} label={t('adminsPage.view_only', 'View only')}
                   description="Open the panel, change nothing" onClick={() => setLevel('view')} />
               </Flex>
             </Field>
 
-            <Field label="Scope" hint="Which scripts they may configure">
+            <Field label={t('adminsPage.scope', 'Scope')} hint="Which scripts they may configure">
               <Flex direction="column" gap="xxs">
                 <Choice
                   active={scope.length === 0}
                   icon={Shield}
-                  label="Every script"
+                  label={t('adminsPage.every_script', 'Every script')}
                   description="Including scripts installed later"
                   onClick={() => setScope([])}
                   wide
@@ -583,10 +588,10 @@ function AdminModal({
           style={{ borderTop: `0.1vh solid ${alpha(theme.colors.dark[4], 0.4)}`, flexShrink: 0 }}
         >
           <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">
-            Granting access is logged, like any other change.
+            {t('adminsPage.granting_access_is_logged_like_any_other', 'Granting access is logged, like any other change.')}
           </Text>
           <Flex gap="xs">
-            <StudioButton label="Cancel" onClick={onClose} />
+            <StudioButton label={t('adminsPage.cancel', 'Cancel')} onClick={onClose} />
             <StudioButton
               label={entry ? 'Save access' : 'Grant access'}
               primary

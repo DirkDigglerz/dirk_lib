@@ -16,6 +16,7 @@ lib.vehicle = {
   setFuel = function(veh,val,_type)
     if not fuel.setFuel then return lib.print.error(('No bridge found for setting fuel for %s'):format(settings.fuel)) end
     return fuel.setFuel(veh,val,_type)
+  end,
 
   getFuel = function(veh)
     if not fuel.getFuel then return lib.print.error(('No bridge found for getting fuel for %s'):format(settings.fuel)) end

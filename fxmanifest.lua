@@ -43,6 +43,8 @@ files {
   'src/autodetect.lua',
   'src/oxCompat.lua',
   'src/onSettings.lua',
+  'src/nuiBridge.lua',
+  'src/autoDefaults.lua',
   --\\ NUI WHEN ADDED \\--
   'web/build/index.html',
   'web/build/**/*',

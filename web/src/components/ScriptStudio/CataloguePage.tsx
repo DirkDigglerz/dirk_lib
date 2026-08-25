@@ -2,10 +2,12 @@ import { alpha, Flex, Select, Text, TextInput, useMantineTheme } from '@mantine/
 import { fetchNui, getItemImageUrl, useItems, type Vehicle } from 'dirk-cfx-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  ArrowDown, ArrowUp, ArrowUpDown, Box, Car, ChevronRight, Package, PackagePlus,
+  AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Box, Car, Check, ChevronRight,
+  Package, PackagePlus,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { StudioButton } from './ui';
+import { useChrome } from './studioLocale';
 
 /**
  * A browsable reference of what this server actually has: every item the
@@ -23,6 +25,15 @@ const PER_PAGE = 25;
 
 type Kind = 'items' | 'vehicles';
 
+/** Server refusal codes, in words. */
+const FAILURES: Record<string, string> = {
+  NoPermission: 'You do not have permission',
+  BadModel: 'That spawn name is not valid',
+  SpawnFailed: 'The server could not create it',
+  NoPed: 'You need to be in the world',
+  NoReply: 'No response from the server',
+};
+
 type Row = {
   id: string;
   label: string;
@@ -33,6 +44,7 @@ type Row = {
 };
 
 export function CataloguePage({ kind, query }: { kind: Kind; query: string }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
 
@@ -85,8 +97,8 @@ export function CataloguePage({ kind, query }: { kind: Kind; query: string }) {
           cells: [item.name, item.weight > 0 ? `${item.weight}g` : '—'],
           description: item.description,
           facts: [
-            { label: 'Weight', value: item.weight > 0 ? `${item.weight}g` : '—' },
-            { label: 'Spawn name', value: item.name },
+            { label: t('column.weight', 'Weight'), value: item.weight > 0 ? `${item.weight}g` : '—' },
+            { label: t('column.spawnName', 'Spawn name'), value: item.name },
           ],
         }));
     }
@@ -105,9 +117,9 @@ export function CataloguePage({ kind, query }: { kind: Kind; query: string }) {
         image: VEHICLE_IMAGE.replace('%s', vehicle.model),
         cells: [vehicle.model, vehicle.brand ?? '—', vehicle.category ?? '—'],
         facts: [
-          ...(vehicle.brand ? [{ label: 'Brand', value: vehicle.brand }] : []),
-          ...(vehicle.category ? [{ label: 'Class', value: vehicle.category }] : []),
-          ...(vehicle.price !== undefined ? [{ label: 'Price', value: `$${vehicle.price.toLocaleString()}` }] : []),
+          ...(vehicle.brand ? [{ label: t('column.brand', 'Brand'), value: vehicle.brand }] : []),
+          ...(vehicle.category ? [{ label: t('column.class', 'Class'), value: vehicle.category }] : []),
+          ...(vehicle.price !== undefined ? [{ label: t('column.price', 'Price'), value: `$${vehicle.price.toLocaleString()}` }] : []),
         ],
       }));
   }, [kind, items, vehicles, needle, category]);
@@ -140,8 +152,8 @@ export function CataloguePage({ kind, query }: { kind: Kind; query: string }) {
   useEffect(() => { setPage(0); setOpen(null); }, [kind, needle, category, sort]);
 
   const columns = kind === 'items'
-    ? ['Spawn name', 'Weight']
-    : ['Spawn name', 'Brand', 'Class'];
+    ? [t('column.spawnName', 'Spawn name'), t('column.weight', 'Weight')]
+    : [t('column.spawnName', 'Spawn name'), t('column.brand', 'Brand'), t('column.class', 'Class')];
 
   return (
     <Flex direction="column" style={{ flex: 1, minHeight: 0 }}>
@@ -169,7 +181,7 @@ export function CataloguePage({ kind, query }: { kind: Kind; query: string }) {
             data={categories}
             value={category}
             onChange={setCategory}
-            placeholder="All classes"
+            placeholder={t('cataloguePage.all_classes', 'All classes')}
             clearable
             comboboxProps={{ zIndex: 10800 }}
             styles={{
@@ -201,7 +213,7 @@ export function CataloguePage({ kind, query }: { kind: Kind; query: string }) {
         <Flex w="1.4vh" style={{ flexShrink: 0 }} />
         <Flex w="3.6vh" style={{ flexShrink: 0 }} />
         <SortHeader
-          label="Name" column={-1} sort={sort} onSort={setSort}
+          label={t('cataloguePage.name', 'Name')} column={-1} sort={sort} onSort={setSort}
           style={{ flex: 1, minWidth: 0 }}
         />
         {columns.map((column, index) => (
@@ -250,8 +262,8 @@ export function CataloguePage({ kind, query }: { kind: Kind; query: string }) {
             {page * PER_PAGE + 1}–{Math.min((page + 1) * PER_PAGE, rows.length)} of {rows.length}
           </Text>
           <Flex gap="xxs">
-            <StudioButton label="Prev" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} />
-            <StudioButton label="Next" onClick={() => setPage((p) => Math.min(pages - 1, p + 1))} disabled={page >= pages - 1} />
+            <StudioButton label={t('cataloguePage.prev', 'Prev')} onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} />
+            <StudioButton label={t('cataloguePage.next', 'Next')} onClick={() => setPage((p) => Math.min(pages - 1, p + 1))} disabled={page >= pages - 1} />
           </Flex>
         </Flex>
       )}
@@ -318,6 +330,29 @@ function CatalogueRow({
 }) {
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
+
+  // Whether the last press worked. Both actions are permission-gated on the
+  // server, so a silent button would leave you unable to tell "denied" from
+  // "nothing happened".
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => { if (!open) setResult(null); }, [open]);
+
+  const run = async () => {
+    if (busy) return;
+    setBusy(true);
+    setResult(null);
+    const reply = await fetchNui<{ success?: boolean; _error?: string }>(
+      kind === 'items' ? 'GIVE_SCRIPT_CONFIG_ITEM' : 'SPAWN_VEHICLE',
+      kind === 'items' ? { itemName: row.id, itemAmount: 1 } : { model: row.id },
+      { success: false, _error: 'NoReply' },
+    ).catch(() => ({ success: false, _error: 'NoReply' }));
+    setBusy(false);
+    setResult(reply?.success
+      ? { ok: true, message: kind === 'items' ? 'In your inventory' : 'Spawned' }
+      : { ok: false, message: FAILURES[reply?._error ?? ''] ?? 'Could not do that' });
+  };
 
   return (
     <Flex
@@ -405,15 +440,27 @@ function CatalogueRow({
                   </Text>
                 )}
 
-                <Flex gap="xs" py="0.4vh">
+                {/* Both actions are decided on the SERVER - the item grant and
+                    the vehicle spawn each check the same permission that gates
+                    editing a config, and the vehicle is created server-side.
+                    Pressing these without that permission does nothing. */}
+                <Flex align="center" gap="xs" py="0.4vh">
                   <StudioButton
                     label={kind === 'items' ? 'Give me one' : 'Spawn it'}
                     icon={kind === 'items' ? PackagePlus : Car}
                     primary
-                    onClick={() => (kind === 'items'
-                      ? fetchNui('GIVE_SCRIPT_CONFIG_ITEM', { itemName: row.id, itemAmount: 1 })
-                      : fetchNui('SPAWN_VEHICLE', { model: row.id }))}
+                    onClick={run}
                   />
+                  {result && (
+                    <Flex align="center" gap="0.4vh">
+                      {result.ok
+                        ? <Check size="1.3vh" color="#5BC98C" />
+                        : <AlertTriangle size="1.3vh" color="#ef4444" />}
+                      <Text ff="Akrobat SemiBold" size="xxs" c={result.ok ? '#5BC98C' : '#ef4444'}>
+                        {result.message}
+                      </Text>
+                    </Flex>
+                  )}
                 </Flex>
 
                 <Flex gap="xs" wrap="wrap">

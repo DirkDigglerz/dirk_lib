@@ -1,3 +1,4 @@
+import { fetchNui, isEnvBrowser } from 'dirk-cfx-react';
 import { useStudio } from './store';
 
 /**
@@ -82,4 +83,67 @@ export function translate(
   return forResource[language]?.[key]
     ?? forResource.en?.[key]
     ?? fallback;
+}
+
+/**
+ * Pull the bundles for one language into the store.
+ *
+ * Nothing was doing this: the panel resolved every label through
+ * `state.locales`, which never moved off its browser mock, so switching the
+ * language setting re-rendered everything in exactly the same English.
+ *
+ * English is fetched alongside anything else, because it is the fallback the
+ * whole resolution chain leans on. Already-loaded languages are skipped - the
+ * bundles are immutable for the life of the resource.
+ */
+export async function loadLocales(language: string) {
+  if (isEnvBrowser()) return;
+
+  const state = useStudio.getState();
+  const resources = state.scripts.map((script) => script.resource);
+  if (resources.length === 0) return;
+
+  const wanted = language === 'en' ? ['en'] : [language, 'en'];
+  const missing = wanted.filter((lang) =>
+    !resources.every((resource) => state.locales[resource]?.[lang]));
+  if (missing.length === 0) return;
+
+  for (const lang of missing) {
+    const bundles = await fetchNui<Record<string, LocaleBundle>>(
+      'GET_STUDIO_LOCALES',
+      { language: lang, resources },
+      {},
+    ).catch(() => ({} as Record<string, LocaleBundle>));
+
+    useStudio.setState((current) => {
+      const next: LocaleBundles = { ...current.locales };
+      for (const [resource, bundle] of Object.entries(bundles ?? {})) {
+        next[resource] = { ...next[resource], [lang]: bundle };
+      }
+      // A language with no file anywhere still gets marked as attempted, so a
+      // missing translation is not re-fetched on every render.
+      for (const resource of resources) {
+        if (!next[resource]?.[lang]) {
+          next[resource] = { ...next[resource], [lang]: {} };
+        }
+      }
+      return { locales: next };
+    });
+  }
+}
+
+/**
+ * A translator for the panel's OWN strings.
+ *
+ * Setting labels belong to the script that owns them; the panel's furniture
+ * belongs to dirk_lib. Components kept inlining that furniture in English,
+ * which is why the overview page and the theme hints stayed English while the
+ * settings around them translated. Keys are prefixed `studio.` so the panel's
+ * strings are obvious in the bundle.
+ */
+export function useChrome() {
+  const language = useActiveLanguage();
+  const bundles = useBundles();
+  return (key: string, fallback: string) =>
+    translate(bundles, language, 'dirk_lib', `studio.${key}`, fallback);
 }

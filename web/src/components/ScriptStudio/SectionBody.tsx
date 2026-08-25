@@ -1,7 +1,7 @@
 import { alpha, Flex, Text, useMantineTheme } from '@mantine/core';
 import { motion } from 'framer-motion';
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { effectiveValue, setValue } from './store';
+import { effectiveValue, setValue, useStudio } from './store';
 import { ZoneMap } from './ZoneMap';
 import type { SettingEntry } from './types';
 
@@ -36,7 +36,7 @@ export function SectionBody({
 
   if (mapLayers.length > 0) {
     return (
-      <>
+      <Flex direction="column" flex={1} style={{ minHeight: 0 }}>
         <ZoneMap
           layers={mapLayers.map((entry) => ({
             entry,
@@ -45,7 +45,7 @@ export function SectionBody({
           }))}
         />
         {rest.map((entry, index) => withSubgroup(entry, index, rest, renderRow, color, theme))}
-      </>
+      </Flex>
     );
   }
 
@@ -106,7 +106,23 @@ function ListTabs({
     if (!lists.some((l) => l.path === activePath)) setActivePath(lists[0]?.path ?? '');
   }, [lists, activePath]);
 
+  // The rail can name a tab directly. Cleared once taken so that picking the
+  // same one again still works, and so it does not fight a later manual choice.
+  const requestedList = useStudio((state) => state.activeList);
+  useEffect(() => {
+    if (!requestedList) return;
+    if (!lists.some((l) => l.path === requestedList)) return;
+    setActivePath(requestedList);
+    useStudio.setState({ activeList: null });
+  }, [requestedList, lists]);
+
   const active = lists.find((l) => l.path === activePath) ?? lists[0];
+
+  // Tell the rail what is on screen, so the matching child highlights.
+  useEffect(() => {
+    if (!active) return;
+    useStudio.setState({ shownList: active.path });
+  }, [active?.path]);
 
   return (
     <Flex direction="column" gap="xs">
@@ -157,17 +173,21 @@ function ListTabs({
         })}
       </Flex>
 
-      {/* Fixed height, own scrollbar: switching from 13 rods to 24 hooks must
-          not resize the section and shove everything below it. */}
+      {/* Rows FLOW into the page scroll rather than sitting in a scroller of
+          their own.
+
+          This used to be a fixed 48vh box, so that switching from 13 rods to 24
+          hooks could not resize the section and shove everything below it. That
+          traded a small jump for a permanent one: a scrollbar inside a
+          scrollbar, and 37 fish in a letterbox less than half the window tall.
+          Scroll-within-scroll is the worse deal, and the old panel never did it.
+
+          A min-height keeps the jump small when a short tab follows a long one,
+          without capping how tall a long one may be. */}
       {active && (
         <Flex
           direction="column"
-          className="studio-scroll"
-          style={{
-            height: '48vh',
-            overflowY: 'auto',
-            paddingRight: '0.4vh',
-          }}
+          style={{ minHeight: '24vh' }}
         >
           <Fragment key={active.path}>
             {renderRow(active, query || undefined)}
@@ -193,7 +213,12 @@ function withSubgroup(
   return (
     <Fragment key={entry.path}>
       {startsBlock && (
-        <Flex align="center" gap="xs" mt="xs" mb="0.1vh">
+        // The rail's sub-tree scrolls to this. The divider already marked where
+        // a block begins; it just had no name anything could aim at.
+        <Flex
+          align="center" gap="xs" mt="xs" mb="0.1vh"
+          data-subgroup={entry.subgroup!.id}
+        >
           <Flex h="0.1vh" w="1.4vh" style={{ background: alpha(color, 0.5) }} />
           <Text ff="Akrobat Bold" size="xs" tt="uppercase" lts="0.1em" c={alpha(color, 0.85)}>
             {entry.subgroup!.label}

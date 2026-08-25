@@ -156,6 +156,10 @@ local function extractDefaults(schema)
   return nil
 end
 
+-- Detected-from-convar defaults (`x-autoDefault`). Shared with dirk_lib's
+-- Script Studio callback so the panel shows the same default the engine holds.
+local resolveAutoDefaults = require '@dirk_lib.src.autoDefaults'
+
 -- Collects all dot-paths marked with 'x-serverOnly' in the schema.
 local function extractServerOnly(schema, path, result)
   result = result or {}
@@ -882,6 +886,21 @@ local function notifyWatcher(watcher, current, previous, changedPaths, source, f
   local newValue = cloneValue(getValueAtPath(current, watcher.path))
   local oldValue = cloneValue(getValueAtPath(previous, watcher.path))
 
+  -- Never hand a watcher nil for a path that exists in the schema.
+  --
+  -- The idiom every consumer uses is `on('basic', function(new) basic = new or
+  -- {} end)`, so one nil delivery replaces a live snapshot with an empty table
+  -- and every read off it is nil from then on. dirk_multichar spent an
+  -- afternoon calling `lib.table.includes(nil, ...)` for exactly this reason,
+  -- after dirk_lib was restarted underneath it.
+  --
+  -- A momentarily unavailable config is not news a watcher can act on. Staying
+  -- quiet leaves the consumer holding the last good value, which is the only
+  -- useful thing it could do anyway.
+  if newValue == nil and getValueAtPath(defaults, watcher.path) ~= nil then
+    return false
+  end
+
   if not forceInitial and watcher.path ~= '*' and isEqualValue(oldValue, newValue) then
     return false
   end
@@ -959,6 +978,9 @@ end
 -- --------------------------------------------------
 
 local function registerScriptConfig(schema, canEditFn, rules)
+  -- Before anything reads a default: some of them are detected from the
+  -- server's own convars rather than written into the schema.
+  resolveAutoDefaults(schema)
   local defaultData    = extractDefaults(schema) or {}
   settingsSchema       = schema
   defaults             = defaultData
@@ -1474,6 +1496,31 @@ local function getScriptConfigHistory(payload)
     end
   end
 
+  -- Sorted HERE, not in the panel. Ordering a page of results client-side only
+  -- orders that page: "oldest first" would have shown the oldest of the newest
+  -- 25. The whole filtered set is in hand at this point, so the order is right
+  -- across every page.
+  local sort = toSafeString(args.sort)
+  if sort == 'oldest' then
+    local reversed = {}
+    for i = #filtered, 1, -1 do reversed[#reversed + 1] = filtered[i] end
+    filtered = reversed
+  elseif sort == 'changes' then
+    table.sort(filtered, function(a, b)
+      local ac, bc = #(a.changes or {}), #(b.changes or {})
+      if ac ~= bc then return ac > bc end
+      return (a.at_unix or 0) > (b.at_unix or 0)
+    end)
+  elseif sort == 'admin' then
+    table.sort(filtered, function(a, b)
+      local an = (a.admin and a.admin.name or ''):lower()
+      local bn = (b.admin and b.admin.name or ''):lower()
+      if an ~= bn then return an < bn end
+      return (a.at_unix or 0) > (b.at_unix or 0)
+    end)
+  end
+  -- anything else keeps the newest-first walk above
+
   local total = #filtered
   local startIndex = offset + 1
   local endIndex = math.min(offset + limit, total)
@@ -1742,6 +1789,22 @@ AddEventHandler('onResourceStop', function(stopped)
   pcall(function()
     exports.dirk_lib:unregisterScriptConfigOverrides(scriptName)
   end)
+end)
+
+-- dirk_lib RESTARTING takes this resource's registration down with it: the map
+-- of who may edit which config lives in dirk_lib's VM, so a restart leaves this
+-- script registered nowhere and its panel unreachable until it is restarted
+-- too. Restarting every consumer by hand after every dirk_lib restart is not a
+-- workflow, it is a chore, so the push is simply repeated.
+--
+-- Guarded on the name: onResourceStart fires for every resource on the server.
+AddEventHandler('onResourceStart', function(started)
+  if started ~= 'dirk_lib' then return end
+  if not scriptConfig then return end
+
+  -- dirk_lib is "started" before its own exports are registered, so the retry
+  -- loop below is doing the real work; this is just what kicks it off.
+  pushAccessOverridesWithRetry()
 end)
 
 -- Admin-tool server-side counterparts now live under dirk_lib's own

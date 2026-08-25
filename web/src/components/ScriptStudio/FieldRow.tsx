@@ -14,6 +14,7 @@ import { WeightMapControl } from './WeightMapControl';
 import { MantineColorControl, ShadeControl } from './ThemeControls';
 import { NestedRows } from './NestedRows';
 import type { SettingColumn } from './types';
+import { useChrome } from './studioLocale';
 
 type Row = Record<string, unknown>;
 
@@ -52,6 +53,7 @@ export function FieldRow({
   /** the item this row represents, if any - drives label/description mirroring */
   itemName?: string;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const items = useItems();
   const wide = isWideColumn(column.type);
@@ -85,7 +87,7 @@ export function FieldRow({
           <Text ff="Akrobat Bold" size="xs" c="rgba(255,255,255,0.85)">{column.label}</Text>
           {mirrors && (
             <Tooltip
-              label="Comes from this item in your inventory — rename it there and it changes everywhere"
+              label={t('fieldRow.comes_from_this_item_in_your_inventory_r', 'Comes from this item in your inventory — rename it there and it changes everywhere')}
               position="top"
               withArrow
               multiline

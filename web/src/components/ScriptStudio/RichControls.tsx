@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Plus, X } from 'lucide-react';
 import { useState } from 'react';
 import { useInputStyles } from './Controls';
+import { useChrome } from './studioLocale';
 
 const STRENGTH_COLORS = ['#22c55e', '#f59e0b', '#ef4444'];
 
@@ -139,6 +140,7 @@ export function TagsControl({
   disabled?: boolean;
   numeric?: boolean;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const styles = useInputStyles(true);
@@ -181,7 +183,7 @@ export function TagsControl({
           </Flex>
         ))}
         {items.length === 0 && (
-          <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">None set</Text>
+          <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">{t('richControls.none_set', 'None set')}</Text>
         )}
       </Flex>
 
@@ -207,7 +209,7 @@ export function TagsControl({
               borderRadius: theme.radius.xs,
               cursor: 'pointer',
             }}
-            aria-label="Add"
+            aria-label={t('richControls.add', 'Add')}
           >
             <Plus size="1.4vh" color={color} />
           </motion.button>

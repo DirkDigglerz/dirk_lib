@@ -3,6 +3,7 @@ import { FiveMKeyBindInput } from 'dirk-cfx-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Check, KeyRound, Pencil, X } from 'lucide-react';
 import { useState } from 'react';
+import { useChrome } from './studioLocale';
 
 /** dirk-cfx-react's keybind shape. */
 type Binding = { _type: string; _key: string };
@@ -27,6 +28,7 @@ export function KeybindMapControl({
   onChange: (next: Bindings) => void;
   disabled?: boolean;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
 
@@ -36,7 +38,7 @@ export function KeybindMapControl({
   if (actions.length === 0) {
     return (
       <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">
-        No actions defined
+        {t('keybindMapControl.no_actions_defined', 'No actions defined')}
       </Text>
     );
   }
@@ -66,6 +68,7 @@ function ActionRow({
   onChange: (next: Action) => void;
   disabled?: boolean;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<Action>(binding);
@@ -101,11 +104,11 @@ function ActionRow({
 
           {editing ? (
             <Flex gap="0.3vh">
-              <IconAction icon={Check} tone="#22c55e" onClick={save} label="Save binding" />
-              <IconAction icon={X} tone="rgba(255,255,255,0.4)" onClick={cancel} label="Cancel" />
+              <IconAction icon={Check} tone="#22c55e" onClick={save} label={t('keybindMapControl.save_binding', 'Save binding')} />
+              <IconAction icon={X} tone="rgba(255,255,255,0.4)" onClick={cancel} label={t('keybindMapControl.cancel', 'Cancel')} />
             </Flex>
           ) : (
-            <IconAction icon={Pencil} tone="rgba(255,255,255,0.4)" onClick={start} label="Edit binding" disabled={disabled} />
+            <IconAction icon={Pencil} tone="rgba(255,255,255,0.4)" onClick={start} label={t('keybindMapControl.edit_binding', 'Edit binding')} disabled={disabled} />
           )}
         </Flex>
       </Flex>
@@ -121,13 +124,13 @@ function ActionRow({
           >
             <Flex direction="column" gap="xs" pt="xs">
               <Slot
-                label="Primary"
+                label={t('keybindMapControl.primary', 'Primary')}
                 binding={draft.main}
                 onChange={(next) => setDraft((prev) => ({ ...prev, main: next }))}
               />
               {draft.alt ? (
                 <Slot
-                  label="Alternate"
+                  label={t('keybindMapControl.alternate', 'Alternate')}
                   binding={draft.alt}
                   onChange={(next) => setDraft((prev) => ({ ...prev, alt: next }))}
                   onRemove={() => setDraft((prev) => ({ main: prev.main }))}
@@ -147,7 +150,7 @@ function ActionRow({
                   }}
                 >
                   <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.05em" c="rgba(255,255,255,0.45)">
-                    Add alternate
+                    {t('keybindMapControl.add_alternate', 'Add alternate')}
                   </Text>
                 </motion.button>
               )}
@@ -167,6 +170,7 @@ function Slot({
   onChange: (next: Binding) => void;
   onRemove?: () => void;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
 
   return (
@@ -181,7 +185,7 @@ function Slot({
             onClick={onRemove}
             whileTap={{ scale: 0.94 }}
             style={{ display: 'flex', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
-            aria-label="Remove alternate"
+            aria-label={t('keybindMapControl.remove_alternate', 'Remove alternate')}
           >
             <X size="1.2vh" color="rgba(255,255,255,0.35)" />
           </motion.button>

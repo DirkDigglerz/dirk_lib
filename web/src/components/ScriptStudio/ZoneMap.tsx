@@ -8,10 +8,13 @@ import 'leaflet-draw/dist/leaflet.draw.css';
 import { Eye, EyeOff, MapPin, Pencil, PenTool, Trash2, X } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Polygon, useMap } from 'react-leaflet';
+import { PANE_HEIGHT } from './Controls';
 import { FieldRow } from './FieldRow';
+import { Icon } from './Icon';
 import { PickerDrawer } from './PickerDrawer';
 import { StudioButton } from './ui';
 import type { SettingColumn, SettingEntry } from './types';
+import { useChrome } from './studioLocale';
 
 type Row = Record<string, unknown>;
 type Point = { x: number; y: number };
@@ -22,10 +25,9 @@ export type MapLayerInput = {
   onChange: (next: unknown) => void;
 };
 
-// Fishing's own layer colours, so the map reads the same as the one admins
-// already use.
-const DEPTH_COLOR = '#f59e0b';
-const SEA_COLOR = '#3b82f6';
+// Fallback colours for a layer whose schema does not name one. A script that
+// cares declares it in `x-mapPaths` - dirk_lib naming fishing's layers was the
+// per-script knowledge this design keeps out.
 const ZONE_PALETTE = ['#5FD08A', '#4CC3DE', '#E0B15F', '#E0776B', '#B98FE0', '#8FE05F'];
 
 /**
@@ -40,6 +42,7 @@ const ZONE_PALETTE = ['#5FD08A', '#4CC3DE', '#E0B15F', '#E0776B', '#B98FE0', '#8
  * leaflet-draw, the same interaction fishing's ZonesSection uses.
  */
 export function ZoneMap({ layers, disabled }: { layers: MapLayerInput[]; disabled?: boolean }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const accent = theme.colors[theme.primaryColor][5];
 
@@ -50,10 +53,14 @@ export function ZoneMap({ layers, disabled }: { layers: MapLayerInput[]; disable
   const [drawInto, setDrawInto] = useState<string | null>(null);
   const [replaceSingle, setReplaceSingle] = useState<{ path: string; points: Point[] } | null>(null);
 
-  // Normalise the three shapes into one thing the map can draw.
+  // Normalise every mapped shape into one thing the map can draw.
   const model = useMemo(() => layers.map((layer, layerIndex) => {
     const raw = Array.isArray(layer.value) ? layer.value : [];
-    const isSingle = raw.length > 0 && typeof (raw[0] as Point)?.x === 'number';
+    // A list of points at the TOP level is one outline (fishing's seaBoundary).
+    // A list of rows each holding a point is a set of markers - told apart by
+    // the entry's declared shape, because both are arrays of objects with x.
+    const isMarker = layer.entry.mapShape === 'marker';
+    const isSingle = !isMarker && raw.length > 0 && typeof (raw[0] as Point)?.x === 'number';
 
     const polyKey = (() => {
       const sample = raw.find((r) => r && typeof r === 'object' && !Array.isArray(r)) as Row | undefined;
@@ -70,15 +77,34 @@ export function ZoneMap({ layers, disabled }: { layers: MapLayerInput[]; disable
       : (raw as Row[]).map((row, index) => ({
         index,
         title: String(row[labelKey] ?? row.id ?? row.name ?? `${layer.entry.label} ${index + 1}`),
-        points: Array.isArray(row[polyKey]) ? (row[polyKey] as Point[]) : [],
+        points: isMarker
+          ? (typeof row.x === 'number' && typeof row.y === 'number'
+            ? [{ x: row.x as number, y: row.y as number }]
+            : [])
+          : (Array.isArray(row[polyKey]) ? (row[polyKey] as Point[]) : []),
         row,
       }));
 
-    const color = layer.entry.path === 'seaBoundary' ? SEA_COLOR
-      : layer.entry.path === 'depthOverride' ? DEPTH_COLOR
-        : ZONE_PALETTE[layerIndex % ZONE_PALETTE.length];
+    // The layer colour comes from the SCHEMA. This used to match the path
+    // against 'seaBoundary' and 'depthOverride' by name - two of fishing's
+    // field names, hardcoded inside dirk_lib, which is the per-script knowledge
+    // this design exists to keep out. Declare it in `x-mapPaths` instead:
+    // `{ "path": "seaBoundary", "color": "#3b82f6" }`.
+    const color = layer.entry.mapColor ?? ZONE_PALETTE[layerIndex % ZONE_PALETTE.length];
 
-    return { ...layer, isSingle, polyKey, labelKey, shapes, color };
+    // Which column carries the value that styles each pin - the first enum
+    // column whose options declare icons or colours.
+    const styleKey = isMarker
+      ? layer.entry.columns?.find((column) =>
+        column.options?.some((option) => option.icon || option.color))?.key
+      : undefined;
+    const styleFor = (row: Row | undefined) => {
+      if (!styleKey || !row) return undefined;
+      const column = layer.entry.columns?.find((c) => c.key === styleKey);
+      return column?.options?.find((option) => option.value === String(row[styleKey]));
+    };
+
+    return { ...layer, isMarker, isSingle, polyKey, labelKey, shapes, color, styleFor };
   }), [layers]);
 
   const layerFor = (path: string) => model.find((l) => l.entry.path === path);
@@ -132,8 +158,10 @@ export function ZoneMap({ layers, disabled }: { layers: MapLayerInput[]; disable
     : undefined;
 
   return (
-    <Flex direction="column" gap="xs" style={{ width: '100%' }}>
-      <Flex gap="xs" style={{ height: '56vh' }}>
+    <Flex direction="column" gap="xs" flex={1} style={{ width: '100%', minHeight: 0 }}>
+      {/* Fills the workspace pane rather than picking a height. The section
+          that holds it is a definite-height column, so there is no sum here. */}
+      <Flex gap="xs" flex={1} style={{ minHeight: 0, height: PANE_HEIGHT }}>
         <Flex
           ref={frameRef as never}
           style={{
@@ -148,7 +176,7 @@ export function ZoneMap({ layers, disabled }: { layers: MapLayerInput[]; disable
         >
           {!mapReady && (
             <Flex align="center" justify="center" style={{ flex: 1, background: alpha(theme.colors.dark[9], 0.5) }}>
-              <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.3)">Loading map...</Text>
+              <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.3)">{t('zoneMap.loading_map', 'Loading map...')}</Text>
             </Flex>
           )}
 
@@ -159,7 +187,43 @@ export function ZoneMap({ layers, disabled }: { layers: MapLayerInput[]; disable
               <FrameAll model={visibleShapes} selected={selected} />
               {drawInto && <DrawPolygon color={layerFor(drawInto)?.color ?? accent} onDone={commitDrawing} />}
 
-              {visibleShapes.map((layer) => layer.shapes.map((shape) => {
+              {/* Pins first, so an outline never paints over one. */}
+              {visibleShapes.filter((layer) => layer.isMarker).map((layer) => layer.shapes.map((shape) => {
+                const point = shape.points[0];
+                if (!point) return null;
+                const active = selected?.path === layer.entry.path && selected.index === shape.index;
+                const style = layer.styleFor(shape.row);
+                return (
+                  <Marker
+                    key={`${layer.entry.path}:${shape.index}`}
+                    position={gameToMap(point.x, point.y)}
+                    draggable={!disabled}
+                    eventHandlers={{
+                      click: () => setSelected({ path: layer.entry.path, index: shape.index }),
+                      // Dragging a pin IS how you move a place. Typing two
+                      // numbers to reposition a shop is the interaction this
+                      // panel exists to replace.
+                      dragend: (event: L.LeafletEvent) => {
+                        const { lat, lng } = (event.target as L.Marker).getLatLng();
+                        const game = mapToGame(lat, lng);
+                        const rows = [...(layer.value as Row[])];
+                        rows[shape.index] = { ...rows[shape.index], x: game[0], y: game[1] };
+                        layer.onChange(rows);
+                      },
+                    }}
+                    icon={(
+                      <PlacePin
+                        label={shape.title}
+                        hex={style?.color ?? layer.color}
+                        icon={style?.icon}
+                        active={active}
+                      />
+                    )}
+                  />
+                );
+              }))}
+
+              {visibleShapes.filter((layer) => !layer.isMarker).map((layer) => layer.shapes.map((shape) => {
                 if (shape.points.length < 3) return null;
                 const active = selected?.path === layer.entry.path && selected.index === shape.index;
                 const positions = shape.points.map((p) => gameToMap(p.x, p.y));
@@ -212,12 +276,19 @@ export function ZoneMap({ layers, disabled }: { layers: MapLayerInput[]; disable
                   })}
                   style={{ cursor: 'pointer', opacity: off ? 0.4 : 1 }}
                 >
-                  <Flex w="1.4vh" h="0.6vh" style={{ background: layer.color, borderRadius: '0.15vh', flexShrink: 0 }} />
+                  <Flex
+                    w="1.4vh" h={layer.isMarker ? '1.4vh' : '0.6vh'}
+                    style={{
+                      background: layer.color,
+                      borderRadius: layer.isMarker ? '50%' : '0.15vh',
+                      flexShrink: 0,
+                    }}
+                  />
                   <Text ff="Akrobat Bold" size="xxs" c="rgba(255,255,255,0.75)" style={{ flex: 1 }}>
                     {layer.entry.label}
                   </Text>
                   <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.35)">
-                    {layer.isSingle ? (layer.shapes[0]?.points.length ?? 0) + ' pts' : layer.shapes.length}
+                    {layer.isSingle ? `${layer.shapes[0]?.points.length ?? 0} pts` : layer.shapes.length}
                   </Text>
                   {off ? <EyeOff size="1.2vh" color="rgba(255,255,255,0.4)" /> : <Eye size="1.2vh" color="rgba(255,255,255,0.4)" />}
                 </Flex>
@@ -242,7 +313,7 @@ export function ZoneMap({ layers, disabled }: { layers: MapLayerInput[]; disable
               <motion.button
                 type="button" onClick={() => setDrawInto(null)} whileTap={{ scale: 0.94 }}
                 style={{ display: 'flex', background: 'transparent', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', padding: 0 }}
-                aria-label="Cancel drawing"
+                aria-label={t('zoneMap.cancel_drawing', 'Cancel drawing')}
               >
                 <X size="1.4vh" />
               </motion.button>
@@ -298,10 +369,10 @@ export function ZoneMap({ layers, disabled }: { layers: MapLayerInput[]; disable
                       </Flex>
                       <Flex align="center" gap="xxs" style={{ flexShrink: 0 }}>
                         {!layer.isSingle && (
-                          <MiniButton icon={Pencil} label="Edit"
+                          <MiniButton icon={Pencil} label={t('zoneMap.edit', 'Edit')}
                             onClick={() => setEditing({ path: layer.entry.path, index: shape.index })} disabled={disabled} />
                         )}
-                        <MiniButton icon={Trash2} label="Delete" danger
+                        <MiniButton icon={Trash2} label={t('zoneMap.delete', 'Delete')} danger
                           onClick={() => setConfirmDelete({ path: layer.entry.path, index: shape.index })} disabled={disabled} />
                       </Flex>
                     </Flex>
@@ -309,7 +380,7 @@ export function ZoneMap({ layers, disabled }: { layers: MapLayerInput[]; disable
                 })}
 
                 {layer.shapes.length === 0 && (
-                  <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.25)" pl="xs">None drawn</Text>
+                  <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.25)" pl="xs">{t('zoneMap.none_drawn', 'None drawn')}</Text>
                 )}
               </Flex>
             ))}
@@ -317,7 +388,7 @@ export function ZoneMap({ layers, disabled }: { layers: MapLayerInput[]; disable
 
           <Flex direction="column" gap="xxs" p="xs" style={{ flexShrink: 0 }}>
             <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.08em" c="rgba(255,255,255,0.3)">
-              Draw new
+              {t('zoneMap.draw_new', 'Draw new')}
             </Text>
             <Flex gap="xxs" wrap="wrap">
               {model.map((layer) => (
@@ -349,7 +420,7 @@ export function ZoneMap({ layers, disabled }: { layers: MapLayerInput[]; disable
       </Flex>
 
       <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.28)">
-        Every area is drawn, never typed. Toggle a layer in the key to get it out of the way while you work.
+        {t('zoneMap.every_area_is_drawn_never_typed_toggle_a', 'Every area is drawn, never typed. Toggle a layer in the key to get it out of the way while you work.')}
       </Text>
 
       <AnimatePresence>
@@ -373,7 +444,7 @@ export function ZoneMap({ layers, disabled }: { layers: MapLayerInput[]; disable
       <AnimatePresence>
         {confirmDelete && (
           <ConfirmModal
-            title="Delete area"
+            title={t('zoneMap.delete_area', 'Delete area')}
             description={`"${layerFor(confirmDelete.path)?.shapes[confirmDelete.index]?.title ?? 'This area'}" and its boundary are removed when you save.`}
             confirmLabel="Delete"
             onConfirm={() => deleteShape(confirmDelete.path, confirmDelete.index)}
@@ -487,6 +558,60 @@ function FrameAll({
   return null;
 }
 
+/**
+ * One place on the map.
+ *
+ * A coloured disc with a lucide glyph inside, matching what the old hand-built
+ * dirk_phone panel drew - and, more to the point, matching the pins players see
+ * in the phone's own Maps app. The colour and icon are the SETTING, so the
+ * admin map should look like the player map rather than approximate it.
+ *
+ * Colour and glyph come from the schema (`x-enumColors` / `x-enumIcons` on the
+ * row's category field); the layer colour is the fallback for a row with no
+ * category or a value the schema does not style.
+ */
+function PlacePin({
+  label, hex, icon, active,
+}: { label: string; hex: string; icon?: string; active: boolean }) {
+  const size = active ? '3.4vh' : '2.6vh';
+
+  return (
+    <Flex
+      direction="column" align="center" gap="0.2vh"
+      style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+    >
+      <Flex
+        align="center" justify="center"
+        w={size} h={size}
+        style={{
+          background: hex,
+          border: `0.2vh solid ${active ? '#ffffff' : alpha('#000000', 0.35)}`,
+          borderRadius: '50%',
+          boxShadow: active ? `0 0 0.8vh ${hex}` : `0 0.1vh 0.3vh ${alpha('#000000', 0.5)}`,
+          transition: 'width 0.12s, height 0.12s',
+        }}
+      >
+        {/* 55% of the disc, as the old pin had it - big enough to read at a
+            glance, small enough to keep the colour ring reading as the colour */}
+        <Icon name={icon ?? 'map-pin'} size={active ? '1.9vh' : '1.45vh'} color="#ffffff" />
+      </Flex>
+      {active && (
+        <Flex
+          px="0.7vh" py="0.15vh"
+          style={{
+            background: 'rgba(8,12,11,0.85)',
+            border: `0.1vh solid ${alpha(hex, 0.9)}`,
+            borderRadius: '0.3vh',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <Text ff="Akrobat Bold" size="xxs" c={hex}>{label}</Text>
+        </Flex>
+      )}
+    </Flex>
+  );
+}
+
 function ShapeLabel({
   label, hex, active, points,
 }: { label: string; hex: string; active: boolean; points: number }) {
@@ -525,6 +650,7 @@ function ShapeModal({
   onClose: () => void;
   disabled?: boolean;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const [draft, setDraft] = useState<Row>(() => JSON.parse(JSON.stringify(row)));
@@ -564,10 +690,10 @@ function ShapeModal({
             align="center" justify="space-between" px="sm" py="xs"
             style={{ borderTop: `0.1vh solid ${alpha(theme.colors.dark[4], 0.4)}`, flexShrink: 0 }}
           >
-            <StudioButton label="Delete" danger icon={Trash2} onClick={onDelete} disabled={disabled} />
+            <StudioButton label={t('zoneMap.delete', 'Delete')} danger icon={Trash2} onClick={onDelete} disabled={disabled} />
             <Flex gap="xs">
-              <StudioButton label="Cancel" onClick={onClose} />
-              <StudioButton label="Save area" primary onClick={() => onSave(draft)} disabled={disabled} />
+              <StudioButton label={t('zoneMap.cancel', 'Cancel')} onClick={onClose} />
+              <StudioButton label={t('zoneMap.save_area', 'Save area')} primary onClick={() => onSave(draft)} disabled={disabled} />
             </Flex>
           </Flex>
         </Flex>

@@ -195,49 +195,11 @@ if context == 'client' and (GetNumResourceMetadata(cache.resource, 'ui_page') or
     })
   end)
 
-  -- Bounces the NUI's GET_FRAMEWORK_GROUPS through to dirk_lib's server-side
-  -- callback so the React side gets a normalised { jobs, gangs } payload
-  -- regardless of which underlying framework the server runs.
-  RegisterNuiCallback('GET_FRAMEWORK_GROUPS', function(_, cb)
-    CreateThread(function()
-      local ok, data = pcall(lib.callback.await, 'dirk_lib:getFrameworkGroups')
-      if ok and type(data) == 'table' then
-        cb(data)
-      else
-        cb({ jobs = {}, gangs = {} })
-      end
-    end)
-  end)
-
-  -- Shared-vehicle list for cfx-react's useVehicles / VehicleSelect /
-  -- CategorySelect. QB/QBX only — those frameworks ship a categorised
-  -- vehicles.lua (exposed via lib.FW.Shared.Vehicles, readable client-side).
-  -- Normalises qb-core's array and qbx_core's model-keyed map to one flat
-  -- list of { model, name, brand, price, category }. ESX etc. get an empty
-  -- list, so any category/blueprint UI can gate itself off.
-  RegisterNuiCallback('GET_VEHICLES', function(_, cb)
-    -- Ask the SHAPE, not the framework name. This used to gate on
-    -- `lib.settings.framework`, which holds the raw setting - "auto" on every
-    -- default install - so the check never matched 'qbx_core' and the list came
-    -- back empty on the very servers that have one. Whether a table of vehicles
-    -- exists is the only thing that actually matters here, and it answers for
-    -- any framework that provides one.
-    local raw = (lib.FW and lib.FW.Shared and lib.FW.Shared.Vehicles) or {}
-    if type(raw) ~= 'table' then cb({}) return end
-    local out = {}
-    for _, v in pairs(raw) do
-      if type(v) == 'table' and v.model then
-        out[#out + 1] = {
-          model    = v.model,
-          name     = v.name or v.model,
-          brand    = v.brand,
-          price    = v.price,
-          category = v.category,
-        }
-      end
-    end
-    cb(out)
-  end)
+  -- Framework groups, the vehicle table and vehicle spawning. Shared with
+  -- dirk_lib's own bootstrap (src/init.lua) rather than written twice - the
+  -- copies had already drifted, which is how dirk_lib's own panel ended up
+  -- with no GET_VEHICLES at all.
+  require('@dirk_lib.src.nuiBridge')(frameworkBridge)
 
   -- Online-player list for the dirk_lib Script Config tab's identifier
   -- picker. Server-bounced because the client only knows about local-scope

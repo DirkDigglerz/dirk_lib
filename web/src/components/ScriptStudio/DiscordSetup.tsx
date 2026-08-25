@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { effectiveValue, useStudio } from './store';
+import { translate, useActiveLanguage, useBundles } from './studioLocale';
 import { StudioButton } from './ui';
 
 type Check = { id: string; ok: boolean; message: string };
@@ -30,6 +31,13 @@ export function DiscordSetup({ resource, canEdit }: { resource: string; canEdit:
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<DiagnoseResult | null>(null);
   const [guideOpen, setGuideOpen] = useState(false);
+
+  // dirk_lib's own bundle - the panel's chrome, as opposed to a script's
+  // setting labels, which come from that script.
+  const language = useActiveLanguage();
+  const bundles = useBundles();
+  const t = (key: string, fallback: string) =>
+    translate(bundles, language, 'dirk_lib', key, fallback);
 
   const entries = useStudio((state) => state.scripts.find((s) => s.resource === resource)?.entries ?? []);
   const draft = useStudio((state) => state.draft[resource]);
@@ -150,7 +158,7 @@ export function DiscordSetup({ resource, canEdit }: { resource: string; canEdit:
           }}
         >
           <Text ff="Akrobat Bold" size="xs" c="rgba(255,255,255,0.8)" style={{ flex: 1 }}>
-            How to create a bot
+            {t('dirk_lib_discord_guide_toggle', 'How to create a bot')}
           </Text>
           <motion.div animate={{ rotate: guideOpen ? 180 : 0 }} style={{ display: 'flex' }}>
             <ChevronDown size="1.4vh" color="rgba(255,255,255,0.35)" />
@@ -185,8 +193,12 @@ export function DiscordSetup({ resource, canEdit }: { resource: string; canEdit:
                       <Text ff="Akrobat Bold" size="xxs" c={color}>{index + 1}</Text>
                     </Flex>
                     <Flex direction="column" gap="0.1vh" style={{ flex: 1, minWidth: 0 }}>
-                      <Text ff="Akrobat Bold" size="xs" c="rgba(255,255,255,0.85)">{step.title}</Text>
-                      <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.45)">{step.body}</Text>
+                      <Text ff="Akrobat Bold" size="xs" c="rgba(255,255,255,0.85)">
+                        {t(`dirk_lib_discord_guide_${step.key}_title`, step.title)}
+                      </Text>
+                      <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.45)">
+                        {t(`dirk_lib_discord_guide_${step.key}_body`, step.body)}
+                      </Text>
                       {step.link && (
                         <Flex
                           component="a"
@@ -197,7 +209,9 @@ export function DiscordSetup({ resource, canEdit }: { resource: string; canEdit:
                           style={{ textDecoration: 'none', width: 'fit-content' }}
                         >
                           <ExternalLink size="1.1vh" color={color} />
-                          <Text ff="Akrobat Bold" size="xxs" c={color}>{step.link.label}</Text>
+                          <Text ff="Akrobat Bold" size="xxs" c={color}>
+                            {t(`dirk_lib_discord_guide_${step.key}_link`, step.link.label)}
+                          </Text>
                         </Flex>
                       )}
                     </Flex>
@@ -212,30 +226,43 @@ export function DiscordSetup({ resource, canEdit }: { resource: string; canEdit:
   );
 }
 
-/** Carried over verbatim from the old panel's locale strings. */
-const STEPS: { title: string; body: string; link?: { href: string; label: string } }[] = [
+/**
+ * The setup guide, by locale key.
+ *
+ * These were carried over as hardcoded English, which quietly undid the one
+ * thing they had going for them: dirk_lib already ships all fifteen of these
+ * strings translated into every language it supports. The English here is the
+ * fallback, not the source.
+ */
+const STEPS: { key: string; title: string; body: string; link?: { href: string; label: string } }[] = [
   {
+    key: 'step1',
     title: 'Open the Developer Portal',
     body: 'Sign in with the Discord account that owns the server you want the bot to operate in.',
     link: { href: 'https://discord.com/developers/applications', label: 'Discord Developer Portal' },
   },
   {
+    key: 'step2',
     title: 'Create a New Application',
     body: "Click 'New Application', give it a name (this becomes the bot's display name), and confirm.",
   },
   {
+    key: 'step3',
     title: 'Grab the Bot Token',
     body: "Open the 'Bot' tab → click 'Reset Token' → copy the token and paste it into the Bot Token field above. The token is shown only once.",
   },
   {
+    key: 'step4',
     title: 'Enable Server Members Intent',
     body: "Still on the Bot tab, scroll to 'Privileged Gateway Intents' and toggle 'Server Members Intent' on. Required for role / member lookups.",
   },
   {
+    key: 'step5',
     title: 'Invite the Bot',
     body: "OAuth2 → URL Generator → tick 'bot' scope, leave permissions empty (read-only is fine), open the generated URL and add the bot to your server.",
   },
   {
+    key: 'step6',
     title: 'Copy the Guild ID',
     body: "Enable Developer Mode in Discord (User Settings → Advanced), right-click your server icon → 'Copy Server ID' and paste into the Guild ID field above.",
   },

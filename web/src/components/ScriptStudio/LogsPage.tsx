@@ -1,5 +1,6 @@
 import { alpha, Flex, Select, Text, TextInput, useMantineTheme } from '@mantine/core';
-import { QueryClient, QueryClientProvider, useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { QueryClientProvider, useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { studioQueryClient } from './studioQuery';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertTriangle, CheckCircle2, ChevronDown, Copy, History, Inbox, Loader2,
@@ -12,6 +13,8 @@ import {
 import { HistoryPanel } from './HistoryModal';
 import { setValue, useStudio } from './store';
 import { Chip, StudioButton } from './ui';
+import { useChrome } from './studioLocale';
+import { copyToClipboard } from 'dirk-cfx-react';
 
 /**
  * Everything that happened, in one place.
@@ -30,21 +33,6 @@ import { Chip, StudioButton } from './ui';
  * one thing on a server guaranteed to outgrow anything a client can hold.
  */
 
-// Its own client rather than one at the app root: the Logs page is the only
-// surface doing paged fetches, and scoping it here keeps the rest of dirk_lib's
-// NUI untouched. Promote it upward if a second page ever needs it.
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // Log lines are immutable once written, so a page fetched a minute ago is
-      // still correct - no point refetching it when a filter changes back.
-      staleTime: 60_000,
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-});
-
 type Tab = 'events' | 'changes' | 'delivery';
 
 const RANGES: { value: string; label: string; seconds: number | null }[] = [
@@ -56,13 +44,14 @@ const RANGES: { value: string; label: string; seconds: number | null }[] = [
 
 export function LogsPage({ canEdit }: { canEdit: boolean }) {
   return (
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={studioQueryClient}>
       <LogsPageInner canEdit={canEdit} />
     </QueryClientProvider>
   );
 }
 
 function LogsPageInner({ canEdit }: { canEdit: boolean }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const [tab, setTab] = useState<Tab>('events');
@@ -73,9 +62,9 @@ function LogsPageInner({ canEdit }: { canEdit: boolean }) {
         align="center" gap="xs" px="md" py="xs"
         style={{ borderBottom: `0.1vh solid ${alpha(theme.colors.dark[4], 0.4)}`, flexShrink: 0 }}
       >
-        <TabButton icon={ScrollText} label="Events" active={tab === 'events'} onClick={() => setTab('events')} />
-        <TabButton icon={History} label="Config changes" active={tab === 'changes'} onClick={() => setTab('changes')} />
-        <TabButton icon={Send} label="Delivery" active={tab === 'delivery'} onClick={() => setTab('delivery')} />
+        <TabButton icon={ScrollText} label={t('logsPage.events', 'Events')} active={tab === 'events'} onClick={() => setTab('events')} />
+        <TabButton icon={History} label={t('logsPage.config_changes', 'Config changes')} active={tab === 'changes'} onClick={() => setTab('changes')} />
+        <TabButton icon={Send} label={t('logsPage.delivery', 'Delivery')} active={tab === 'delivery'} onClick={() => setTab('delivery')} />
         <Flex flex={1} />
         <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.28)">
           {tab === 'events' && 'Filtered and paged on the server'}
@@ -94,6 +83,7 @@ function LogsPageInner({ canEdit }: { canEdit: boolean }) {
 // ── Events ──────────────────────────────────────────────────────────────────
 
 function EventsTab() {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
 
@@ -176,10 +166,10 @@ function EventsTab() {
         }}
       >
         <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.12em" c="rgba(255,255,255,0.3)" px="0.4vh" pb="0.3vh">
-          Resource
+          {t('logsPage.resource', 'Resource')}
         </Text>
         <FacetRow
-          label="All resources"
+          label={t('logsPage.all_resources', 'All resources')}
           count={facets.data?.total}
           active={resource === null}
           onClick={() => setResource(null)}
@@ -203,18 +193,18 @@ function EventsTab() {
         >
           <LogInput
             value={search} onChange={setSearch} icon={Search} grow
-            placeholder="Search the message"
+            placeholder={t('logsPage.search_the_message', 'Search the message')}
           />
           <LogInput
             value={player} onChange={setPlayer} icon={User} width="26vh"
-            placeholder="Player name or licence"
+            placeholder={t('logsPage.player_name_or_licence', 'Player name or licence')}
           />
           <LogSelect
-            value={event} onChange={setEvent} width="24vh" placeholder="Any event"
+            value={event} onChange={setEvent} width="24vh" placeholder={t('logsPage.any_event', 'Any event')}
             data={eventOptions.map((e) => ({ value: e.name, label: `${e.name} (${e.count})` }))}
           />
           <LogSelect
-            value={level} onChange={(v) => setLevel(v as LogLevel | null)} width="16vh" placeholder="Any level"
+            value={level} onChange={(v) => setLevel(v as LogLevel | null)} width="16vh" placeholder={t('logsPage.any_level', 'Any level')}
             data={[{ value: 'info', label: 'Info' }, { value: 'warn', label: 'Warning' }, { value: 'alert', label: 'Alert' }]}
           />
           <LogSelect
@@ -229,14 +219,14 @@ function EventsTab() {
           className="studio-scroll"
           style={{ overflowY: 'auto', flex: 1, minHeight: 0, opacity: typing ? 0.55 : 1, transition: 'opacity 120ms' }}
         >
-          {logs.isPending && <Waiting label="Fetching" />}
+          {logs.isPending && <Waiting label={t('logsPage.fetching', 'Fetching')} />}
 
           {!logs.isPending && rows.length === 0 && (
             <Flex direction="column" align="center" justify="center" gap="xs" py="xl">
               <Inbox size="3vh" color="rgba(255,255,255,0.18)" />
-              <Text ff="Akrobat Bold" size="sm" c="rgba(255,255,255,0.4)">Nothing matches those filters</Text>
+              <Text ff="Akrobat Bold" size="sm" c="rgba(255,255,255,0.4)">{t('logsPage.nothing_matches_those_filters', 'Nothing matches those filters')}</Text>
               <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.25)">
-                Widen the time range, or clear the resource filter.
+                {t('logsPage.widen_the_time_range_or_clear_the_resour', 'Widen the time range, or clear the resource filter.')}
               </Text>
             </Flex>
           )}
@@ -254,11 +244,11 @@ function EventsTab() {
           ))}
 
           <div ref={sentinel} />
-          {logs.isFetchingNextPage && <Waiting label="Loading older" />}
+          {logs.isFetchingNextPage && <Waiting label={t('logsPage.loading_older', 'Loading older')} />}
 
           {!logs.hasNextPage && rows.length > 0 && (
             <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.22)" ta="center" py="sm">
-              That is everything in this range.
+              {t('logsPage.that_is_everything_in_this_range', 'That is everything in this range.')}
             </Text>
           )}
         </Flex>
@@ -273,7 +263,7 @@ function EventsTab() {
           <Flex align="center" gap="xs">
             {(resource || event || level || player || search) && (
               <StudioButton
-                label="Clear filters"
+                label={t('logsPage.clear_filters', 'Clear filters')}
                 onClick={() => { setResource(null); setEvent(null); setLevel(null); setPlayer(''); setSearch(''); }}
               />
             )}
@@ -306,6 +296,7 @@ function LogRowCard({
   onResource: () => void;
   onEvent: () => void;
 }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const tone = LEVEL_COLOR[row.level];
@@ -384,21 +375,21 @@ function LogRowCard({
 
               {row.player && (
                 <Flex align="center" gap="xs" wrap="wrap">
-                  <Detail label="Player" value={row.player.name} />
-                  <Detail label="Licence" value={row.player.identifier} mono copyable />
-                  {row.player.source != null && <Detail label="Server id" value={String(row.player.source)} mono />}
+                  <Detail label={t('logsPage.player', 'Player')} value={row.player.name} />
+                  <Detail label={t('logsPage.licence', 'Licence')} value={row.player.identifier} mono copyable />
+                  {row.player.source != null && <Detail label={t('logsPage.server_id', 'Server id')} value={String(row.player.source)} mono />}
                 </Flex>
               )}
 
               <Flex align="center" gap="xs" wrap="wrap">
-                <Detail label="When" value={stamp(row.at)} mono />
+                <Detail label={t('logsPage.when', 'When')} value={stamp(row.at)} mono />
                 <Detail label="Id" value={String(row.id)} mono />
               </Flex>
 
               <Flex align="center" gap="xs" pt="0.2vh">
-                <StudioButton label="This player" icon={User} onClick={onPlayer} />
-                <StudioButton label="This resource" onClick={onResource} />
-                <StudioButton label="This event" onClick={onEvent} />
+                <StudioButton label={t('logsPage.this_player', 'This player')} icon={User} onClick={onPlayer} />
+                <StudioButton label={t('logsPage.this_resource', 'This resource')} onClick={onResource} />
+                <StudioButton label={t('logsPage.this_event', 'This event')} onClick={onEvent} />
               </Flex>
             </Flex>
           </motion.div>
@@ -411,6 +402,7 @@ function LogRowCard({
 // ── Config changes ──────────────────────────────────────────────────────────
 
 function ChangesTab({ canEdit }: { canEdit: boolean }) {
+  const t = useChrome();
   const scripts = useStudio((s) => s.scripts);
   const activeResource = useStudio((s) => s.activeResource);
   const [resource, setResource] = useState(activeResource);
@@ -451,6 +443,7 @@ function ChangesTab({ canEdit }: { canEdit: boolean }) {
 // ── Delivery ────────────────────────────────────────────────────────────────
 
 function DeliveryTab({ accent }: { accent: string }) {
+  const t = useChrome();
   const theme = useMantineTheme();
   const { service, local, webhooks } = MOCK_DELIVERY;
 
@@ -460,7 +453,7 @@ function DeliveryTab({ accent }: { accent: string }) {
       className="studio-scroll"
       style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}
     >
-      <DeliveryBlock title="Service" description="Where lines are streamed for long-term search">
+      <DeliveryBlock title={t('logsPage.service', 'Service')} description="Where lines are streamed for long-term search">
         <DeliveryRow
           ok={service.ok}
           title={service.name}
@@ -469,7 +462,7 @@ function DeliveryTab({ accent }: { accent: string }) {
         />
       </DeliveryBlock>
 
-      <DeliveryBlock title="This server" description="What the Events tab reads from">
+      <DeliveryBlock title={t('logsPage.this_server', 'This server')} description="What the Events tab reads from">
         <DeliveryRow
           ok={local.enabled}
           title={local.enabled ? 'Local sink on' : 'Local sink off'}
@@ -477,11 +470,11 @@ function DeliveryTab({ accent }: { accent: string }) {
           right={`pruned ${ago(local.lastPruneAt)}`}
         />
         <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.28)" pt="0.3vh">
-          Rows older than the retention window are deleted in batches overnight, so the table never locks.
+          {t('logsPage.rows_older_than_the_retention_window_are', 'Rows older than the retention window are deleted in batches overnight, so the table never locks.')}
         </Text>
       </DeliveryBlock>
 
-      <DeliveryBlock title="Webhooks" description="Discord channels, per script and per situation">
+      <DeliveryBlock title={t('logsPage.webhooks', 'Webhooks')} description="Discord channels, per script and per situation">
         {webhooks.map((hook) => (
           <DeliveryRow
             key={hook.scope}
@@ -623,7 +616,7 @@ function Detail({
   const [copied, setCopied] = useState(false);
 
   const copy = () => {
-    navigator.clipboard?.writeText(value);
+    copyToClipboard(value);
     setCopied(true);
     setTimeout(() => setCopied(false), 1200);
   };
