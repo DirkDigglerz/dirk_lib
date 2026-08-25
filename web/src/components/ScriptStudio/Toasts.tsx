@@ -62,11 +62,16 @@ export function Toasts() {
       direction="column"
       gap="0.6vh"
       style={{
-        position: 'absolute',
-        // clears the save bar, which owns the bottom of the panel
+        // FIXED and above everything.
+        //
+        // Sitting inside the panel at z-index 400 put these underneath every
+        // modal the panel opens - which is exactly when something is most
+        // likely to need saying, since a modal is where the actions are.
+        // Modals here run to 10300, so this clears them.
+        position: 'fixed',
         bottom: '7.5vh',
         right: '1.6vh',
-        zIndex: 400,
+        zIndex: 10500,
         pointerEvents: 'none',
       }}
     >

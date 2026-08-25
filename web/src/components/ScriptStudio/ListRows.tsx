@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useStudio } from './store';
 import { RowModal } from './RowModal';
 import { useItems } from 'dirk-cfx-react';
-import { ItemArt, StudioButton } from './ui';
+import { ItemArt, singular, StudioButton } from './ui';
 import type { SettingColumn, SettingEntry } from './types';
 import { useChrome } from './studioLocale';
 
@@ -39,6 +39,8 @@ export function ListRows({
   const PAGE = 200;
   const [page, setPage] = useState(0);
   const [editing, setEditing] = useState<number | null>(null);
+  /** a row being composed, not yet in the list */
+  const [creating, setCreating] = useState<Row | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
   const [query, setQuery] = useState('');
 
@@ -88,10 +90,15 @@ export function ListRows({
 
   const rowTitle = (row: Row, index: number) => String(row[labelKey] ?? `Entry ${index + 1}`);
 
+  /**
+   * A new row exists only once you save it.
+   *
+   * Adding used to append the blank template immediately and then open the
+   * editor, so backing out left an empty row in the list - and in the staged
+   * changes - that nobody asked for. It is held here until Save.
+   */
   const addRow = () => {
-    const template = JSON.parse(JSON.stringify(entry.rowTemplate ?? {}));
-    onChange([...rows, template]);
-    setEditing(rows.length);
+    setCreating(JSON.parse(JSON.stringify(entry.rowTemplate ?? {})));
   };
 
   const deleteRow = (index: number) => {
@@ -104,7 +111,14 @@ export function ListRows({
   };
 
   return (
-    <Flex direction="column" gap="xxs" style={{ width: '100%' }}>
+    /* Fills a flexible parent, flows in an inline one.
+     *
+     * In a workspace the list is handed a definite height, and everything
+     * after the rows - paging, and the Add button - was pushed past the
+     * bottom edge. `flex: 1` does nothing in the inline case (there is no
+     * free space to take), so one layout serves both without a fixed height
+     * anywhere. */
+    <Flex direction="column" gap="xxs" style={{ width: '100%', flex: 1, minHeight: 0 }}>
       {rows.length > 6 && (
         <TextInput
           value={query}
@@ -142,9 +156,21 @@ export function ListRows({
             section: { width: '3.6vh' },
           }}
           mb="xxs"
+          style={{ flexShrink: 0 }}
         />
       )}
 
+      {/* Sized by its rows, scrolling only when they outgrow the space.
+        *
+        * `flex: 1` made this take every spare pixel, so eight stores in a tall
+        * workspace left a dead region inside the list - and the Add button
+        * beneath it looked marooned. `0 1 auto` keeps the rows against the
+        * search box and lets the button sit directly under the last row. */}
+      <Flex
+        direction="column" gap="xxs"
+        className="studio-scroll"
+        style={{ flex: '0 1 auto', minHeight: 0, overflowY: 'auto' }}
+      >
       {paged.map((index) => {
         const row = rows[index];
         return (
@@ -215,8 +241,10 @@ export function ListRows({
         </Flex>
       )}
 
+      </Flex>
+
       {pageCount > 1 && (
-        <Flex align="center" justify="space-between" pt="xxs">
+        <Flex align="center" justify="space-between" pt="xxs" style={{ flexShrink: 0 }}>
           <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.35)">
             {page * PAGE + 1}–{Math.min((page + 1) * PAGE, visible.length)} of {visible.length}
           </Text>
@@ -227,9 +255,27 @@ export function ListRows({
         </Flex>
       )}
 
-      <Flex pt="xxs">
+      <Flex pt="xxs" style={{ flexShrink: 0 }}>
         <StudioButton label={`Add ${singular(entry.label)}`} icon={Plus} onClick={addRow} disabled={disabled} grow />
       </Flex>
+
+      <AnimatePresence>
+        {creating && (
+          <RowModal
+            entry={entry}
+            resource={resource}
+            row={creating}
+            title={t('listRows.new_entry', 'New {}').replace('{}', singular(entry.label).toLowerCase())}
+            disabled={disabled}
+            onSave={(next) => {
+              onChange([...rows, next]);
+              setCreating(null);
+            }}
+            onDelete={() => setCreating(null)}
+            onClose={() => setCreating(null)}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {editing !== null && rows[editing] && (
@@ -303,11 +349,33 @@ function formatCell(value: unknown, column: SettingColumn): string {
     const match = column.options?.find((o) => o.value === value);
     return match?.label ?? String(value);
   }
+  /**
+   * Anything that is not a scalar gets COUNTED, not stringified.
+   *
+   * A store row was printing "Categories [object Object],[object Object]..."
+   * across most of its width - `String(value)` on an array of objects, which
+   * is never information. What the summary can honestly say about a nested
+   * table is how many rows are in it.
+   */
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '-';
+    // A pair of numbers is a range and reads perfectly well as one.
+    if (value.length === 2 && value.every((v) => typeof v === 'number')) {
+      return `${value[0]}–${value[1]}`;
+    }
+    if (value.every((v) => typeof v !== 'object' || v === null)) return value.join(', ');
+    return `${value.length}`;
+  }
+
+  if (typeof value === 'object') {
+    const keys = Object.keys(value as object);
+    if (keys.length === 0) return '-';
+    // Named things say their name; the rest just say they are set.
+    const named = (value as Record<string, unknown>).label
+      ?? (value as Record<string, unknown>).name;
+    return typeof named === 'string' ? named : '…';
+  }
+
   return column.suffix ? `${value}${column.suffix}` : String(value);
 }
 
-function singular(label: string): string {
-  if (label.endsWith('ies')) return `${label.slice(0, -3)}y`;
-  if (label.endsWith('s')) return label.slice(0, -1);
-  return label;
-}

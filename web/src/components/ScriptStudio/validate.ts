@@ -1,5 +1,6 @@
 import { describe, test, type Condition, type Lookup, type ValidationRule } from './conditions';
 import { effectiveValue, useStudio } from './store';
+import { fieldGatedOff } from './ui';
 import { activeLanguage, translate } from './studioLocale';
 import type { SettingColumn, SettingEntry } from './types';
 
@@ -78,25 +79,70 @@ function collectProblems(resource: string, override?: Map<string, unknown>): Pro
 
     // rows inside a list carry their own constraints
     if (Array.isArray(value) && entry.columns?.length) {
-      value.forEach((row, index) => {
-        if (!row || typeof row !== 'object') return;
-        const record = row as Record<string, unknown>;
-        const rowLookup: Lookup = (path) => (path.startsWith('self.')
-          ? record[path.slice(5)]
-          : lookup(path));
-        for (const column of entry.columns!) {
-          for (const message of checkValue(column, record[column.key], rowLookup)) {
-            problems.push({
-              path: `${entry.path}[${index}].${column.key}`,
-              label: `${entry.label} #${index + 1} — ${column.label}`,
-              group: entry.group,
-              message: say(message),
-            });
-          }
-        }
-      });
+      problems.push(...checkRows(
+        value, entry.columns, entry.path, entry.label, entry.group, lookup, say,
+      ));
     }
   }
+
+  return problems;
+}
+
+/**
+ * Every constraint the rows of one list carry, at any depth.
+ *
+ * Recursive because a list's rows can hold lists of their own, and only the
+ * first level was ever checked - a store's stock is a table inside a table, so
+ * `x-validateRows: { "stock.variance": ... }` was declared, converted, hung on
+ * the right column, and then never run against anything.
+ */
+function checkRows(
+  rows: unknown[],
+  columns: SettingColumn[],
+  path: string,
+  label: string,
+  group: string,
+  outer: Lookup,
+  say: (message: string) => string,
+): Problem[] {
+  const problems: Problem[] = [];
+
+  rows.forEach((row, index) => {
+    if (!row || typeof row !== 'object') return;
+    const record = row as Record<string, unknown>;
+
+    // `self.` is THIS row; anything else falls through to the config around it.
+    const rowLookup: Lookup = (lookupPath) => (lookupPath.startsWith('self.')
+      ? record[lookupPath.slice(5)]
+      : outer(lookupPath));
+
+    for (const column of columns) {
+      // A field its own row has switched off is not asked to be valid - the
+      // same rule entries already followed, and without it a zone that
+      // requires no permit was still being asked for a permit price.
+      if (fieldGatedOff(column, record)) continue;
+
+      const cell = record[column.key];
+
+      for (const message of checkValue(column, cell, rowLookup)) {
+        problems.push({
+          path: `${path}[${index}].${column.key}`,
+          label: `${label} #${index + 1} — ${column.label}`,
+          group,
+          message: say(message),
+        });
+      }
+
+      if (Array.isArray(cell) && column.columns?.length) {
+        problems.push(...checkRows(
+          cell, column.columns,
+          `${path}[${index}].${column.key}`,
+          `${label} #${index + 1} — ${column.label}`,
+          group, rowLookup, say,
+        ));
+      }
+    }
+  });
 
   return problems;
 }

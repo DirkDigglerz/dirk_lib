@@ -7,7 +7,7 @@ import {
 import { useMemo, useState } from 'react';
 import { FieldRow } from './FieldRow';
 import { PickerDrawer } from './PickerDrawer';
-import { ItemArt, StudioButton } from './ui';
+import { fieldGatedOff, ItemArt, StudioButton } from './ui';
 import type { SettingColumn, SettingEntry } from './types';
 import { useChrome } from './studioLocale';
 
@@ -88,8 +88,15 @@ export function RowModal({
   // schema happened to declare it, often at the very bottom, read as an
   // afterthought. Only the position moves; the field is the same one.
   const current = useMemo(() => {
-    if (!currentTab || !entry.rowItemKey) return currentTab;
-    const key = entry.rowItemKey;
+    // The item if the row IS one, otherwise whatever names it. A store has no
+    // item, and its name arriving somewhere in the middle of the form reads
+    // as an afterthought - it is the thing every other field describes.
+    // Unless the schema said what comes first. Hoisting the name is a guess
+    // about which field matters most, and a guess should lose to a statement:
+    // a store's `id` is the thing every other script refers to it by, so
+    // that schema asks for id first and gets it.
+    const key = entry.rowOrdered ? undefined : (entry.rowItemKey ?? entry.rowLabelKey);
+    if (!currentTab || !key) return currentTab;
     if (!currentTab.columns.some((c) => c.key === key)) return currentTab;
     return {
       ...currentTab,
@@ -98,7 +105,7 @@ export function RowModal({
         ...currentTab.columns.filter((c) => c.key !== key),
       ],
     };
-  }, [currentTab, entry.rowItemKey]);
+  }, [currentTab, entry.rowItemKey, entry.rowLabelKey]);
 
   const itemName = entry.rowItemKey ? String(draft[entry.rowItemKey] ?? '') : '';
 
@@ -115,14 +122,7 @@ export function RowModal({
    * by it - the same rule the settings list follows, or a switch would grey
    * itself out and leave no way back.
    */
-  const gatedOff = (column: SettingColumn) => {
-    const rule = column.enabledWhen;
-    if (!rule) return false;
-    const key = rule.path.startsWith('self.') ? rule.path.slice(5) : rule.path;
-    if (key === column.key) return false;
-    const other = draft[key];
-    return rule.equals === undefined ? !other : other !== rule.equals;
-  };
+  const gatedOff = (column: SettingColumn) => fieldGatedOff(column, draft);
 
   return (
     <>
@@ -193,6 +193,7 @@ export function RowModal({
                 key={column.key}
                 column={column}
                 resource={resource}
+                row={draft}
                 path={entry.path}
                 // `?? column.default`: a row that predates a field has no key
                 // for it, and blank is not what the server will use
@@ -228,6 +229,7 @@ export function RowModal({
           <PickerDrawer
             type={picker.column.type}
             label={picker.column.label}
+            iconSet={picker.column.iconSet}
             value={picker.value}
             disabled={disabled}
             onApply={(v) => picker.apply(v)}

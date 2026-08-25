@@ -12,7 +12,7 @@
 //      guessed from JSON Schema type + key naming. That guessing is exactly
 //      what an explicit `x-control` annotation replaces.
 
-import type { ControlType, EnabledWhen, RowTab, SettingColumn, SettingEntry, SettingGroup, StudioScript } from './types';
+import type { ScriptPage, ControlType, EnabledWhen, RowTab, SettingColumn, SettingEntry, SettingGroup, StudioScript } from './types';
 import type { ValidationRule } from './conditions';
 
 type JsonSchema = Record<string, any>;
@@ -82,11 +82,31 @@ function looksLikeCoords(value: unknown, node: JsonSchema): boolean {
   return false;
 }
 
+/**
+ * Every field the rows of a list actually use, in the order first seen.
+ *
+ * Reading the shape off the FIRST row assumes every row has the same fields,
+ * and real config does not work that way: of fishing's stock lines, forty
+ * carry a `variance` and four carry a `ref`, and neither happens to be on the
+ * first one. Those columns did not exist, so those values were invisible in
+ * the panel, uneditable, and any rule written about them silently never ran.
+ *
+ * A field one row uses is a field of that list. Union, not sample.
+ */
+function keysAcross(rows: unknown[]): string[] {
+  const seen = new Set<string>();
+  for (const row of rows) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) continue;
+    for (const key of Object.keys(row as Record<string, unknown>)) seen.add(key);
+  }
+  return [...seen];
+}
+
 /** Every control the panel can render, for validating `x-control`. */
 const CONTROL_TYPES = new Set<string>([
   'boolean', 'number', 'integer', 'percent', 'string', 'secret', 'weekdays',
-  'text', 'enum', 'enumList', 'pickList', 'color', 'blipColor', 'blipSprite',
-  'blipDisplay', 'ped', 'vehicle', 'coords', 'positions', 'time', 'keybind',
+  'text', 'enum', 'enumList', 'pickList', 'pickOne', 'color', 'blipColor', 'blipSprite',
+  'blipDisplay', 'ped', 'peds', 'vehicle', 'coords', 'positions', 'time', 'keybind',
   'control', 'controls', 'item', 'list', 'zones', 'palette', 'slider', 'range',
   'chance', 'multiplier', 'difficulty', 'forgiveness', 'rarity', 'balance', 'progression',
   'group',
@@ -293,27 +313,134 @@ function columnsFor(node: JsonSchema, rows: unknown[]): { columns: SettingColumn
   // arrays declare no `items` schema at all - their shape comes from the
   // default rows - so there is no per-field node to put `x-control` on. Keyed
   // by column, dotted to reach inside a nested object: `"blip.color"`.
-  const rowControls = (node?.['x-rowControls'] ?? {}) as Record<string, string>;
-  const keys = itemProps ? Object.keys(itemProps) : Object.keys(sample);
+  /**
+   * A control name, or a control WITH its options.
+   *
+   * Several of these arrays ship no `items` schema, so there is no per-field
+   * node to hang `enum` or `x-optionsFrom` on - and adding a partial one would
+   * silently drop every column it did not list, because the keys come from
+   * `items.properties` the moment that exists. The long form says the same
+   * things here instead:
+   *
+   *   "type":           { "control": "enum", "options": ["equipment", ...] }
+   *   "stock.category": { "control": "pickOne",
+   *                       "optionsFrom": { "path": "self.categories" } }
+   */
+  type RowControl = string | {
+    control: string;
+    options?: (string | { value: string; label?: string })[];
+    optionsFrom?: { path: string; key?: string; labelKey?: string };
+    anyLabel?: string;
+    iconSet?: 'lucide' | 'fontawesome';
+    boundsFrom?: { path: string };
+    /**
+     * Greyed out unless a sibling field says otherwise.
+     *
+     * The same statement `x-enabledWhen` makes, written where there is room
+     * for it: several of these arrays ship no `items` schema at all, so a zone
+     * has no node for its permit price to carry the rule on - and the price
+     * and interval then sat there fully editable on a zone that requires no
+     * permit, saying nothing about why they did nothing.
+     */
+    enabledWhen?: { path: string; equals?: unknown };
+  };
+  const rowControls = (node?.['x-rowControls'] ?? {}) as Record<string, RowControl>;
+
+  const controlName = (entry: RowControl) => (typeof entry === 'string' ? entry : entry.control);
+
+  /** Everything the long form adds, written onto a built column. */
+  const applyRowControl = (target: SettingColumn, entry: RowControl) => {
+    const name = controlName(entry);
+    if (!CONTROL_TYPES.has(name)) return;
+    target.type = name as SettingColumn['type'];
+    if (typeof entry === 'string') return;
+
+    if (entry.options) {
+      target.options = entry.options.map((option) => (typeof option === 'string'
+        ? { value: option, label: humanise(option) }
+        : { value: option.value, label: option.label ?? humanise(option.value) }));
+    }
+    if (entry.optionsFrom) {
+      target.optionsFrom = {
+        path: entry.optionsFrom.path,
+        key: entry.optionsFrom.key ?? 'name',
+        labelKey: entry.optionsFrom.labelKey,
+      };
+    }
+    if (entry.anyLabel) target.anyLabel = entry.anyLabel;
+    if (entry.iconSet) target.iconSet = entry.iconSet;
+    if (entry.enabledWhen?.path) {
+      target.enabledWhen = {
+        path: entry.enabledWhen.path,
+        equals: entry.enabledWhen.equals === undefined ? true : entry.enabledWhen.equals,
+      };
+    }
+    if (entry.boundsFrom?.path) target.boundsFrom = { path: entry.boundsFrom.path };
+  };
+  /**
+   * The order fields appear in the row editor.
+   *
+   * Without this the order is whatever order the keys happen to sit in - the
+   * `items` schema if there is one, otherwise the first default row - which is
+   * an accident of how the data was written, not a decision about what you
+   * read first. Listed keys lead, in this order; everything else keeps its
+   * existing position behind them.
+   *
+   * Same idea as `x-sections.paths` does for a page.
+   */
+  const declaredOrder: string[] = Array.isArray(node?.['x-rowOrder']) ? node['x-rowOrder'] : [];
+
+  // Live rows first, then the shipped defaults - an emptied list still knows
+  // its shape, and a list someone has added a field to still shows it.
+  const naturalKeys = itemProps
+    ? Object.keys(itemProps)
+    : keysAcross(rows.length > 0 ? rows : defaults);
+  const keys = declaredOrder.length > 0
+    ? [
+      ...declaredOrder.filter((key) => naturalKeys.includes(key)),
+      ...naturalKeys.filter((key) => !declaredOrder.includes(key)),
+    ]
+    : naturalKeys;
   const columns: SettingColumn[] = [];
   const template: Record<string, unknown> = {};
 
+  const shapeSource = rows.length > 0 ? rows : defaults;
+
   for (const key of keys) {
     const child: JsonSchema = itemProps?.[key] ?? {};
-    const value = sample[key];
+    // The sample row, or whichever row actually HAS this field.
+    //
+    // Four of fishing's stores carry a numeric `lvlRequired` and the first one
+    // does not, so the column was built against `undefined` and came out as a
+    // text box for what is a number. A field is described by a row that uses
+    // it, not by a row that happens to be first.
+    const value = sample[key] !== undefined
+      ? sample[key]
+      : (shapeSource.find((row) => row && typeof row === 'object'
+        && (row as Record<string, unknown>)[key] !== undefined) as
+          Record<string, unknown> | undefined)?.[key];
     const isItemKey = /name$|^item$/.test(key);
     const declaredItem = installList && key === arrayKey;
     const column = buildColumn(
       key,
       // An x-rowControls entry is the same statement `x-control` makes, just
       // written where there is room for it.
-      rowControls[key] ? { ...child, 'x-control': rowControls[key] } : child,
+      rowControls[key] ? { ...child, 'x-control': controlName(rowControls[key]!) } : child,
       value,
       declaredItem || (itemRow && isItemKey),
       declaredItem,
+      shapeSource.map(
+        (row) => (row && typeof row === 'object' ? (row as Record<string, unknown>)[key] : undefined),
+      ),
     );
+    const iconSet = child?.['x-iconSet'];
+    if (iconSet === 'fontawesome' || iconSet === 'lucide') column.iconSet = iconSet;
+
+    const bounds = child?.['x-boundsFrom'];
+    if (bounds?.path) column.boundsFrom = { path: String(bounds.path) };
     if (requiredKeys.has(key)) column.required = true;
     if (rowRules[key]) column.validate = [...(column.validate ?? []), ...rowRules[key]!];
+    if (rowControls[key]) applyRowControl(column, rowControls[key]!);
     columns.push(column);
     // NOT `?? value`. `sample` is the first existing row and it is here to
     // infer what a column IS when the schema does not say - it is not what a
@@ -329,11 +456,11 @@ function columnsFor(node: JsonSchema, rows: unknown[]): { columns: SettingColumn
   }
 
   // dotted keys, resolved against the columns just built
-  for (const [dotted, control] of Object.entries(rowControls)) {
+  for (const [dotted, entry] of Object.entries(rowControls)) {
     if (!dotted.includes('.')) continue;
     const [parent, child] = dotted.split('.');
     const target = columns.find((c) => c.key === parent)?.columns?.find((c) => c.key === child);
-    if (target && CONTROL_TYPES.has(control)) target.type = control as SettingColumn['type'];
+    if (target) applyRowControl(target, entry);
   }
 
   for (const [key, rules] of Object.entries(rowRules)) {
@@ -362,13 +489,23 @@ function buildColumn(
   value: unknown,
   isItem: boolean,
   declaredItem = false,
+  /**
+   * This field's value on EVERY row, not just the sample one.
+   *
+   * A nested table is described by the rows it holds, and the sample row holds
+   * only its own: the first store's stock lines carry no `variance`, forty
+   * lines in other stores do, and reading the shape off the first store alone
+   * meant that column did not exist anywhere. The whole list describes the
+   * whole list.
+   */
+  siblings?: unknown[],
 ): SettingColumn {
   // Rows written before a field existed simply do not carry it, and the editor
   // showed those blank - fish[].minigameType is declared `default: "cut"` and
   // only the eight crustaceans store "crush", so every other species opened
   // with an empty gutting minigame. Carrying the schema default through means
   // the row editor can show what the server will actually use.
-  const built = buildColumnInner(key, child, value, isItem);
+  const built = buildColumnInner(key, child, value, isItem, siblings);
   const out: SettingColumn = child.default !== undefined ? { ...built, default: child.default } : built;
   // A field inside a row editor had nowhere to say what it means. Inline help
   // works in the settings list because every row is one line; in a modal it
@@ -391,7 +528,13 @@ function buildColumn(
   return out;
 }
 
-function buildColumnInner(key: string, child: JsonSchema, value: unknown, isItem: boolean): SettingColumn {
+function buildColumnInner(
+  key: string,
+  child: JsonSchema,
+  value: unknown,
+  isItem: boolean,
+  siblings?: unknown[],
+): SettingColumn {
   const label = humanise(key);
   const min = child.minimum;
   const max = child.maximum;
@@ -443,12 +586,22 @@ function buildColumnInner(key: string, child: JsonSchema, value: unknown, isItem
     }
 
     if (sample || itemProps) {
-      const nestedKeys = itemProps ? Object.keys(itemProps) : Object.keys(sample ?? {});
+      // Every row of this table, from every row of the table it sits in.
+      const everyRow = siblings
+        ? [...rows, ...siblings.flatMap((cell) => (Array.isArray(cell) ? cell : []))]
+        : rows;
+      const nestedKeys = itemProps ? Object.keys(itemProps) : keysAcross(everyRow);
       const nested: SettingColumn[] = [];
       const nestedTemplate: Record<string, unknown> = {};
       for (const nestedKey of nestedKeys) {
         const nestedChild: JsonSchema = itemProps?.[nestedKey] ?? {};
-        const nestedValue = sample?.[nestedKey];
+        // ...and the sample VALUE for a key the first row lacks comes from
+        // whichever row does have it, or the column has nothing to judge by.
+        const nestedValue = sample?.[nestedKey] !== undefined
+          ? sample[nestedKey]
+          : (everyRow.find((r) => r && typeof r === 'object'
+            && (r as Record<string, unknown>)[nestedKey] !== undefined) as
+              Record<string, unknown> | undefined)?.[nestedKey];
         const built = buildColumn(nestedKey, nestedChild, nestedValue, /name$|^item$/.test(nestedKey));
         nested.push(built);
         nestedTemplate[nestedKey] = nestedChild.default ?? defaultForControl(built.type);
@@ -559,6 +712,15 @@ function buildColumnInner(key: string, child: JsonSchema, value: unknown, isItem
           buildColumn(nestedKey, props?.[nestedKey] ?? {}, sample[nestedKey], false)),
       };
     }
+
+    // An object with no fixed fields is a MAP - its keys are data. A zone's
+    // per-species overrides are keyed by fish name, so listing the species
+    // that happen to be in the shipped zones would say those are the only ones
+    // a zone may modify. Declared `additionalProperties`, or simply empty
+    // right now: either way it takes key/value pairs, and falling through to
+    // the default text box - which is what an emptied one used to do - offers
+    // a box that cannot hold what the field is.
+    return { key, label, type: 'keyvalue' };
   }
 
   const control = inferControl(key, child, value, isItem);
@@ -611,9 +773,8 @@ function defaultForControl(control: ControlType): unknown {
     case 'mantineColor': return 'dirk';
     case 'shade': return 5;
     case 'groups': return [];
-    case 'tags': case 'rows': return [];
+    case 'tags': case 'rows': case 'peds': return [];
     case 'object': return {};
-    case 'slider': return 0;
     default: return '';
   }
 }
@@ -776,6 +937,23 @@ export function schemaToStudio(schema: JsonSchema, meta: StudioMeta): StudioScri
   // supplied, which keeps the door open for a host override, but nothing needs
   // to supply it - a script that ships its own layout just works.
   const sections = meta.sections ?? (schema?.['x-sections'] as StudioMeta['sections']);
+  /**
+   * Pages this script supplies. Declared, never inferred - the panel has no
+   * way to guess that a resource ships a screen, and a missing file should be
+   * a page that says so rather than a rail entry that was never offered.
+   */
+  const pages: ScriptPage[] = Array.isArray(schema['x-pages'])
+    ? (schema['x-pages'] as Record<string, string>[])
+      .filter((page) => page?.id && page?.component)
+      .map((page) => ({
+        id: String(page.id),
+        label: String(page.label ?? humanise(String(page.id))),
+        icon: String(page.icon ?? 'square-dashed'),
+        component: String(page.component),
+        description: page.description ? String(page.description) : undefined,
+      }))
+    : [];
+
   const rowTabs = meta.rowTabs ?? collectRowTabs(topLevel);
   // `x-mapPaths` takes either a bare path or `{ path, color, shape }`. The
   // colour matters: ZoneMap used to pick one by matching the path against
@@ -891,13 +1069,68 @@ export function schemaToStudio(schema: JsonSchema, meta: StudioMeta): StudioScri
   // declared ones lead and anything unclaimed keeps its schema position.
   if (sections?.length) {
 
+    /**
+     * Where each setting sits INSIDE its section.
+     *
+     * A section lists its paths in the order it wants them read - a master
+     * switch first, then what it governs - but entries are built by walking
+     * the schema, so they came out in property order regardless. That is why
+     * "Disable Permit System" sat at the bottom of the section it controls.
+     *
+     * Only settings a section actually names are reordered; anything matched
+     * by a prefix keeps its schema order after them, because a prefix says
+     * nothing about the order of what is under it.
+     */
+    const rank = new Map<string, number>();
+
     for (const entry of entries) {
       if (entry.group === MANAGED_ELSEWHERE) continue;
       const section = sections.find((s) => matches(entry.path, s.paths));
       if (!section) continue;
       entry.group = section.id;
+
+      const named = section.paths.indexOf(entry.path);
+      if (named >= 0) rank.set(entry.path, named);
+
       // a sub-block label only helps when it is not just restating the section
       if (entry.subgroup && entry.subgroup.label === section.label) entry.subgroup = undefined;
+    }
+
+    if (rank.size > 0) {
+      /**
+       * Reordered WITHIN each group, in place.
+       *
+       * Sorting the whole array with a comparator that returns 0 for entries
+       * in different groups is not a total order - the result is whatever the
+       * engine felt like, which is why the switch stayed at the bottom. This
+       * rewrites each group's slots with that group's members in their
+       * declared order, leaving every other position untouched.
+       */
+      const slots = new Map<string, number[]>();
+      entries.forEach((entry, index) => {
+        const list = slots.get(entry.group);
+        if (list) list.push(index);
+        else slots.set(entry.group, [index]);
+      });
+
+      for (const indices of slots.values()) {
+        const members = indices.map((index) => entries[index]!);
+        const ordered = members
+          .map((entry, position) => ({ entry, position }))
+          .sort((a, b) => {
+            const ra = rank.get(a.entry.path);
+            const rb = rank.get(b.entry.path);
+            // Named settings lead, in the order the section named them;
+            // everything else keeps the order the schema gave it.
+            if (ra !== undefined && rb !== undefined) return ra - rb;
+            if (ra !== undefined) return -1;
+            if (rb !== undefined) return 1;
+            return a.position - b.position;
+          })
+          .map((item) => item.entry);
+
+        indices.forEach((slot, position) => { entries[slot] = ordered[position]!; });
+      }
     }
 
     for (const section of sections) {
@@ -934,6 +1167,7 @@ export function schemaToStudio(schema: JsonSchema, meta: StudioMeta): StudioScri
     icon: meta.icon,
     version: meta.version,
     shared: meta.shared,
+    pages: pages.length > 0 ? pages : undefined,
     groups: orderGroups(
       groups.filter((g) => g.id !== MANAGED_ELSEWHERE && entries.some((e) => e.group === g.id)),
       entries,
@@ -998,6 +1232,17 @@ function walkObject(
       installItem: child?.['x-installItem'] ? true : undefined,
       // A NUI callback that says whether the typed value actually works.
       validateWith: child?.['x-validateWith'],
+      // Which icon set the value belongs to, when it is an icon.
+      iconSet: child?.['x-iconSet'],
+      // Which band of the Bridges page this belongs in, when it is a bridge.
+      bridgeGroup: child?.['x-bridgeGroup'],
+      // A button beside the field, for something that has an effect.
+      action: child?.['x-action']?.callback ? {
+        label: String(child['x-action'].label ?? 'Run'),
+        callback: String(child['x-action'].callback),
+        icon: child['x-action'].icon ? String(child['x-action'].icon) : undefined,
+        sendSection: child['x-action'].sendSection === true,
+      } : undefined,
       component: child?.['x-component'],
       componentFull: child?.['x-componentFull'] === true,
     });
@@ -1043,6 +1288,7 @@ function buildListEntry(
       component: node['x-component'],
       componentFull: node['x-componentFull'] === true,
       rowLabelKey: rowLabelKey(custom.columns, node?.['x-arrayKey'], node?.['x-itemTitle']),
+      rowOrdered: Array.isArray(node?.['x-rowOrder']),
       rowItemKey: rowItemKey(custom.columns),
       rowTabs: rowTabs?.[path],
       columns: custom.columns,
@@ -1213,6 +1459,7 @@ function buildListEntry(
     group,
     subgroup,
     rowLabelKey: rowLabelKey(columns, node?.['x-arrayKey'], node?.['x-itemTitle']),
+    rowOrdered: Array.isArray(node?.['x-rowOrder']),
     rowItemKey: rowItemKey(columns),
     rowTabs: rowTabs?.[path],
     columns,

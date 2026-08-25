@@ -131,9 +131,10 @@
             "es_extended",
             "qbx_core",
             "qb-core",
-            "nd-framework"
+            "ND_Core"
           ],
-          "description": "Server framework dirk_lib reads player data from."
+          "description": "Server framework dirk_lib reads player data from.",
+          "x-bridgeGroup": "bridge"
         },
         "inventory": {
           "type": "string",
@@ -142,22 +143,26 @@
             "auto",
             "dirk_inventory",
             "one_inventory",
-            "ox_inventory",
-            "qb-inventory",
             "qs-inventory",
             "codem-inventory",
             "tgiann-inventory",
+            "devix-inventory",
+            "bp_inventory",
             "mf-inventory",
             "core_inventory",
-            "ak47_inventory"
+            "ak47_inventory",
+            "ox_inventory",
+            "qb-inventory"
           ],
-          "description": "Inventory system used for item lookups, give/remove, and image paths."
+          "description": "Inventory system used for item lookups, give/remove, and image paths.",
+          "x-bridgeGroup": "bridge"
         },
         "itemImgPath": {
           "type": "string",
           "default": "auto",
           "x-renamedFrom": "branding.itemImgPath",
-          "description": "Inventory image path used by dirk_lib UIs. 'auto' resolves from the detected inventory; override with a full nui://… or CDN URL."
+          "description": "Inventory image path used by dirk_lib UIs. 'auto' resolves from the detected inventory; override with a full nui://… or CDN URL.",
+          "x-bridgeGroup": "bridge"
         },
         "target": {
           "type": "string",
@@ -169,7 +174,8 @@
             "q-target",
             "bt-target"
           ],
-          "description": "Targeting system for entity interactions."
+          "description": "Targeting system for entity interactions.",
+          "x-bridgeGroup": "bridge"
         },
         "interact": {
           "type": "string",
@@ -180,7 +186,8 @@
             "sleepless_interact",
             "interact"
           ],
-          "description": "Interact-prompt system used as the alternative to target-based interactions."
+          "description": "Interact-prompt system used as the alternative to target-based interactions.",
+          "x-bridgeGroup": "bridge"
         },
         "time": {
           "type": "string",
@@ -194,7 +201,8 @@
             "vSync",
             "wasabi_wheather"
           ],
-          "description": "Weather/time sync resource."
+          "description": "Weather/time sync resource.",
+          "x-bridgeGroup": "bridge"
         },
         "keys": {
           "type": "string",
@@ -213,7 +221,8 @@
             "wasabi_carlock",
             "ludaro-keys"
           ],
-          "description": "Vehicle keys / lockpicking system."
+          "description": "Vehicle keys / lockpicking system.",
+          "x-bridgeGroup": "bridge"
         },
         "fuel": {
           "type": "string",
@@ -228,9 +237,11 @@
             "ti_fuel",
             "x-fuel",
             "wasabi_fuel",
-            "okokGasStation"
+            "okokGasStation",
+            "qs-fuelstations"
           ],
-          "description": "Vehicle fuel system."
+          "description": "Vehicle fuel system.",
+          "x-bridgeGroup": "bridge"
         },
         "phone": {
           "type": "string",
@@ -243,7 +254,8 @@
             "high-phone",
             "npwd"
           ],
-          "description": "Phone resource (used for messages, mail, etc.)."
+          "description": "Phone resource (used for messages, mail, etc.).",
+          "x-bridgeGroup": "bridge"
         },
         "garage": {
           "type": "string",
@@ -260,7 +272,8 @@
             "renewed-garage",
             "qb-garages"
           ],
-          "description": "Garage / vehicle storage system (used by lib.garage.addVehicle)."
+          "description": "Garage / vehicle storage system (used by lib.garage.addVehicle).",
+          "x-bridgeGroup": "bridge"
         },
         "clothing": {
           "type": "string",
@@ -275,7 +288,8 @@
             "dirk_charCreator",
             "tgiann-clothing"
           ],
-          "description": "Clothing / character appearance system."
+          "description": "Clothing / character appearance system.",
+          "x-bridgeGroup": "bridge"
         },
         "ambulance": {
           "type": "string",
@@ -286,7 +300,8 @@
             "wasabi_ambulance",
             "core_ambulance"
           ],
-          "description": "Ambulance / death + revive system."
+          "description": "Ambulance / death + revive system.",
+          "x-bridgeGroup": "bridge"
         },
         "prison": {
           "type": "string",
@@ -297,7 +312,8 @@
             "rcore_prison",
             "wasabi_jail"
           ],
-          "description": "Prison / jail system."
+          "description": "Prison / jail system.",
+          "x-bridgeGroup": "bridge"
         },
         "dispatch": {
           "type": "string",
@@ -311,7 +327,8 @@
             "ps-dispatch",
             "tk_dispatch"
           ],
-          "description": "Dispatch / police alert system."
+          "description": "Dispatch / police alert system.",
+          "x-bridgeGroup": "bridge"
         },
         "doorlock": {
           "type": "string",
@@ -323,7 +340,8 @@
             "nui_doorlock",
             "doors_creator"
           ],
-          "description": "Doorlock system."
+          "description": "Doorlock system.",
+          "x-bridgeGroup": "bridge"
         },
         "skills": {
           "type": "string",
@@ -340,7 +358,8 @@
             "skillsystem_v2",
             "ot_skill_system"
           ],
-          "description": "Skills / progression system."
+          "description": "Skills / progression system.",
+          "x-bridgeGroup": "bridge"
         },
         "housing": {
           "type": "string",
@@ -352,7 +371,8 @@
             "bcs_housing",
             "origen_housing"
           ],
-          "description": "Player housing system."
+          "description": "Player housing system.",
+          "x-bridgeGroup": "bridge"
         },
         "notify": {
           "type": "string",
@@ -361,7 +381,8 @@
             "ox_lib",
             "dirk_lib"
           ],
-          "description": "Provider for lib.notify (toast notifications)."
+          "description": "Provider for lib.notify (toast notifications).",
+          "x-bridgeGroup": "interface"
         },
         "progress": {
           "type": "string",
@@ -370,7 +391,8 @@
             "ox_lib",
             "dirk_lib"
           ],
-          "description": "Provider for lib.progressBar / lib.progressCircle."
+          "description": "Provider for lib.progressBar / lib.progressCircle.",
+          "x-bridgeGroup": "interface"
         },
         "showTextUI": {
           "type": "string",
@@ -379,7 +401,8 @@
             "ox_lib",
             "dirk_lib"
           ],
-          "description": "Provider for lib.showTextUI / hideTextUI."
+          "description": "Provider for lib.showTextUI / hideTextUI.",
+          "x-bridgeGroup": "interface"
         },
         "contextMenu": {
           "type": "string",
@@ -388,7 +411,8 @@
             "ox_lib",
             "dirk_lib"
           ],
-          "description": "Provider for lib.registerContext / showContext."
+          "description": "Provider for lib.registerContext / showContext.",
+          "x-bridgeGroup": "interface"
         },
         "alertDialog": {
           "type": "string",
@@ -397,7 +421,8 @@
             "ox_lib",
             "dirk_lib"
           ],
-          "description": "Provider for lib.alertDialog (confirm/cancel modals)."
+          "description": "Provider for lib.alertDialog (confirm/cancel modals).",
+          "x-bridgeGroup": "interface"
         },
         "inputDialog": {
           "type": "string",
@@ -406,7 +431,8 @@
             "ox_lib",
             "dirk_lib"
           ],
-          "description": "Provider for lib.inputDialog (form-style prompts)."
+          "description": "Provider for lib.inputDialog (form-style prompts).",
+          "x-bridgeGroup": "interface"
         }
       }
     },

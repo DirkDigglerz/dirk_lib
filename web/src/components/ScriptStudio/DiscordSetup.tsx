@@ -1,5 +1,5 @@
 import { alpha, Flex, Text, useMantineTheme } from '@mantine/core';
-import { fetchNui } from 'dirk-cfx-react';
+import { fetchNui, openLink } from 'dirk-cfx-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   CheckCircle2, ChevronDown, ExternalLink, Loader2, PlugZap, XCircle,
@@ -201,12 +201,14 @@ export function DiscordSetup({ resource, canEdit }: { resource: string; canEdit:
                       </Text>
                       {step.link && (
                         <Flex
-                          component="a"
-                          href={step.link.href}
-                          target="_blank"
-                          rel="noreferrer"
+                          component="button"
+                          type="button"
+                          onClick={() => openLink(step.link!.href)}
                           align="center" gap="0.4vh"
-                          style={{ textDecoration: 'none', width: 'fit-content' }}
+                          style={{
+                            background: 'transparent', border: 'none', padding: 0,
+                            cursor: 'pointer', width: 'fit-content',
+                          }}
                         >
                           <ExternalLink size="1.1vh" color={color} />
                           <Text ff="Akrobat Bold" size="xxs" c={color}>

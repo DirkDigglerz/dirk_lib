@@ -90,7 +90,7 @@ export function PickListControl({
  * same source list as the multi-select above so the two cannot drift apart.
  */
 export function PickOneControl({
-  resource, sourcePath, sourceKey, sourceLabelKey, value, onChange, disabled, anyLabel,
+  resource, sourcePath, sourceKey, sourceLabelKey, value, onChange, disabled, anyLabel, row, parentRow,
 }: {
   resource: string;
   sourcePath: string;
@@ -101,14 +101,39 @@ export function PickOneControl({
   disabled?: boolean;
   /** what "no choice" means here, e.g. "Anywhere" */
   anyLabel?: string;
+  /**
+   * The row ABOVE this one, for a `parent.` source.
+   *
+   * A store's stock names one of that STORE's categories, and a stock row has
+   * no categories of its own - so `self.` would resolve to nothing. Two
+   * prefixes rather than one guess: `self.` is the row you are editing,
+   * `parent.` is the row it sits inside.
+   */
+  parentRow?: Record<string, unknown>;
+  /**
+   * The row being edited, for a `self.` source.
+   *
+   * A store's stock names one of THAT store's categories - not a category
+   * from a list somewhere else in the script - so the options come from the
+   * row itself. Same `self.` convention x-validate already uses.
+   */
+  row?: Record<string, unknown>;
 }) {
   const styles = useInputStyles();
   const entries = useStudio((state) => state.scripts.find((s) => s.resource === resource)?.entries ?? []);
   const draft = useStudio((state) => state.draft[resource]);
 
   const options = useMemo(() => {
-    const source = entries.find((entry) => entry.path === sourcePath);
-    const rows = source ? effectiveValue(resource, source) : null;
+    const selfPath = sourcePath.startsWith('self.') ? sourcePath.slice(5) : null;
+    const parentPath = sourcePath.startsWith('parent.') ? sourcePath.slice(7) : null;
+    const rows = selfPath
+      ? row?.[selfPath]
+      : parentPath
+        ? parentRow?.[parentPath]
+        : (() => {
+          const source = entries.find((entry) => entry.path === sourcePath);
+          return source ? effectiveValue(resource, source) : null;
+        })();
     if (!Array.isArray(rows)) return [];
     return rows
       .map((row) => {
@@ -122,7 +147,7 @@ export function PickOneControl({
       })
       .filter((o): o is { value: string; label: string } => o !== null);
     // `draft` on purpose: the source list is being edited in the same session
-  }, [entries, resource, sourcePath, sourceKey, sourceLabelKey, draft]);
+  }, [entries, resource, sourcePath, sourceKey, sourceLabelKey, draft, row, parentRow]);
 
   const current = typeof value === 'string' ? value : '';
 

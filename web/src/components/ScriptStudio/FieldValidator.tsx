@@ -1,5 +1,6 @@
 import { alpha, Flex, Text, useMantineTheme } from '@mantine/core';
-import { fetchNui, isEnvBrowser } from 'dirk-cfx-react';
+import { isEnvBrowser } from 'dirk-cfx-react';
+import { studioRequest } from './studioRequest';
 import { AnimatePresence, motion } from 'framer-motion';
 import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -11,9 +12,14 @@ import { useEffect, useRef, useState } from 'react';
  * Fivemanage token works — so without this a revoked or mistyped key looks
  * exactly like a good one until an upload silently fails days later.
  *
- * Declared per field with `x-validateWith`, naming a NUI callback the owning
- * resource already registers. dirk_lib sends the value and renders the verdict;
- * it never needs to know what the value means.
+ * Declared per field with `x-validateWith`, naming a SERVER callback on the
+ * owning script. dirk_lib sends the value and renders the verdict; it never
+ * needs to know what the value means.
+ *
+ * Through the relay, not straight out: this panel is dirk_lib's NUI frame, so
+ * a direct `fetchNui` would post to dirk_lib and never reach the script that
+ * registered the callback - and fetchNui's mock fallback would have dressed
+ * that failure up as a pass.
  *
  * Deliberately AS YOU TYPE, debounced, rather than behind a button. The button
  * version asks you to save first, then press it, then watch a spinner — three
@@ -34,9 +40,11 @@ type Verdict = {
 const DEBOUNCE_MS = 600;
 
 export function FieldValidator({
-  callback, value, disabled,
+  resource, callback, value, disabled,
 }: {
-  /** NUI callback named by `x-validateWith` */
+  /** the script that registered the callback */
+  resource: string;
+  /** server callback named by `x-validateWith`, without its resource prefix */
   callback: string;
   value: unknown;
   disabled?: boolean;
@@ -66,13 +74,17 @@ export function FieldValidator({
     setState('checking');
 
     const timer = setTimeout(async () => {
-      const reply = await fetchNui<Verdict>(
-        callback,
-        { value: text },
-        // A browser has no service to ask, and saying "invalid" there would be
-        // a lie about a key that may be perfectly good.
-        { ok: true, reason: 'Not checked in browser preview' },
-      ).catch(() => ({ ok: false, reason: 'Could not reach the server' }));
+      // A browser has no service to ask, and saying "invalid" there would be
+      // a lie about a key that may be perfectly good.
+      const reply = isEnvBrowser()
+        ? { ok: true, reason: 'Not checked in browser preview' }
+        : await studioRequest<Verdict>(resource, callback, { value: text })
+          .catch((error: Error) => ({
+            ok: false,
+            reason: error.message === 'NotAuthorized'
+              ? 'You are not allowed to check that'
+              : 'Could not reach the server',
+          }));
 
       if (runId.current !== id) return;
       setVerdict(reply ?? null);

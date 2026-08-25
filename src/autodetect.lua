@@ -113,6 +113,40 @@ local function detect()
   return autodetected
 end
 
+--- Shout if the panel's dropdowns have drifted from this list.
+---
+--- Two lists said what a bridge supports: this one, and the enum on each
+--- `bridging.*` setting in schema.json. They disagreed - the framework
+--- dropdown offered `nd-framework` while the detector looks for `ND_Core`, so
+--- picking it from the panel forced a bridge to a resource nothing would ever
+--- find. devix and bp inventories had bridges but could not be picked at all.
+---
+--- Boot-time only, and only when they differ, so it costs nothing on a healthy
+--- server and cannot be ignored on a broken one.
+CreateThread(function()
+  local raw = LoadResourceFile(GetCurrentResourceName(), 'schema.json')
+  local ok, schema = pcall(json.decode, raw)
+  if not ok or type(schema) ~= 'table' then return end
+
+  local bridging = schema.properties and schema.properties.bridging
+  local props = bridging and bridging.properties
+  if type(props) ~= 'table' then return end
+
+  for system, names in pairs(supportedResources) do
+    local node = props[system]
+    local list = node and (node.enum or node['x-enum'])
+    if type(list) == 'table' then
+      local offered = {}
+      for _, name in ipairs(list) do offered[name] = true end
+      for _, name in ipairs(names) do
+        if not offered[name] then
+          lib.print.warn(('[dirk_lib] bridging.%s supports %q but the panel cannot offer it - schema.json enum is out of date'):format(system, name))
+        end
+      end
+    end
+  end
+end)
+
 -- Exposed so the post-boot re-detection (settingsOverlay) can recompute fresh —
 -- `require` would just hand back this same memoized boot snapshot.
 lib.detectResources = detect

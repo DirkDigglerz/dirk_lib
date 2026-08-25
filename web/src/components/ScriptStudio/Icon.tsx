@@ -1,3 +1,5 @@
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import type { IconProp } from '@fortawesome/fontawesome-svg-core';
 import * as lucide from 'lucide-react';
 import { SlidersHorizontal } from 'lucide-react';
 
@@ -43,4 +45,50 @@ export function resolveIcon(name: string): React.ElementType {
 export function Icon({ name, size, color }: { name: string; size: string; color: string }) {
   const Cmp = resolveIcon(name);
   return <Cmp size={size} color={color} />;
+}
+
+/**
+ * An icon named by a schema, from EITHER set.
+ *
+ * Scripts predate this panel, and the ones that already had a config UI named
+ * their icons the way that UI drew them - fishing's store categories carry
+ * Font Awesome classes ("fas fa-fish") because fishing's own store screen
+ * draws Font Awesome. Rewriting those values to lucide names would change what
+ * the game renders, so the panel reads both instead: an `fa-` class goes to
+ * Font Awesome, anything else to lucide.
+ */
+export function AnyIcon({ name, size, color }: { name: string; size: string; color: string }) {
+  const fa = parseFaIcon(name);
+  if (fa) {
+    return (
+      <FontAwesomeIcon
+        icon={fa as IconProp}
+        color={color}
+        style={{ width: size, height: size }}
+      />
+    );
+  }
+  return <Icon name={name} size={size} color={color} />;
+}
+
+/** `"fa-solid fa-fish"` -> `["fas", "fish"]`, or null when it is not one. */
+export function parseFaIcon(name: string): [string, string] | null {
+  if (!name || !/fa-/.test(name)) return null;
+
+  // Font Awesome names its styles two ways - the short `fas` and the long
+  // `fa-solid` - and the long one is itself an `fa-` token. Reading the glyph
+  // as "the first fa- word" therefore turned `fa-solid fa-fish` into the icon
+  // named "solid", which does not exist, and every category drew a blank.
+  const STYLES = {
+    'fa-solid': 'fas', fas: 'fas',
+    'fa-regular': 'far', far: 'far',
+    'fa-brands': 'fab', fab: 'fab',
+    'fa-light': 'fal', fal: 'fal',
+    'fa-duotone': 'fad', fad: 'fad',
+  } as Record<string, string>;
+
+  const parts = name.trim().toLowerCase().split(/\s+/);
+  const style = parts.map((part) => STYLES[part]).find(Boolean) ?? 'fas';
+  const glyph = parts.find((part) => part.startsWith('fa-') && !STYLES[part])?.slice(3);
+  return glyph ? [style, glyph] : null;
 }

@@ -5,7 +5,8 @@ import { ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { NestedRowModal } from './NestedRowModal';
 import { useItems } from 'dirk-cfx-react';
-import { ItemArt, StudioButton } from './ui';
+import { ItemArt, rowIdentity, singular, StudioButton } from './ui';
+import { AnyIcon } from './Icon';
 import type { SettingColumn } from './types';
 import { useChrome } from './studioLocale';
 
@@ -22,26 +23,36 @@ type Row = Record<string, unknown>;
  * level down.
  */
 export function NestedRows({
-  column, value, onChange, disabled,
+  column, resource, value, onChange, disabled, parentRow,
 }: {
   column: SettingColumn;
+  /**
+   * The script this table belongs to.
+   *
+   * Needed by anything whose options come from the config rather than the
+   * schema - a stock row's category is one of the categories of the store it
+   * sits in, and resolving that means knowing whose config to look in. Missing
+   * here, the picker silently fell back to a plain text box.
+   */
+  resource?: string;
   value: unknown;
   onChange: (next: unknown) => void;
   disabled?: boolean;
+  /** the row this table sits inside, for options sourced from it */
+  parentRow?: Record<string, unknown>;
 }) {
   const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+  /** a row being composed, not yet in the table */
+  const [creating, setCreating] = useState<Record<string, unknown> | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
   const rows = Array.isArray(value) ? (value as Row[]) : [];
   const children = column.columns ?? [];
 
   const items = useItems();
-  const itemKey = children.find((child) => child.type === 'item')?.key
-    // same fallback as the outer lists: follow the value, not the schema
-    ?? children.find((child) => (child.key === 'name' || child.key === 'item')
-      && rows.some((row) => !!items[String(row[child.key] ?? '')]))?.key;
+  const { itemKey, iconKey } = rowIdentity(children, rows, items);
 
   /** What names this entry: its item, else the first text it carries. */
   const titleKey = itemKey
@@ -50,10 +61,11 @@ export function NestedRows({
 
   /** The rest, as label/value pairs - enough to tell two entries apart. */
   const summaryKeys = children
-    .filter((child) => child.key !== titleKey && isSummarisable(child.type))
+    .filter((child) => child.key !== titleKey && child.key !== iconKey
+      && isSummarisable(child.type))
     .slice(0, 4);
 
-  const singular = column.label.replace(/s$/, '').toLowerCase();
+  const one = singular(column.label).toLowerCase();
 
   const save = (index: number, next: Row) => {
     onChange(rows.map((row, i) => (i === index ? next : row)));
@@ -84,14 +96,34 @@ export function NestedRows({
               cursor: 'pointer', textAlign: 'left',
             }}
           >
+            {/* The icon WINS over the item art. A category has a `name` and
+                that name looks item-shaped, so the art slot claimed it and
+                drew the missing-item box for "Rods" - while the row was
+                carrying a perfectly good fish icon of its own. A declared
+                icon is evidence; a name that resembles an item key is a
+                guess. */}
             {itemKey && <ItemArt name={String(row[itemKey] ?? '')} size="2.8vh" />}
+
+            {iconKey && (
+              <Flex
+                align="center" justify="center"
+                style={{
+                  width: '2.8vh', height: '2.8vh', flexShrink: 0,
+                  background: alpha(theme.colors.dark[9], 0.6),
+                  border: `0.1vh solid ${alpha(theme.colors.dark[4], 0.4)}`,
+                  borderRadius: '0.3vh',
+                }}
+              >
+                <AnyIcon name={String(row[iconKey] ?? '')} size="1.4vh" color={color} />
+              </Flex>
+            )}
 
             <Text
               ff="Akrobat Bold" size="xs" c="rgba(255,255,255,0.88)"
               style={{ flexShrink: 0, maxWidth: '22vh' }}
               truncate
             >
-              {display(row[titleKey ?? '']) || `${singular} ${index + 1}`}
+              {display(row[titleKey ?? '']) || `${one} ${index + 1}`}
             </Text>
 
             <Flex align="center" gap="xs" style={{ flex: 1, minWidth: 0 }}>
@@ -124,7 +156,7 @@ export function NestedRows({
               cursor: disabled ? 'not-allowed' : 'pointer',
               color: 'rgba(255,255,255,0.5)', flexShrink: 0,
             }}
-            aria-label={`Remove ${singular}`}
+            aria-label={`Remove ${one}`}
           >
             <Trash2 size="1.2vh" />
           </motion.button>
@@ -136,20 +168,39 @@ export function NestedRows({
       )}
 
       <StudioButton
-        label={`Add ${singular}`}
+        label={`Add ${one}`}
         icon={Plus}
         disabled={disabled}
-        onClick={() => {
-          const next = [...rows, JSON.parse(JSON.stringify(column.rowTemplate ?? {}))];
-          onChange(next);
-          setEditing(next.length - 1);   // straight into the editor, like the outer lists
-        }}
+        // Composed, then appended on save - the same rule the outer lists
+        // follow. A reward you started and abandoned should not be in the list.
+        onClick={() => setCreating(JSON.parse(JSON.stringify(column.rowTemplate ?? {})))}
         grow
       />
 
       <AnimatePresence>
+        {creating && (
+          <NestedRowModal
+          resource={resource}
+            column={column}
+            parentRow={parentRow}
+            row={creating}
+            index={rows.length}
+            disabled={disabled}
+            onSave={(next) => {
+              onChange([...rows, next]);
+              setCreating(null);
+            }}
+            onDelete={() => setCreating(null)}
+            onClose={() => setCreating(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {editing !== null && rows[editing] && (
           <NestedRowModal
+          resource={resource}
+          parentRow={parentRow}
             column={column}
             row={rows[editing]!}
             index={editing}

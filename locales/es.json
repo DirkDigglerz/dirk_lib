@@ -639,5 +639,7 @@
   "studio.meter.progression.harder": "Más difícil",
   "studio.meter.progression.normal": "Normal",
   "studio.meter.progression.easier": "Más fácil",
-  "studio.meter.progression.muchEasier": "Mucho más fácil"
+  "studio.meter.progression.muchEasier": "Mucho más fácil",
+  "studio.groupGradeControl.rank_and_above": "rango {} o superior",
+  "studio.groupGradeControl.done": "Listo"
 }

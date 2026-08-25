@@ -259,6 +259,23 @@ end
 -- scriptConfig engine so both sides agree on what a default is.
 local collectAutoDefaults = require '@dirk_lib.src.autoDefaults'
 
+--- The server artifact build, published once.
+---
+--- The Bridges page reports it, and the page runs on the CLIENT - where the
+--- `version` convar does not exist, so reading it there returned nothing and
+--- the card said "unknown". It is a server fact, so the server states it.
+---
+--- A GlobalState bag rather than a callback: it is replicated once at startup
+--- and read for free forever after, and a build number cannot change without
+--- the server restarting anyway.
+CreateThread(function()
+  -- "FXServer-master v1.0.0.12913 win32" - the artifact number is the part
+  -- that `/server:7290` in a fxmanifest is talking about.
+  local raw = GetConvar('version', '')
+  local build = tonumber(raw:match('v%d+%.%d+%.%d+%.(%d+)'))
+  GlobalState.dirkServerBuild = build or false
+end)
+
 lib.callback.register('dirk_lib:getScriptStudio', function(source)
   local out = {}
   local total = GetNumResources()

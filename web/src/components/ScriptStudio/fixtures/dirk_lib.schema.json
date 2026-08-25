@@ -1,5 +1,8 @@
 {
-  "x-managedElsewhere": ["bridging", "access"],
+  "x-managedElsewhere": [
+    "bridging",
+    "access"
+  ],
   "x-label": "Shared Settings",
   "x-icon": "library",
   "x-shared": true,
@@ -7,7 +10,6 @@
   "type": "object",
   "description": "dirk_lib library-level settings. Controls global theming, localization, and other shared defaults used by every resource that depends on dirk_lib.",
   "properties": {
-
     "basic": {
       "x-icon": "sliders-horizontal",
       "type": "object",
@@ -17,31 +19,51 @@
           "type": "string",
           "default": "DirkRP",
           "x-renamedFrom": "branding.serverName",
-          "x-autoDefault": ["sv_projectName", "sv_hostname"],
+          "x-autoDefault": [
+            "sv_projectName",
+            "sv_hostname"
+          ],
           "description": "Server branding string displayed in NUIs that surface a server name. Detected from your server.cfg (sv_projectName, then sv_hostname) until you type something here."
         },
         "primaryIdentifier": {
           "type": "string",
           "default": "license",
           "x-renamedFrom": "advanced.primaryIdentifier",
-          "enum": ["license", "license2", "steam", "discord", "fivem", "ip"],
+          "enum": [
+            "license",
+            "license2",
+            "steam",
+            "discord",
+            "fivem",
+            "ip"
+          ],
           "description": "Which player identifier dirk_lib uses as the primary lookup key. Default 'license' works for the vast majority of servers — only change if your framework or txAdmin setup uses a different identifier."
         },
         "language": {
           "type": "string",
           "default": "en",
           "x-renamedFrom": "localization.language",
-          "enum": ["en", "es", "lt", "zh-TW", "de", "fr", "it", "pt", "no"],
+          "enum": [
+            "en",
+            "es",
+            "lt",
+            "zh-TW",
+            "de",
+            "fr",
+            "it",
+            "pt",
+            "no"
+          ],
           "x-enumLabels": {
             "en": "English (en)",
-            "es": "Espa\u00f1ol (es)",
-            "fr": "Fran\u00e7ais (fr)",
+            "es": "Español (es)",
+            "fr": "Français (fr)",
             "de": "Deutsch (de)",
-            "pt": "Portugu\u00eas (pt)",
+            "pt": "Português (pt)",
             "it": "Italiano (it)",
             "no": "Norsk (no)",
-            "lt": "Lietuvi\u0173 (lt)",
-            "zh-TW": "\u7e41\u9ad4\u4e2d\u6587 (zh-TW)"
+            "lt": "Lietuvių (lt)",
+            "zh-TW": "繁體中文 (zh-TW)"
           },
           "description": "Locale code used when resolving strings from /locales. A language with no matching file there falls back to English."
         },
@@ -59,7 +81,6 @@
         }
       }
     },
-
     "appearance": {
       "x-icon": "palette",
       "type": "object",
@@ -97,155 +118,324 @@
         }
       }
     },
-
     "bridging": {
       "x-icon": "plug",
       "type": "object",
       "description": "Pick which third-party resource (framework, inventory, target, etc.) and which UI library dirk_lib should bridge to. Resource bridges default to 'auto' so dirk_lib detects whatever's installed; UI bridges default to 'ox_lib' so servers running ox get its native UI without any extra setup. Set any value explicitly to override autodetect.",
       "properties": {
-
         "framework": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "es_extended", "qbx_core", "qb-core", "nd-framework"],
-          "description": "Server framework dirk_lib reads player data from."
+          "enum": [
+            "auto",
+            "es_extended",
+            "qbx_core",
+            "qb-core",
+            "ND_Core"
+          ],
+          "description": "Server framework dirk_lib reads player data from.",
+          "x-bridgeGroup": "bridge"
         },
         "inventory": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "dirk_inventory", "one_inventory", "ox_inventory", "qb-inventory", "qs-inventory", "codem-inventory", "tgiann-inventory", "mf-inventory", "core_inventory", "ak47_inventory"],
-          "description": "Inventory system used for item lookups, give/remove, and image paths."
+          "enum": [
+            "auto",
+            "dirk_inventory",
+            "one_inventory",
+            "qs-inventory",
+            "codem-inventory",
+            "tgiann-inventory",
+            "devix-inventory",
+            "bp_inventory",
+            "mf-inventory",
+            "core_inventory",
+            "ak47_inventory",
+            "ox_inventory",
+            "qb-inventory"
+          ],
+          "description": "Inventory system used for item lookups, give/remove, and image paths.",
+          "x-bridgeGroup": "bridge"
         },
         "itemImgPath": {
           "type": "string",
           "default": "auto",
           "x-renamedFrom": "branding.itemImgPath",
-          "description": "Inventory image path used by dirk_lib UIs. 'auto' resolves from the detected inventory; override with a full nui://… or CDN URL."
+          "description": "Inventory image path used by dirk_lib UIs. 'auto' resolves from the detected inventory; override with a full nui://… or CDN URL.",
+          "x-bridgeGroup": "bridge"
         },
         "target": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "ox_target", "qb-target", "q-target", "bt-target"],
-          "description": "Targeting system for entity interactions."
+          "enum": [
+            "auto",
+            "ox_target",
+            "qb-target",
+            "q-target",
+            "bt-target"
+          ],
+          "description": "Targeting system for entity interactions.",
+          "x-bridgeGroup": "bridge"
         },
         "interact": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "redm-uiprompt", "sleepless_interact", "interact"],
-          "description": "Interact-prompt system used as the alternative to target-based interactions."
+          "enum": [
+            "auto",
+            "redm-uiprompt",
+            "sleepless_interact",
+            "interact"
+          ],
+          "description": "Interact-prompt system used as the alternative to target-based interactions.",
+          "x-bridgeGroup": "bridge"
         },
         "time": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "av_weather", "cd_easytime", "qb-weathersync", "Renewed-Weathersync", "vSync", "wasabi_wheather"],
-          "description": "Weather/time sync resource."
+          "enum": [
+            "auto",
+            "av_weather",
+            "cd_easytime",
+            "qb-weathersync",
+            "Renewed-Weathersync",
+            "vSync",
+            "wasabi_wheather"
+          ],
+          "description": "Weather/time sync resource.",
+          "x-bridgeGroup": "bridge"
         },
         "keys": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "cd_garage", "MrNewbVehicleKeys", "t1ger_keys", "okokGarage", "qb-vehiclekeys", "qbx_vehiclekeys", "qs-vehiclekeys", "Renewed-Vehiclekeys", "vehicles_keys", "wasabi_carlock", "ludaro-keys"],
-          "description": "Vehicle keys / lockpicking system."
+          "enum": [
+            "auto",
+            "cd_garage",
+            "MrNewbVehicleKeys",
+            "t1ger_keys",
+            "okokGarage",
+            "qb-vehiclekeys",
+            "qbx_vehiclekeys",
+            "qs-vehiclekeys",
+            "Renewed-Vehiclekeys",
+            "vehicles_keys",
+            "wasabi_carlock",
+            "ludaro-keys"
+          ],
+          "description": "Vehicle keys / lockpicking system.",
+          "x-bridgeGroup": "bridge"
         },
         "fuel": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "cdn-fuel", "LegacyFuel", "ox_fuel", "ps-fuel", "Renewed-Fuel", "ti_fuel", "x-fuel", "wasabi_fuel", "okokGasStation"],
-          "description": "Vehicle fuel system."
+          "enum": [
+            "auto",
+            "cdn-fuel",
+            "LegacyFuel",
+            "ox_fuel",
+            "ps-fuel",
+            "Renewed-Fuel",
+            "ti_fuel",
+            "x-fuel",
+            "wasabi_fuel",
+            "okokGasStation",
+            "qs-fuelstations"
+          ],
+          "description": "Vehicle fuel system.",
+          "x-bridgeGroup": "bridge"
         },
         "phone": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "lb-phone", "qb-phone", "gksphone", "high-phone", "npwd"],
-          "description": "Phone resource (used for messages, mail, etc.)."
+          "enum": [
+            "auto",
+            "lb-phone",
+            "qb-phone",
+            "gksphone",
+            "high-phone",
+            "npwd"
+          ],
+          "description": "Phone resource (used for messages, mail, etc.).",
+          "x-bridgeGroup": "bridge"
         },
         "garage": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "jg-advancedgarages", "jg-garages", "cd_garage", "okokGarage", "esx_garage", "loaf_garage", "wasabi_garage", "renewed-garage", "qb-garages"],
-          "description": "Garage / vehicle storage system (used by lib.garage.addVehicle)."
+          "enum": [
+            "auto",
+            "jg-advancedgarages",
+            "jg-garages",
+            "cd_garage",
+            "okokGarage",
+            "esx_garage",
+            "loaf_garage",
+            "wasabi_garage",
+            "renewed-garage",
+            "qb-garages"
+          ],
+          "description": "Garage / vehicle storage system (used by lib.garage.addVehicle).",
+          "x-bridgeGroup": "bridge"
         },
         "clothing": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "esx_skin", "qb-clothing", "rcore_clothing", "illenium-appearance", "fivem-appearance", "dirk_charCreator", "tgiann-clothing"],
-          "description": "Clothing / character appearance system."
+          "enum": [
+            "auto",
+            "esx_skin",
+            "qb-clothing",
+            "rcore_clothing",
+            "illenium-appearance",
+            "fivem-appearance",
+            "dirk_charCreator",
+            "tgiann-clothing"
+          ],
+          "description": "Clothing / character appearance system.",
+          "x-bridgeGroup": "bridge"
         },
         "ambulance": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "qb-ambulancejob", "wasabi_ambulance", "core_ambulance"],
-          "description": "Ambulance / death + revive system."
+          "enum": [
+            "auto",
+            "qb-ambulancejob",
+            "wasabi_ambulance",
+            "core_ambulance"
+          ],
+          "description": "Ambulance / death + revive system.",
+          "x-bridgeGroup": "bridge"
         },
         "prison": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "qb-prison", "rcore_prison", "wasabi_jail"],
-          "description": "Prison / jail system."
+          "enum": [
+            "auto",
+            "qb-prison",
+            "rcore_prison",
+            "wasabi_jail"
+          ],
+          "description": "Prison / jail system.",
+          "x-bridgeGroup": "bridge"
         },
         "dispatch": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "bub_mdt", "cd_dispatch", "linden_outlawalert", "qs_dispatch", "ps-dispatch", "tk_dispatch"],
-          "description": "Dispatch / police alert system."
+          "enum": [
+            "auto",
+            "bub_mdt",
+            "cd_dispatch",
+            "linden_outlawalert",
+            "qs_dispatch",
+            "ps-dispatch",
+            "tk_dispatch"
+          ],
+          "description": "Dispatch / police alert system.",
+          "x-bridgeGroup": "bridge"
         },
         "doorlock": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "ox_doorlock", "qb-doorlock", "nui_doorlock", "doors_creator"],
-          "description": "Doorlock system."
+          "enum": [
+            "auto",
+            "ox_doorlock",
+            "qb-doorlock",
+            "nui_doorlock",
+            "doors_creator"
+          ],
+          "description": "Doorlock system.",
+          "x-bridgeGroup": "bridge"
         },
         "skills": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "sd_skills", "evolent_skills", "core_skills", "B1-skillz", "skill_system_v1.5", "skillsystem_v3", "boii_skills", "skillsystem_v2", "ot_skill_system"],
-          "description": "Skills / progression system."
+          "enum": [
+            "auto",
+            "sd_skills",
+            "evolent_skills",
+            "core_skills",
+            "B1-skillz",
+            "skill_system_v1.5",
+            "skillsystem_v3",
+            "boii_skills",
+            "skillsystem_v2",
+            "ot_skill_system"
+          ],
+          "description": "Skills / progression system.",
+          "x-bridgeGroup": "bridge"
         },
         "housing": {
           "type": "string",
           "default": "auto",
-          "enum": ["auto", "qs-housing", "rtx_housing", "bcs_housing", "origen_housing"],
-          "description": "Player housing system."
+          "enum": [
+            "auto",
+            "qs-housing",
+            "rtx_housing",
+            "bcs_housing",
+            "origen_housing"
+          ],
+          "description": "Player housing system.",
+          "x-bridgeGroup": "bridge"
         },
-
         "notify": {
           "type": "string",
           "default": "ox_lib",
-          "enum": ["ox_lib", "dirk_lib"],
-          "description": "Provider for lib.notify (toast notifications)."
+          "enum": [
+            "ox_lib",
+            "dirk_lib"
+          ],
+          "description": "Provider for lib.notify (toast notifications).",
+          "x-bridgeGroup": "interface"
         },
         "progress": {
           "type": "string",
           "default": "ox_lib",
-          "enum": ["ox_lib", "dirk_lib"],
-          "description": "Provider for lib.progressBar / lib.progressCircle."
+          "enum": [
+            "ox_lib",
+            "dirk_lib"
+          ],
+          "description": "Provider for lib.progressBar / lib.progressCircle.",
+          "x-bridgeGroup": "interface"
         },
         "showTextUI": {
           "type": "string",
           "default": "ox_lib",
-          "enum": ["ox_lib", "dirk_lib"],
-          "description": "Provider for lib.showTextUI / hideTextUI."
+          "enum": [
+            "ox_lib",
+            "dirk_lib"
+          ],
+          "description": "Provider for lib.showTextUI / hideTextUI.",
+          "x-bridgeGroup": "interface"
         },
         "contextMenu": {
           "type": "string",
           "default": "ox_lib",
-          "enum": ["ox_lib", "dirk_lib"],
-          "description": "Provider for lib.registerContext / showContext."
+          "enum": [
+            "ox_lib",
+            "dirk_lib"
+          ],
+          "description": "Provider for lib.registerContext / showContext.",
+          "x-bridgeGroup": "interface"
         },
         "alertDialog": {
           "type": "string",
           "default": "ox_lib",
-          "enum": ["ox_lib", "dirk_lib"],
-          "description": "Provider for lib.alertDialog (confirm/cancel modals)."
+          "enum": [
+            "ox_lib",
+            "dirk_lib"
+          ],
+          "description": "Provider for lib.alertDialog (confirm/cancel modals).",
+          "x-bridgeGroup": "interface"
         },
         "inputDialog": {
           "type": "string",
           "default": "ox_lib",
-          "enum": ["ox_lib", "dirk_lib"],
-          "description": "Provider for lib.inputDialog (form-style prompts)."
+          "enum": [
+            "ox_lib",
+            "dirk_lib"
+          ],
+          "description": "Provider for lib.inputDialog (form-style prompts).",
+          "x-bridgeGroup": "interface"
         }
       }
     },
-
     "groups": {
       "x-icon": "users",
       "type": "object",
@@ -281,29 +471,34 @@
         }
       }
     },
-
     "access": {
       "x-icon": "shield",
       "type": "object",
       "x-serverOnly": true,
       "description": "Who (besides master admins) can open & edit dirk_lib's OWN config — additive on top of the dirk_lib_master_group convar, never removes master. WARNING: dirk_lib's config holds secrets (Discord bot token, logger credentials); anyone granted here can see/edit them and grant others (but can NEVER make themselves master). Grant trusted co-admins only. x-serverOnly so the grant list never leaves the server.",
-      "default": { "groups": [], "identifiers": [] },
+      "default": {
+        "groups": [],
+        "identifiers": []
+      },
       "properties": {
         "groups": {
           "type": "array",
           "default": [],
           "description": "ACE group names granted dirk_lib config access (checked via IsPlayerAceAllowed).",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "identifiers": {
           "type": "array",
           "default": [],
           "description": "Specific players granted access — framework persistent id (citizenid on qb/qbx, license on esx), or a raw FiveM identifier (license:/discord:/...).",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
-
     "discord": {
       "x-icon": "message-circle",
       "type": "object",
@@ -323,7 +518,6 @@
         }
       }
     },
-
     "logger": {
       "x-icon": "scroll-text",
       "type": "object",
@@ -331,14 +525,22 @@
       "properties": {
         "service": {
           "type": "string",
-          "enum": ["off", "datadog", "loki", "fivemanage"],
+          "enum": [
+            "off",
+            "datadog",
+            "loki",
+            "fivemanage"
+          ],
           "default": "off",
           "description": "External log backend. off = Discord webhooks only (per-resource)."
         },
         "hostname": {
           "type": "string",
           "default": "",
-          "x-autoDefault": ["sv_projectName", "sv_hostname"],
+          "x-autoDefault": [
+            "sv_projectName",
+            "sv_hostname"
+          ],
           "description": "Hostname label attached to every log line. Detected from your server.cfg until you type something here."
         },
         "loki": {
@@ -367,6 +569,10 @@
               "default": "",
               "description": "Optional X-Scope-OrgID tenant header for multi-tenant Loki."
             }
+          },
+          "x-enabledWhen": {
+            "path": "logger.service",
+            "equals": "loki"
           }
         },
         "datadog": {
@@ -385,6 +591,10 @@
               "default": "datadoghq.com",
               "description": "Datadog site (e.g. datadoghq.com, datadoghq.eu, us5.datadoghq.com)."
             }
+          },
+          "x-enabledWhen": {
+            "path": "logger.service",
+            "equals": "datadog"
           }
         },
         "fivemanage": {
@@ -398,6 +608,10 @@
               "x-serverOnly": true,
               "description": "Fivemanage API key (Authorization). Server-side only — never sent to clients."
             }
+          },
+          "x-enabledWhen": {
+            "path": "logger.service",
+            "equals": "fivemanage"
           }
         }
       }

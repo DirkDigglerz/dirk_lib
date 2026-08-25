@@ -1,4 +1,4 @@
-import { alpha, Flex, NumberInput, Slider, Text, TextInput, useMantineTheme } from '@mantine/core';
+import { alpha, Flex, NumberInput, RangeSlider, Slider, Text, TextInput, useMantineTheme } from '@mantine/core';
 import { motion } from 'framer-motion';
 import { Plus, X } from 'lucide-react';
 import { useState } from 'react';
@@ -101,6 +101,8 @@ export function RangeControl({
   max?: number;
 }) {
   const styles = useInputStyles();
+  const theme = useMantineTheme();
+  const sliderColor = theme.colors[theme.primaryColor][5];
   const pair = Array.isArray(value) ? value : [0, 0];
   const [low, high] = [Number(pair[0] ?? 0), Number(pair[1] ?? 0)];
 
@@ -131,8 +133,50 @@ export function RangeControl({
     onChange([Math.min(low, value), value]);
   };
 
+  /**
+   * A slider needs somewhere to slide BETWEEN.
+   *
+   * Two number boxes are the honest control for an open-ended pair - there is
+   * no track to draw when the maximum is "whatever you type". Given real
+   * limits, though, a pair of numbers is a range you should be able to see and
+   * grab, so the boxes keep the exact values and the track shows the shape.
+   */
+  const slidable = typeof min === 'number' && typeof max === 'number' && max > min;
+
   return (
-    <Flex align="center" gap="xs" style={{ width: '100%' }}>
+    <Flex direction="column" gap="0.4vh" style={{ width: '100%' }}>
+      {slidable && (
+        <Flex direction="column" gap="0.2vh">
+          <Flex justify="space-between">
+            <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.3)">
+              {min}{suffix ? ` ${suffix}` : ''}
+            </Text>
+            <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.3)">
+              {max}{suffix ? ` ${suffix}` : ''}
+            </Text>
+          </Flex>
+          <RangeSlider
+            value={[low, high]}
+            onChange={([nextLow, nextHigh]) => onChange([clamp(nextLow), clamp(nextHigh)])}
+            disabled={disabled}
+            min={min}
+            max={max}
+            step={(max - min) / 100 < 1 ? 0.01 : 1}
+            minRange={0}
+            label={null}
+            styles={{
+              bar: { background: sliderColor },
+              thumb: {
+                borderColor: sliderColor, background: sliderColor,
+                width: '1.2vh', height: '1.2vh',
+              },
+              track: { background: alpha(sliderColor, 0.12) },
+            }}
+          />
+        </Flex>
+      )}
+
+      <Flex align="center" gap="xs" style={{ width: '100%' }}>
       <Flex direction="column" gap="0.2vh" style={{ flex: 1 }}>
         <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.1em" c="rgba(255,255,255,0.35)">Min</Text>
         <NumberInput
@@ -162,6 +206,7 @@ export function RangeControl({
           suffix={suffix ? ` ${suffix}` : undefined}
           styles={styles}
         />
+      </Flex>
       </Flex>
     </Flex>
   );

@@ -3,7 +3,8 @@ import { motion } from 'framer-motion';
 import { Search } from 'lucide-react';
 import * as lucide from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { Icon } from './Icon';
+import { fas } from '@fortawesome/free-solid-svg-icons';
+import { AnyIcon, parseFaIcon } from './Icon';
 import { useChrome } from './studioLocale';
 
 /**
@@ -17,6 +18,31 @@ import { useChrome } from './studioLocale';
  * showing them costs nothing beyond the rendering, and only what matches the
  * search is ever rendered.
  */
+
+/**
+ * Font Awesome's solid set, by the name it answers to.
+ *
+ * A script that already draws Font Awesome cannot be handed a lucide name -
+ * the value here is what its own UI renders, so writing "fuel" into a field
+ * fishing passes to Font Awesome just breaks the icon. The set is a property
+ * of the FIELD, declared by the schema, not something to infer.
+ */
+const FA_ICONS: string[] = [...new Set(
+  Object.values(fas).map((icon) => (icon as { iconName?: string }).iconName).filter(Boolean) as string[],
+)].sort();
+
+/** The value a field of this set actually stores. */
+function iconValue(set: IconSet, name: string): string {
+  return set === 'fontawesome' ? `fa-solid fa-${name}` : name;
+}
+
+/** ...and the bare name inside one, for matching the current selection. */
+function iconName(set: IconSet, value: string): string {
+  if (set !== 'fontawesome') return value;
+  return parseFaIcon(value)?.[1] ?? '';
+}
+
+export type IconSet = 'lucide' | 'fontawesome';
 
 /** kebab-case names, derived from lucide's own exports rather than a list. */
 const ALL_ICONS: string[] = (() => {
@@ -32,36 +58,48 @@ const ALL_ICONS: string[] = (() => {
   return [...seen].sort();
 })();
 
-/** Rendering 1,500 icons at once is pointless; nobody scrolls that far. */
-const LIMIT = 120;
+/**
+ * No cap.
+ *
+ * Capping the list assumed you know what to search for. Nobody knows the name
+ * of an icon they have not seen - browsing IS how you pick one, the same way
+ * it is for blip sprites - and a hundred and twenty of fifteen hundred meant
+ * the answer was usually not on screen and there was no way to reach it.
+ */
 
 export function IconPicker({
-  value, onChange, disabled,
+  value, onChange, disabled, set = 'lucide',
 }: {
   value: unknown;
   onChange: (next: string) => void;
   disabled?: boolean;
+  /** which icon set this field's value belongs to - schema `x-iconSet` */
+  set?: IconSet;
 }) {
   const theme = useMantineTheme();
   const t = useChrome();
   const color = theme.colors[theme.primaryColor][5];
   const [query, setQuery] = useState('');
 
-  const current = typeof value === 'string' ? value : '';
+  const stored = typeof value === 'string' ? value : '';
+  const current = iconName(set, stored);
+  const catalogue = set === 'fontawesome' ? FA_ICONS : ALL_ICONS;
 
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) {
       // With no search, lead with whatever is already set so it is visible
       // rather than buried alphabetically.
-      const rest = ALL_ICONS.filter((n) => n !== current).slice(0, LIMIT - 1);
+      // Whatever is already set leads, so it is visible rather than buried
+      // alphabetically.
+      const rest = catalogue.filter((n) => n !== current);
       return current ? [current, ...rest] : rest;
     }
-    return ALL_ICONS.filter((n) => n.includes(needle)).slice(0, LIMIT);
-  }, [query, current]);
+    return catalogue.filter((n) => n.includes(needle));
+  }, [query, current, catalogue]);
 
   return (
-    <Flex direction="column" gap="xs" style={{ width: '100%' }}>
+    <Flex direction="column" gap="xs" style={{ width: '100%', flex: 1, minHeight: 0 }}>
       <Flex align="center" gap="xs">
         <Flex
           align="center" justify="center"
@@ -73,7 +111,7 @@ export function IconPicker({
             flexShrink: 0,
           }}
         >
-          <Icon name={current || 'help-circle'} size="2vh" color={color} />
+          <AnyIcon name={stored || 'help-circle'} size="2vh" color={color} />
         </Flex>
 
         <TextInput
@@ -111,7 +149,9 @@ export function IconPicker({
           background: alpha(theme.colors.dark[9], 0.4),
           border: `0.1vh solid ${alpha(theme.colors.dark[5], 0.35)}`,
           borderRadius: theme.radius.xs,
-          maxHeight: '22vh',
+          flex: 1,
+          minHeight: 0,
+          alignContent: 'flex-start',
           overflowY: 'auto',
         }}
       >
@@ -122,7 +162,7 @@ export function IconPicker({
               key={name}
               type="button"
               title={name}
-              onClick={() => !disabled && onChange(name)}
+              onClick={() => !disabled && onChange(iconValue(set, name))}
               whileTap={disabled ? undefined : { scale: 0.9 }}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -135,7 +175,11 @@ export function IconPicker({
               }}
               aria-label={name}
             >
-              <Icon name={name} size="1.7vh" color={active ? color : 'rgba(255,255,255,0.6)'} />
+              <AnyIcon
+                name={iconValue(set, name)}
+                size="1.7vh"
+                color={active ? color : 'rgba(255,255,255,0.6)'}
+              />
             </motion.button>
           );
         })}

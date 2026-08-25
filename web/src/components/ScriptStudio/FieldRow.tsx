@@ -8,12 +8,14 @@ import { GroupsControl, KeyValueControl } from './MapControls';
 import { KeybindMapControl } from './KeybindMapControl';
 import { GroupGradeControl } from './GroupGradeControl';
 import { WeekdayControl } from './WeekdayControl';
+import { PedsField } from './PedControl';
 import { PositionListControl } from './PositionListControl';
 import { PickListControl, PickOneControl } from './PickListControl';
 import { WeightMapControl } from './WeightMapControl';
 import { MantineColorControl, ShadeControl } from './ThemeControls';
 import { NestedRows } from './NestedRows';
 import type { SettingColumn } from './types';
+import { useMemo } from 'react';
 import { translate, useActiveLanguage, useBundles, useChrome } from './studioLocale';
 
 type Row = Record<string, unknown>;
@@ -25,7 +27,7 @@ type Row = Record<string, unknown>;
 
 /** Types that need their own block rather than a right-hand control. */
 export function isWideColumn(type: SettingColumn['type']): boolean {
-  return type === 'slider' || type === 'range' || type === 'tags'
+  return type === 'slider' || type === 'range' || type === 'tags' || type === 'peds'
     || type === 'rows' || type === 'object'
     || type === 'keyvalue' || type === 'groups'
     || type === 'keybindMap' || type === 'mantineColor' || type === 'shade'
@@ -46,7 +48,7 @@ export function isWideColumn(type: SettingColumn['type']): boolean {
  * nobody sees.
  */
 export function FieldRow({
-  column, value, onChange, onPick, disabled, itemName, resource, path, dimmed,
+  column, value, onChange, onPick, disabled, itemName, resource, path, dimmed, row, parentRow,
 }: {
   column: SettingColumn;
   /**
@@ -79,9 +81,33 @@ export function FieldRow({
    * but one that does not currently apply should look like it.
    */
   dimmed?: boolean;
+  /** the row this field belongs to, for options sourced from a sibling field */
+  row?: Record<string, unknown>;
+  /** the row above it, for options sourced from the row it sits inside */
+  parentRow?: Record<string, unknown>;
 }) {
   const t = useChrome();
   const theme = useMantineTheme();
+
+  /**
+   * Bounds read off a sibling field, when the column asks for them.
+   *
+   * `self.` is this row, `parent.` the row it sits inside - the same prefixes
+   * `x-optionsFrom` and `x-enabledWhen` use, so a schema author learns them
+   * once. A pair of numbers is a range; a single number is a ceiling.
+   */
+  const bounds = useMemo((): [number | undefined, number | undefined] | undefined => {
+    const path = column.boundsFrom?.path;
+    if (!path) return undefined;
+    const source = path.startsWith('parent.') ? parentRow : row;
+    const key = path.replace(/^(self|parent)\./, '');
+    const found = source?.[key];
+    if (Array.isArray(found)) {
+      const [low, high] = found.map(Number);
+      return [Number.isFinite(low) ? low : undefined, Number.isFinite(high) ? high : undefined];
+    }
+    return Number.isFinite(Number(found)) ? [0, Number(found)] : undefined;
+  }, [column.boundsFrom?.path, row, parentRow]);
   const items = useItems();
   const wide = isWideColumn(column.type);
 
@@ -195,10 +221,19 @@ export function FieldRow({
       {column.type === 'range' && (
         <RangeControl
           value={value}
-          min={column.min}
-          max={column.max}
+          min={bounds?.[0] ?? column.min}
+          max={bounds?.[1] ?? column.max}
           disabled={disabled}
           suffix={column.suffix}
+          onChange={onChange}
+        />
+      )}
+
+      {column.type === 'peds' && (
+        <PedsField
+          value={value}
+          disabled={disabled}
+          label={column.label}
           onChange={onChange}
         />
       )}
@@ -274,6 +309,8 @@ export function FieldRow({
       {column.type === 'pickOne' && column.optionsFrom && resource && (
         <PickOneControl
           resource={resource}
+          row={row}
+          parentRow={parentRow}
           sourcePath={column.optionsFrom.path}
           sourceKey={column.optionsFrom.key}
           sourceLabelKey={column.optionsFrom.labelKey}
@@ -317,10 +354,21 @@ export function FieldRow({
       )}
 
       {column.type === 'rows' && (
-        <NestedRows column={column} value={value} disabled={disabled} onChange={onChange} />
+        <NestedRows
+          column={column}
+          resource={resource}
+          value={value}
+          disabled={disabled}
+          onChange={onChange}
+          parentRow={row}
+        />
       )}
 
-      {!wide && (
+      {/* `pickOne` is handled above, out of the row it belongs to - it cannot
+        * come from SettingControl, which has no idea what "the categories of
+        * the store this row is inside" means. Without this it fell through to
+        * the default text box and drew BOTH. */}
+      {!wide && column.type !== 'pickOne' && (
         <SettingControl
           type={column.type}
           column={column}

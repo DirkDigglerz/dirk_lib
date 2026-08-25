@@ -27,7 +27,7 @@ export function SectionBody({
   entries: SettingEntry[];
   query: string;
   /** the row renderer lives in main so it keeps its memoised identity */
-  renderRow: (entry: SettingEntry, rowFilter?: string) => React.ReactNode;
+  renderRow: (entry: SettingEntry, rowFilter?: string, fill?: boolean) => React.ReactNode;
   /**
    * The RAIL is the switcher, so there is no strip in the body.
    *
@@ -65,11 +65,51 @@ export function SectionBody({
     });
   }, [railDriven, railActive?.path, railPlain.length]);
 
+  // Polygon layers all share one canvas rather than getting a map each.
+  const mapLayers = entries.filter((e) => e.type === 'zones');
+  const rest = entries.filter((e) => e.type !== 'zones');
+
   if (railDriven) {
+    // A map section FIRST. Being a workspace is exactly what a map section
+    // is, so the rail-driven split below - which knows only about lists and
+    // loose settings - was catching Zones and rendering it as three plain
+    // rows before the map was ever considered.
+    if (mapLayers.length > 0) {
+      return (
+        <Flex direction="column" flex={1} style={{ minHeight: 0 }}>
+          <ZoneMap
+            resource={resource}
+            layers={mapLayers.map((entry) => ({
+              entry,
+              value: effectiveValue(resource, entry),
+              onChange: (next) => setValue(resource, entry, next),
+            }))}
+          />
+          {rest.map((entry, index) => withSubgroup(entry, index, rest, renderRow, color, theme))}
+        </Flex>
+      );
+    }
+
+    // One list: its own settings first, then the list. A store toggle that
+    // switches the whole list off belongs above the thing it switches off,
+    // not behind a tab beside it.
+    if (railLists.length <= 1) {
+      return (
+        <Flex direction="column" gap="xs" flex={1} style={{ minHeight: 0 }}>
+          {railPlain.map((entry, index) => withSubgroup(entry, index, railPlain, renderRow, color, theme))}
+          {railLists[0] && (
+            <Flex direction="column" flex={1} style={{ minHeight: 0 }}>
+              {renderRow(railLists[0], query || undefined, true)}
+            </Flex>
+          )}
+        </Flex>
+      );
+    }
+
     if (railActive) {
       return (
         <Flex direction="column" flex={1} style={{ minHeight: 0 }}>
-          <Fragment key={railActive.path}>{renderRow(railActive, query || undefined)}</Fragment>
+          <Fragment key={railActive.path}>{renderRow(railActive, query || undefined, true)}</Fragment>
         </Flex>
       );
     }
@@ -79,10 +119,6 @@ export function SectionBody({
       </Flex>
     );
   }
-
-  // Polygon layers all share one canvas rather than getting a map each.
-  const mapLayers = entries.filter((e) => e.type === 'zones');
-  const rest = entries.filter((e) => e.type !== 'zones');
 
   if (mapLayers.length > 0) {
     return (

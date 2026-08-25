@@ -6,13 +6,16 @@ import { AlertTriangle, ChevronRight, Crosshair, Eye, EyeOff, Keyboard, MapPin, 
 import { useState } from 'react';
 import {
   AccountSelect, BlipDisplaySelect, ControlMultiSelect, ControlSelect, FiveMKeyBindInput,
+  blipUrlForSprite, getBlipColor, getBlipEntry,
   GroupSelect, Vector4Display, WorldPositionGotoButton, WorldPositionSetButton, fetchNui, useItems,
 } from 'dirk-cfx-react';
 import { MeterControl } from './MeterControl';
+import { RangeControl, SliderControl } from './RichControls';
 import { Icon } from './Icon';
 import { notify } from './Toasts';
-import { IconPicker } from './IconPicker';
+import { AnyIcon } from './Icon';
 import { ModelControl } from './ModelControl';
+import { PedsField } from './PedControl';
 import type { ControlType, SettingColumn, SettingEntry } from './types';
 import { useChrome } from './studioLocale';
 
@@ -141,18 +144,6 @@ export function useLeftSectionStyles(compact?: boolean) {
 }
 
 /** GTA blip palette - enough of it to make the picker read as real. */
-export const BLIP_COLORS: Record<number, { name: string; hex: string }> = {
-  1: { name: 'Red', hex: '#e03232' },
-  2: { name: 'Green', hex: '#48c74a' },
-  3: { name: 'Blue', hex: '#2f8fe0' },
-  5: { name: 'Yellow', hex: '#e0d13a' },
-  17: { name: 'Orange', hex: '#e08a3a' },
-  38: { name: 'Dark Blue', hex: '#2f5ee0' },
-  46: { name: 'Gold', hex: '#e0b15f' },
-  47: { name: 'Pink', hex: '#e05fb1' },
-  59: { name: 'Teal', hex: '#4cc3de' },
-  69: { name: 'Lime', hex: '#8fe05f' },
-};
 
 function ControlShell({
   children, width, className,
@@ -365,14 +356,25 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
         </ControlShell>
       );
 
+    // Our own picker modal, filled from the library's catalogue.
+    //
+    // The list used to be ten colours hand-written in this file, out of the
+    // eighty-odd the game has. Swapping the whole control for the library's
+    // dropdown fixed the list and lost the picker - so only the DATA comes
+    // from there now, and the modal is the same one every other picker uses.
     case 'blipColor': {
-      const blip = BLIP_COLORS[Number(value)] ?? { name: 'Custom', hex: '#888' };
+      const blip = getBlipColor(Number(value));
       return (
         <ControlShell>
           <PickerButton onClick={onDrill} disabled={disabled} grow>
             <Flex align="center" gap="xs" style={{ minWidth: 0 }}>
-              <Flex w="1.8vh" h="1.8vh" style={{ background: blip.hex, borderRadius: '0.3vh', flexShrink: 0 }} />
-              <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.85)">{blip.name}</Text>
+              <Flex
+                w="1.8vh" h="1.8vh"
+                style={{ background: blip?.hex ?? '#888', borderRadius: '0.3vh', flexShrink: 0 }}
+              />
+              <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.85)">
+                {blip?.label ?? t('controls.custom', 'Custom')}
+              </Text>
               <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.35)">{String(value)}</Text>
             </Flex>
             <ChevronRight size="1.5vh" color="rgba(255,255,255,0.35)" />
@@ -438,7 +440,10 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
       return (
         <ControlShell>
           <BlipDisplaySelect
-            label={undefined}
+            // Empty, not undefined: the library declares `label = "Blip
+            // Display"` as a default parameter, so passing undefined asks for
+            // the default rather than for nothing.
+            label=""
             value={typeof value === 'number' ? value : 4}
             onChange={(next) => onChange(next)}
             disabled={disabled}
@@ -449,18 +454,26 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
         </ControlShell>
       );
 
-    case 'blipSprite':
+    case 'blipSprite': {
+      const sprite = getBlipEntry(Number(value));
+      const art = blipUrlForSprite(Number(value));
       return (
         <ControlShell>
           <PickerButton onClick={onDrill} disabled={disabled} grow>
-            <Flex align="center" gap="xs">
-              <MapPin size="1.5vh" color={color} />
-              <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.85)">Sprite {String(value)}</Text>
+            <Flex align="center" gap="xs" style={{ minWidth: 0 }}>
+              {art
+                ? <img src={art} alt="" style={{ width: '1.8vh', height: '1.8vh', flexShrink: 0 }} />
+                : <MapPin size="1.5vh" color={color} />}
+              <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.85)" truncate>
+                {sprite?.name ?? `Sprite ${String(value)}`}
+              </Text>
+              <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.35)">{String(value)}</Text>
             </Flex>
             <ChevronRight size="1.5vh" color="rgba(255,255,255,0.35)" />
           </PickerButton>
         </ControlShell>
       );
+    }
 
     // One framework job or gang, declared with `x-groupPicker`. A plain text
     // box here is a silent failure waiting to happen: a typo makes, say, a
@@ -478,19 +491,28 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
         </ControlShell>
       );
 
-    // A lucide icon. This was a text box, which asked you to know that the
-    // icon called "fuel" exists and is spelled that way. Nobody knows that;
-    // they know what a fuel pump looks like.
-    case 'icon':
+    // An icon. This was a text box, which asked you to know that the icon
+    // called "fuel" exists and is spelled that way. Nobody knows that; they
+    // know what a fuel pump looks like.
+    //
+    // Which SET is the field's business, not the panel's: a script whose own
+    // UI draws Font Awesome must keep getting Font Awesome back.
+    case 'icon': {
+      const iconName = typeof value === 'string' ? value : '';
       return (
-        <ControlShell width="46vh">
-          <IconPicker
-            value={value}
-            onChange={(next) => onChange(next)}
-            disabled={disabled}
-          />
+        <ControlShell>
+          <PickerButton onClick={onDrill} disabled={disabled} grow>
+            <Flex align="center" gap="xs" style={{ minWidth: 0 }}>
+              <AnyIcon name={iconName || 'help-circle'} size="1.7vh" color={color} />
+              <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.85)" truncate>
+                {iconName || t('controls.no_icon', 'No icon')}
+              </Text>
+            </Flex>
+            <ChevronRight size="1.5vh" color="rgba(255,255,255,0.35)" />
+          </PickerButton>
         </ControlShell>
       );
+    }
 
     case 'account':
       // dirk_lib knows the framework's real account list; the picker asks it.
@@ -530,6 +552,13 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
       return (
         <ControlShell width="40vh">
           <ModelControl value={value} onChange={onChange} disabled={disabled} compact={compact} />
+        </ControlShell>
+      );
+
+    case 'peds':
+      return (
+        <ControlShell>
+          <PedsField value={value} onChange={(next) => onChange(next)} disabled={disabled} />
         </ControlShell>
       );
 
@@ -778,6 +807,44 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
         </ControlShell>
       );
     }
+
+    // A [min, max] pair, and the sliders that go with it.
+    //
+    // These were wired into the ROW editor only, so the same type at the top
+    // level - `cellFishDensity`, `gridDensity` - fell through to the default
+    // text box and rendered as one empty field.
+    //
+    // NOTE the position: `case 'string'` is a deliberate fall-through to the
+    // default text box, so anything added between the two silently becomes
+    // the control for every string in the panel. These belong ABOVE it.
+    case 'range':
+      return (
+        // The standard width, so the MIN box lines up with the control in the
+        // row above and below rather than starting two vh to the left.
+        <ControlShell>
+          <RangeControl
+            value={value}
+            min={entry?.min ?? column?.min}
+            max={entry?.max ?? column?.max}
+            suffix={suffix}
+            disabled={disabled}
+            onChange={onChange}
+          />
+        </ControlShell>
+      );
+
+    case 'slider':
+      return (
+        <ControlShell width="30vh">
+          <SliderControl
+            value={value}
+            min={entry?.min ?? column?.min}
+            max={entry?.max ?? column?.max}
+            disabled={disabled}
+            onChange={onChange}
+          />
+        </ControlShell>
+      );
 
     case 'string':
     default:

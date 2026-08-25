@@ -1,11 +1,43 @@
 import { alpha, Flex, NumberInput, Text, TextInput, useMantineTheme } from '@mantine/core';
-import { Modal, fetchNui, isEnvBrowser, useItems } from 'dirk-cfx-react';
+import {
+  Modal, blipUrlForSprite, fetchNui, getBlipColor, getBlipEntry, isEnvBrowser,
+  loadModels, useItems, useModels,
+} from 'dirk-cfx-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { PedArt } from './pedArt';
+import { IconPicker } from './IconPicker';
+
+/**
+ * The real catalogues, discovered rather than hardcoded.
+ *
+ * dirk-cfx-react resolves a blip colour or sprite BY ID; it exports no list.
+ * Walking the id space once and keeping whatever resolves gives the full set
+ * without a copy of it living here to fall out of date - which is exactly how
+ * this panel ended up offering ten colours out of eighty-odd.
+ */
+const BLIP_COLOURS = Array.from({ length: 90 }, (_, id) => getBlipColor(id))
+  .filter((entry): entry is { id: number; label: string; hex: string } => !!entry);
+
+const BLIP_SPRITES = Array.from({ length: 900 }, (_, id) => getBlipEntry(id))
+  .filter((entry): entry is { id: number; name: string; ext: string } => !!entry);
+
+/**
+ * Which models are PEDS.
+ *
+ * The model dump is peds, vehicles and props in one list with no flag saying
+ * which is which - but ped models follow a naming convention that has held
+ * since launch: a_/s_/u_/g_ plus male-female-child, the cutscene and
+ * multiplayer prefixes, the animals. Matching the prefix is reading the scheme
+ * rather than guessing at it.
+ */
+const PED_PREFIX = /^(a_[cmf]_|s_[mf]_|u_[mf]_|g_[mf]_|cs_|csb_|ig_|mp_[mf]_|player_|hc_)/;
 import { motion } from 'framer-motion';
 import { ItemArt } from './ui';
-import { Crosshair, Keyboard, MapPin, Navigation, Package, Palette, Plus, Search } from 'lucide-react';
+import {
+  Crosshair, Keyboard, MapPin, Navigation, Package, Palette, Plus, Search, Shapes, User,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { BLIP_COLORS, useInputStyles, useSearchInputStyles } from './Controls';
+import { useInputStyles, useSearchInputStyles } from './Controls';
 import { StudioButton } from './ui';
 import { MOCK_ITEMS } from './mockData';
 import type { ControlType } from './types';
@@ -22,16 +54,14 @@ type PickerProps = {
   onApply: (next: unknown) => void;
   onClose: () => void;
   disabled?: boolean;
+  /** which icon set an `icon` picker should offer - schema `x-iconSet` */
+  iconSet?: 'lucide' | 'fontawesome';
 };
 
-const BLIP_SPRITES: { id: number; name: string }[] = [
-  { id: 1, name: 'Waypoint' }, { id: 68, name: 'Fishing' }, { id: 356, name: 'Boat' },
-  { id: 404, name: 'Anchor' }, { id: 371, name: 'Shop' }, { id: 267, name: 'Docks' },
-  { id: 50, name: 'Garage' }, { id: 108, name: 'Weed' }, { id: 140, name: 'Meth' },
-  { id: 51, name: 'Crate' }, { id: 434, name: 'Trophy' }, { id: 280, name: 'Target' },
-];
 
-export function PickerDrawer({ type, label, help, value, onApply, onClose, disabled }: PickerProps) {
+export function PickerDrawer({
+  type, label, help, value, onApply, onClose, disabled, iconSet,
+}: PickerProps) {
   const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
@@ -102,6 +132,55 @@ export function PickerDrawer({ type, label, help, value, onApply, onClose, disab
    * Offered as its own row rather than silently allowed, so choosing it is a
    * decision. Hidden once the name IS installed - there is a real row for it.
    */
+  /**
+   * Every sprite that matches, with no cap.
+   *
+   * Capping the list assumed you know what to search for, and nobody knows
+   * the name of a blip they have not seen - browsing IS the way you pick one.
+   * The artwork loads as it scrolls into view (see BlipArt), so eight hundred
+   * of them costs eight hundred small DOM nodes and only the images actually
+   * looked at.
+   */
+  // The model dump is a ~1MB dynamic import, pulled only when a ped picker
+  // actually opens.
+  useEffect(() => { if (type === 'ped') loadModels(); }, [type]);
+  const { models } = useModels();
+
+  /**
+   * Ped models matching the search - people first.
+   *
+   * `a_c_` is the animal prefix and sorts before every human one, so the
+   * picker opened on a boar, a cat and a chicken. Whoever is being placed
+   * behind a counter is a person almost every time; the animals keep their
+   * place in the list, just not the first screen of it.
+   */
+  const peds = useMemo(() => {
+    if (type !== 'ped') return [];
+    const all = models.filter((model) => PED_PREFIX.test(model));
+    const needle = query.trim().toLowerCase();
+    const matched = needle
+      ? all.filter((model) => model.toLowerCase().includes(needle))
+      : all;
+    const animal = (model: string) => (model.startsWith('a_c_') ? 1 : 0);
+    return [...matched].sort((a, b) => animal(a) - animal(b) || a.localeCompare(b));
+  }, [type, models, query]);
+
+  /** A typed model the list does not know. */
+  const customPed = useMemo(() => {
+    const typed = query.trim();
+    if (type !== 'ped' || !typed) return '';
+    return peds.some((model) => model.toLowerCase() === typed.toLowerCase()) ? '' : typed;
+  }, [type, query, peds]);
+
+  const sprites = useMemo(() => {
+    if (type !== 'blipSprite') return [];
+    const needle = query.trim().toLowerCase();
+    if (!needle) return BLIP_SPRITES;
+    return BLIP_SPRITES.filter((s) => (
+      s.name.toLowerCase().includes(needle) || String(s.id) === needle
+    ));
+  }, [type, query]);
+
   const customName = useMemo(() => {
     const typed = query.trim();
     if (type !== 'item' || !typed) return '';
@@ -130,7 +209,12 @@ export function PickerDrawer({ type, label, help, value, onApply, onClose, disab
       onClose={onClose}
       width={type === 'item' ? '68vh' : type === 'coords' ? '62vh' : '72vh'}
       height={type === 'coords' ? '42vh' : '62vh'}
-      zIndex={10100}
+      // Above the row editors that open it.
+      //
+      // At 10100 this tied with RowModal and sat under NestedRowModal (10400),
+      // so a blip colour picked from a store row opened behind the very modal
+      // that asked for it. Toasts stay above at 10500.
+      zIndex={10450}
     >
       <Flex direction="column" flex={1} style={{ minHeight: 0 }}>
         <Flex direction="column" flex={1} p="sm" gap="xs" style={{ overflowY: 'auto', minHeight: 0 }}>
@@ -168,18 +252,47 @@ export function PickerDrawer({ type, label, help, value, onApply, onClose, disab
           )}
 
           {type === 'blipColor' && (
-            <Flex wrap="wrap" gap="xs">
-              {Object.entries(BLIP_COLORS).map(([id, blip]) => {
-                const active = Number(id) === Number(draft);
+            <>
+              <TextInput
+                value={query}
+                onChange={(e) => setQuery(e.currentTarget.value)}
+                placeholder={t('pickerDrawer.search_colours', 'Search colours')}
+                leftSection={<Search size="1.5vh" color="rgba(255,255,255,0.35)" />}
+                styles={searchStyles}
+                style={{ width: '100%' }}
+              />
+            {/* A GRID, not a wrap.
+              * Fixed-width tiles in a wrapping row leave whatever does not
+              * divide evenly as a ragged strip down the right-hand side.
+              * auto-fill spreads the same tiles across the full width. */}
+            <div
+              className="studio-scroll"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(11vh, 1fr))',
+                gap: '0.8vh',
+                maxHeight: '44vh',
+                overflowY: 'auto',
+                alignContent: 'start',
+              }}
+            >
+              {BLIP_COLOURS
+                .filter((blip) => {
+                  const needle = query.trim().toLowerCase();
+                  if (!needle) return true;
+                  return blip.label.toLowerCase().includes(needle) || String(blip.id) === needle;
+                })
+                .map((blip) => {
+                const active = blip.id === Number(draft);
                 return (
                   <motion.button
-                    key={id}
+                    key={blip.id}
                     type="button"
-                    onClick={() => !disabled && setDraft(Number(id))}
+                    onClick={() => !disabled && setDraft(blip.id)}
                     whileTap={{ scale: 0.96 }}
                     style={{
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5vh',
-                      width: '11vh', padding: '1vh 0.6vh',
+                      padding: '1vh 0.6vh', minWidth: 0,
                       background: active ? alpha(color, 0.12) : alpha(theme.colors.dark[8], 0.5),
                       border: `0.1vh solid ${active ? alpha(color, 0.6) : alpha(theme.colors.dark[5], 0.4)}`,
                       borderRadius: theme.radius.xs,
@@ -187,17 +300,42 @@ export function PickerDrawer({ type, label, help, value, onApply, onClose, disab
                     }}
                   >
                     <Flex w="3.4vh" h="3.4vh" style={{ background: blip.hex, borderRadius: '0.4vh' }} />
-                    <Text ff="Akrobat Bold" size="xxs" c="rgba(255,255,255,0.8)">{blip.name}</Text>
-                    <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.3)">{id}</Text>
+                    <Text ff="Akrobat Bold" size="xxs" c="rgba(255,255,255,0.8)" truncate style={{ maxWidth: '100%' }}>
+                      {blip.label}
+                    </Text>
+                    <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.3)">{blip.id}</Text>
                   </motion.button>
                 );
               })}
-            </Flex>
+            </div>
+            </>
           )}
 
           {type === 'blipSprite' && (
-            <Flex wrap="wrap" gap="xs">
-              {BLIP_SPRITES.map((sprite) => {
+            <>
+              {/* Eight hundred sprites is not a wall to scroll: it is a thing
+                  to search. The grid shows what matches, capped, because
+                  nobody reads past a screenful anyway. */}
+              <TextInput
+                value={query}
+                onChange={(e) => setQuery(e.currentTarget.value)}
+                placeholder={t('pickerDrawer.search_sprites', 'Search sprites')}
+                leftSection={<Search size="1.5vh" color="rgba(255,255,255,0.35)" />}
+                styles={searchStyles}
+                style={{ width: '100%' }}
+              />
+            <div
+              className="studio-scroll"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(11vh, 1fr))',
+                gap: '0.8vh',
+                maxHeight: '44vh',
+                overflowY: 'auto',
+                alignContent: 'start',
+              }}
+            >
+              {sprites.map((sprite) => {
                 const active = sprite.id === Number(draft);
                 return (
                   <motion.button
@@ -207,20 +345,147 @@ export function PickerDrawer({ type, label, help, value, onApply, onClose, disab
                     whileTap={{ scale: 0.96 }}
                     style={{
                       display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5vh',
-                      width: '11vh', padding: '1vh 0.6vh',
+                      padding: '1vh 0.6vh', minWidth: 0,
                       background: active ? alpha(color, 0.12) : alpha(theme.colors.dark[8], 0.5),
                       border: `0.1vh solid ${active ? alpha(color, 0.6) : alpha(theme.colors.dark[5], 0.4)}`,
                       borderRadius: theme.radius.xs,
                       cursor: disabled ? 'not-allowed' : 'pointer',
                     }}
                   >
-                    <MapPin size="2.6vh" color={active ? color : 'rgba(255,255,255,0.5)'} />
-                    <Text ff="Akrobat Bold" size="xxs" c="rgba(255,255,255,0.8)">{sprite.name}</Text>
+                    {/* The blip's own artwork - the whole point of choosing
+                        one by eye rather than by number. */}
+                    <BlipArt id={sprite.id} active={active} color={color} />
+                    <Text ff="Akrobat Bold" size="xxs" c="rgba(255,255,255,0.8)" truncate style={{ maxWidth: '100%' }}>
+                      {sprite.name}
+                    </Text>
                     <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.3)">{sprite.id}</Text>
                   </motion.button>
                 );
               })}
-            </Flex>
+
+              {sprites.length === 0 && (
+                <Flex justify="center" py="md" style={{ gridColumn: '1 / -1' }}>
+                  <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.3)">
+                    {t('pickerDrawer.no_sprite', 'No sprite matches that')}
+                  </Text>
+                </Flex>
+              )}
+            </div>
+            </>
+          )}
+
+          {/* The icon grid is the same component the row used to embed. What
+              changed is where it lives: inline, it was a 300px block sitting in
+              the middle of a form, pushing everything after it off the screen -
+              and it was the one picker in the panel that did not open like the
+              rest of them. */}
+          {type === 'icon' && (
+            <IconPicker
+              value={draft}
+              set={iconSet}
+              disabled={disabled}
+              onChange={(next) => setDraft(next)}
+            />
+          )}
+
+          {type === 'ped' && (
+            <>
+              <TextInput
+                value={query}
+                onChange={(e) => setQuery(e.currentTarget.value)}
+                placeholder={t('pickerDrawer.search_peds', 'Search peds, or type a custom model')}
+                leftSection={<Search size="1.5vh" color="rgba(255,255,255,0.35)" />}
+                styles={searchStyles}
+                style={{ width: '100%' }}
+              />
+
+              {/* A model this list does not know is still a model: servers add
+                  their own peds constantly, and the picker should not be the
+                  reason one cannot be used. Flagged, not refused. */}
+              {customPed && (
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    if (disabled) return;
+                    setDraft(customPed);
+                    onApply(customPed);
+                    onClose();
+                  }}
+                  whileTap={{ scale: 0.995 }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.9vh',
+                    padding: '0.7vh 0.8vh',
+                    background: alpha('#f59e0b', 0.1),
+                    border: `0.1vh solid ${alpha('#f59e0b', 0.45)}`,
+                    borderRadius: theme.radius.xs,
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    textAlign: 'left', width: '100%',
+                  }}
+                >
+                  <PedArt model={customPed} size="3.2vh" />
+                  <Flex direction="column" style={{ minWidth: 0, lineHeight: 1.15 }}>
+                    <Text ff="Akrobat Bold" size="xs" c="#f59e0b">
+                      {t('pickerDrawer.use_this_ped', 'Use this model anyway')}
+                    </Text>
+                    <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.4)">
+                      {customPed}
+                    </Text>
+                  </Flex>
+                </motion.button>
+              )}
+
+              <div
+                className="studio-scroll"
+                style={{
+                  display: 'grid',
+                  // Five across, fixed. Auto-fill packed in as many as would go, which
+                  // for a picture of a person meant a wall of thumbnails you had
+                  // to lean in to read. Fewer, bigger, is the whole point of
+                  // showing the ped rather than its model name.
+                  gridTemplateColumns: 'repeat(5, 1fr)',
+                  gap: '0.8vh',
+                  maxHeight: '44vh',
+                  overflowY: 'auto',
+                  alignContent: 'start',
+                }}
+              >
+                {peds.map((model) => {
+                  const active = model === draft;
+                  return (
+                    <motion.button
+                      key={model}
+                      type="button"
+                      onClick={() => !disabled && setDraft(model)}
+                      whileTap={{ scale: 0.96 }}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5vh',
+                        padding: '0.9vh 0.5vh', minWidth: 0,
+                        background: active ? alpha(color, 0.12) : alpha(theme.colors.dark[8], 0.5),
+                        border: `0.1vh solid ${active ? alpha(color, 0.6) : alpha(theme.colors.dark[5], 0.4)}`,
+                        borderRadius: theme.radius.xs,
+                        cursor: disabled ? 'not-allowed' : 'pointer',
+                      }}
+                    >
+                      <PedArt model={model} size="13vh" />
+                      <Text
+                        ff="monospace" size="xxs" c="rgba(255,255,255,0.7)"
+                        truncate style={{ maxWidth: '100%' }}
+                      >
+                        {model}
+                      </Text>
+                    </motion.button>
+                  );
+                })}
+
+                {peds.length === 0 && (
+                  <Flex justify="center" py="md" style={{ gridColumn: '1 / -1' }}>
+                    <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.3)">
+                      {t('pickerDrawer.no_ped', 'No ped matches that')}
+                    </Text>
+                  </Flex>
+                )}
+              </div>
+            </>
           )}
 
           {type === 'item' && (
@@ -439,6 +704,8 @@ const PICKER_META: Partial<Record<ControlType, { icon: React.ElementType; title:
   keybind: { icon: Keyboard, title: 'Rebind key' },
   blipColor: { icon: Palette, title: 'Blip colour' },
   blipSprite: { icon: MapPin, title: 'Blip sprite' },
+  ped: { icon: User, title: 'Ped model' },
+  icon: { icon: Shapes, title: 'Icon' },
   item: { icon: Package, title: 'Pick an item' },
   coords: { icon: Crosshair, title: 'Position' },
 };
@@ -447,5 +714,34 @@ const PICKER_META: Partial<Record<ControlType, { icon: React.ElementType; title:
 export function opensPicker(type: ControlType): boolean {
   // keybind and control edit inline through dirk-cfx-react's own inputs, so
   // they deliberately do not open a sub-view.
-  return type === 'blipColor' || type === 'blipSprite' || type === 'item' || type === 'coords';
+  //
+  // The blips DO. Their controls draw a picker button and hand `onDrill` up,
+  // but a field only receives one when this says so - and while they were
+  // briefly dropdowns, this stopped saying so. The buttons stayed, wired to
+  // nothing, which is why clicking a blip colour in a store did nothing at all.
+  return type === 'item' || type === 'coords' || type === 'icon'
+    || type === 'blipColor' || type === 'blipSprite' || type === 'ped';
+}
+
+
+/** A blip's artwork, falling back to a pin when it has none. */
+function BlipArt({ id, active, color }: { id: number; active: boolean; color: string }) {
+  const [failed, setFailed] = useState(false);
+  const src = blipUrlForSprite(id);
+
+  if (!src || failed) {
+    return <MapPin size="2.6vh" color={active ? color : 'rgba(255,255,255,0.5)'} />;
+  }
+  return (
+    <img
+      src={src}
+      alt=""
+      // Fetched when it scrolls into view, not all at once. This is what lets
+      // the whole catalogue be browsable rather than searched blind.
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+      style={{ width: '2.8vh', height: '2.8vh', objectFit: 'contain' }}
+    />
+  );
 }

@@ -1,5 +1,5 @@
 import { alpha, Flex, Select, Text, TextInput, useMantineTheme } from '@mantine/core';
-import { fetchNui, getItemImageUrl, useItems, type Vehicle } from 'dirk-cfx-react';
+import { fetchNui, getItemImageUrl, useItems, useSettings, type Vehicle } from 'dirk-cfx-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Box, Car, Check, ChevronRight,
@@ -119,7 +119,7 @@ export function CataloguePage({ kind, query }: { kind: Kind; query: string }) {
         facts: [
           ...(vehicle.brand ? [{ label: t('column.brand', 'Brand'), value: vehicle.brand }] : []),
           ...(vehicle.category ? [{ label: t('column.class', 'Class'), value: vehicle.category }] : []),
-          ...(vehicle.price !== undefined ? [{ label: t('column.price', 'Price'), value: `$${vehicle.price.toLocaleString()}` }] : []),
+          ...(vehicle.price !== undefined ? [{ label: t('column.price', 'Price'), value: `${useSettings.getState().currency || '$'}${vehicle.price.toLocaleString()}` }] : []),
         ],
       }));
   }, [kind, items, vehicles, needle, category]);

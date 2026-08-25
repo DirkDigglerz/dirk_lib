@@ -12,7 +12,7 @@ import { PANE_HEIGHT, PANE_MIN_HEIGHT } from './Controls';
 import { FieldRow } from './FieldRow';
 import { Icon } from './Icon';
 import { PickerDrawer } from './PickerDrawer';
-import { StudioButton } from './ui';
+import { fieldGatedOff, StudioButton } from './ui';
 import type { SettingColumn, SettingEntry } from './types';
 import { useChrome } from './studioLocale';
 
@@ -41,7 +41,9 @@ const ZONE_PALETTE = ['#5FD08A', '#4CC3DE', '#E0B15F', '#E0776B', '#B98FE0', '#8
  * Nothing here asks anyone to type a coordinate: boundaries are drawn with
  * leaflet-draw, the same interaction fishing's ZonesSection uses.
  */
-export function ZoneMap({ layers, disabled }: { layers: MapLayerInput[]; disabled?: boolean }) {
+export function ZoneMap({
+  layers, resource, disabled,
+}: { layers: MapLayerInput[]; resource?: string; disabled?: boolean }) {
   const t = useChrome();
   const theme = useMantineTheme();
   const accent = theme.colors[theme.primaryColor][5];
@@ -427,6 +429,7 @@ export function ZoneMap({ layers, disabled }: { layers: MapLayerInput[]; disable
         {editing && editingLayer && editingRow && (
           <ShapeModal
             entry={editingLayer.entry}
+            resource={resource}
             row={editingRow}
             polyKey={editingLayer.polyKey}
             title={editingLayer.shapes[editing.index]?.title ?? editingLayer.entry.label}
@@ -639,9 +642,11 @@ function ShapeLabel({
 }
 
 function ShapeModal({
-  entry, row, polyKey, title, onSave, onDelete, onClose, disabled,
+  entry, resource, row, polyKey, title, onSave, onDelete, onClose, disabled,
 }: {
   entry: SettingEntry;
+  /** the script this zone belongs to, for options resolved from its config */
+  resource?: string;
   row: Row;
   polyKey: string;
   title: string;
@@ -678,8 +683,11 @@ function ShapeModal({
               <FieldRow
                 key={column.key}
                 column={column}
+                resource={resource}
+                row={draft}
                 value={draft[column.key]}
-                disabled={disabled}
+                disabled={disabled || fieldGatedOff(column, draft)}
+                dimmed={fieldGatedOff(column, draft)}
                 onChange={(v) => setDraft((prev) => ({ ...prev, [column.key]: v }))}
                 onPick={() => setPicker(column)}
               />
@@ -704,6 +712,7 @@ function ShapeModal({
           <PickerDrawer
             type={picker.type}
             label={picker.label}
+            iconSet={picker.iconSet}
             value={draft[picker.key]}
             disabled={disabled}
             onApply={(v) => setDraft((prev) => ({ ...prev, [picker.key]: v }))}

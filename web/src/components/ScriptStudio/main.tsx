@@ -38,17 +38,20 @@ import { WeightMapControl } from './WeightMapControl';
 import { RefListControl } from './RefListControl';
 import { MantineColorControl, ShadeControl } from './ThemeControls';
 import { CustomControl } from './CustomControl';
+import { FieldAction } from './FieldAction';
 import { FieldValidator } from './FieldValidator';
 import { Icon } from './Icon';
 import { PickerDrawer, opensPicker } from './PickerDrawer';
+import { SearchResults } from './SearchResults';
+import { ScriptPage } from './ScriptPage';
 import { Chip, StudioButton } from './ui';
 import {
-  commitDraft, discardDraft, dirtyCount, effectiveValue, factoryReset,
-  isEnabled, isModified, isStaged, matchesSearch, redo, revertToDefault, setValue, undo, useStudio,
+  commitDraft, dirtyCount, discardDraft, effectiveValue, factoryReset, isEnabled, isModified, isStaged, matchesSearch, redo, revertToDefault, sectionValues, setValue, undo, useStudio,
 } from './store';
 import { loadLocales, sectionKey, settingKey, translate, useActiveLanguage, useBundles, useChrome } from './studioLocale';
 import type { SettingEntry, SettingGroup, StudioScript } from './types';
 import { useInputCssVars } from './Controls';
+import { useAdminToolStore } from 'dirk-cfx-react';
 import { ChangelogPage } from './ChangelogPage';
 import { TestsPage } from './TestsPage';
 import { useAnnouncedResources } from './Dispatch';
@@ -92,6 +95,16 @@ export default function ScriptStudio() {
   const activePage = useStudio((s) => s.activePage);
   const shownList = useStudio((s) => s.shownList);
   const inputVars = useInputCssVars();
+
+  /**
+   * A running admin tool takes the screen.
+   *
+   * Picking a position means walking to it, so the panel has to be out of the
+   * way - it is hidden rather than closed, because everything staged in it
+   * must still be there when you come back. dirk_lib's client has already
+   * released NUI focus by this point.
+   */
+  const activeTool = useAdminToolStore((s) => s.active);
 
   /**
    * Published on the DOCUMENT, not on the panel.
@@ -157,6 +170,10 @@ export default function ScriptStudio() {
     const primaryColor = read('.primaryColor') ?? read('.primaryColour');
     const primaryShade = read('.primaryShade');
     const customTheme = read('.customTheme');
+    // Currency belongs here for the same reason the theme does: a script's own
+    // Studio page renders money, and hardcoding "$" in each one means a server
+    // running on pounds has to be corrected in every script that shows a price.
+    const currency = read('.currency');
 
     useSettings.setState({
       ...(typeof primaryColor === 'string' ? { primaryColor } : {}),
@@ -164,6 +181,7 @@ export default function ScriptStudio() {
       ...(Array.isArray(customTheme) && customTheme.length === 10
         ? { customTheme: customTheme as never }
         : {}),
+      ...(typeof currency === 'string' && currency ? { currency } : {}),
       ...(language ? { language } : {}),
     });
   }, [sharedScript, sharedDraft, language]);
@@ -244,6 +262,30 @@ export default function ScriptStudio() {
     () => scripts.find((s) => s.resource === activeResource) ?? scripts[0],
     [scripts, activeResource],
   );
+
+  /**
+   * The script's own page currently open, if any.
+   *
+   * Namespaced `page:<id>` so a script cannot collide with a built-in - a
+   * resource declaring a page called "logs" should get its own, not dirk_lib's
+   * server log.
+   */
+  const scriptPage = useMemo(
+    () => (activePage?.startsWith('page:')
+      ? script?.pages?.find((entry) => entry.id === activePage.slice(5))
+      : undefined),
+    [activePage, script],
+  );
+
+  /**
+   * A section to land on once the script owning it is actually open.
+   *
+   * A global search result belongs to a script that is not selected yet, and
+   * jumping in the same tick asks the CURRENT script for a section it does not
+   * have - so the click opened the right script on its first section and
+   * stopped there. Selecting is one render; jumping is the next.
+   */
+  const pendingJump = useRef<{ resource: string; group: string } | null>(null);
 
   const query = deferredSearch.trim();
 
@@ -333,7 +375,11 @@ export default function ScriptStudio() {
       const loose = groupEntries.filter((entry) => !tabsAsList(entry));
       const isWorkspace = workspaceGroups.has(groupId);
 
-      if (lists.length >= 2 || (isWorkspace && lists.length >= 1)) {
+      // TWO or more. A section holding a single list is one page - its own
+      // settings above it and the list below - and giving that a child called
+      // Basic and a child called the-list-again splits one screen in half for
+      // no reason.
+      if (lists.length >= 2) {
         const children: { id: string; label: string; count: number; list?: string }[] = [];
 
         // A workspace's own settings are one of its places, so they get a name
@@ -793,6 +839,35 @@ export default function ScriptStudio() {
 
     jumpAnim.current = requestAnimationFrame(step);
   }, [virtualizer, visibleGroups, pinSection]);
+
+  // Land on the section a global search result named, once its script is the
+  // one on screen. `visibleGroups` is what proves that: it is derived from the
+  // active script, so the moment it contains the target the pane is showing
+  // that script and the anchor exists to scroll to.
+  //
+  // A REF rather than state, and cleared BEFORE the frame is asked for. Held
+  // as state, clearing it re-ran this effect, and the re-run's cleanup
+  // cancelled the very frame that was about to do the jump - so nothing
+  // happened at all, and the click looked like it had merely opened the
+  // script.
+  useEffect(() => {
+    const want = pendingJump.current;
+    if (!want) return;
+    if (script?.resource !== want.resource) return;
+    // The search is cleared on the same click, but `deferredSearch` lags a
+    // render - so jumping straight away scrolled a list that was still
+    // filtered, and the pane snapped back when it unfiltered a tick later.
+    if (query) return;
+    if (!visibleGroups.some((group) => group.id === want.group)) return;
+
+    pendingJump.current = null;
+    // Two frames: the pane has just gone from one section to all of them, and
+    // the virtualiser measures on the frame after that.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => jumpToRef.current(want.group));
+    });
+  }, [script, visibleGroups, query]);
+
   jumpToRef.current = jumpTo;
 
   useEffect(() => () => {
@@ -875,6 +950,9 @@ export default function ScriptStudio() {
             transition={{ duration: 0.25, ease: 'easeOut' }}
             style={{
               display: 'flex', flexDirection: 'column',
+              // Hidden, not unmounted: staged edits, scroll position and the
+              // open modal all have to survive walking across the map.
+              visibility: activeTool ? 'hidden' : 'visible',
               border: fullScreen ? 'none' : `0.1vh solid ${alpha(theme.colors.dark[6], 0.9)}`,
               boxShadow: fullScreen ? 'none' : '0 3vh 9vh rgba(0,0,0,0.65)',
               overflow: 'hidden',
@@ -933,7 +1011,24 @@ export default function ScriptStudio() {
               )}
 
               <Flex direction="column" flex={1} style={{ minHeight: 0, position: 'relative' }}>
-                {activePage === 'home' ? <HomePage />
+                {/* A search typed while standing on a page searches EVERY
+                    script. Overview is where you land, and the search box did
+                    nothing there - which is the one moment you are most likely
+                    to be looking for a setting whose owner you cannot name.
+                    Inside a script's settings the box still filters that
+                    script, which is what you mean there - until that script has
+                    NO match, which used to leave an empty pane while the thing
+                    being looked for sat in the script next door. */}
+                {(activePage || (query && populatedGroups.length === 0)) && query ? (
+                  <SearchResults
+                    query={query}
+                    onOpen={(resource, group) => {
+                      useStudio.setState({ activeResource: resource, activePage: null });
+                      setSearch('');
+                      pendingJump.current = { resource, group };
+                    }}
+                  />
+                ) : activePage === 'home' ? <HomePage />
                   : activePage === 'bridges' ? <BridgesPage />
                   : activePage === 'admins' ? <AdminsPage canEdit={canEdit} />
                   : activePage === 'logs' ? <LogsPage canEdit={canEdit} />
@@ -943,6 +1038,9 @@ export default function ScriptStudio() {
                   : activePage === 'changelog' ? <ChangelogPage resource={activeResource} />
                   : activePage === 'tests' ? <TestsPage resource={activeResource} />
                   : activePage === 'minigames' ? <MinigamesPage />
+                  : scriptPage ? (
+                    <ScriptPage resource={script.resource} page={scriptPage} canEdit={canEdit} />
+                  )
                   : activePage ? (
                   <Flex align="center" justify="center" style={{ flex: 1 }}>
                     <Text ff="Akrobat Bold" size="sm" c="rgba(255,255,255,0.35)">
@@ -978,12 +1076,13 @@ export default function ScriptStudio() {
                         entries={byGroup.get(openWorkspace.id) ?? []}
                         query={query}
                         railDriven
-                        renderRow={(entry, rowFilter) => (
+                        renderRow={(entry, rowFilter, fill) => (
                           <SettingRow
                             resource={script.resource}
                             entry={entry}
                             query={query}
                             rowFilter={rowFilter}
+                            fill={fill}
                             canEdit={canEdit}
                             problems={problemsByPath.get(entry.path)}
                             onDrill={openPicker}
@@ -1159,6 +1258,7 @@ export default function ScriptStudio() {
                 type={pickerEntry.type}
                 label={pickerEntry.label}
                 help={pickerEntry.help}
+                iconSet={pickerEntry.iconSet}
                 value={effectiveValue(script.resource, pickerEntry)}
                 disabled={!canEdit}
                 onApply={(next) => setValue(script.resource, pickerEntry, next)}
@@ -1574,7 +1674,8 @@ function Sidebar({
    */
   const footer = useMemo(() => {
     const ownedByScript = !activePage
-      || activePage === 'design' || activePage === 'changelog' || activePage === 'tests';
+      || activePage === 'design' || activePage === 'changelog' || activePage === 'tests'
+      || activePage.startsWith('page:');
     if (ownedByScript && script) return script;
     const lib = scripts.find((entry) => entry.shared);
     return lib ?? script;
@@ -1598,7 +1699,7 @@ function Sidebar({
     const active =
       entry.resource === script.resource
       && (!activePage || activePage === 'design' || activePage === 'changelog'
-        || activePage === 'tests');
+        || activePage === 'tests' || activePage.startsWith('page:'));
     return (
       <Flex key={entry.resource} direction="column" gap="xxs">
         <motion.button
@@ -1726,6 +1827,43 @@ function Sidebar({
                     </Text>
                   </motion.button>
                 )}
+
+                {/* Pages the script supplies itself.
+                  *
+                  * Above its sections rather than below, because these are
+                  * places rather than settings - fishing's Players screen is
+                  * somewhere you go, not something you configure, and burying
+                  * it under fourteen sections would hide it. */}
+                {entry.pages?.map((pageEntry) => {
+                  const pageId = `page:${pageEntry.id}`;
+                  return (
+                    <motion.button
+                      key={pageId}
+                      type="button"
+                      onClick={() => onPickPage(pageId)}
+                      whileTap={{ scale: 0.99 }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: '0.7vh',
+                        padding: '0.5vh 0.7vh',
+                        background: activePage === pageId ? alpha(color, 0.1) : 'transparent',
+                        border: 'none',
+                        borderRadius: theme.radius.xs,
+                        cursor: 'pointer', textAlign: 'left', width: '100%',
+                      }}
+                    >
+                      <Icon name={pageEntry.icon} size="1.4vh" color={color} />
+                      <Text
+                        ff="Akrobat SemiBold" size="sm" c={color}
+                        style={{ flex: 1, minWidth: 0 }} truncate
+                      >
+                        {translate(
+                          bundles, language, entry.resource,
+                          `studio.pages.${pageEntry.id}.label`, pageEntry.label,
+                        )}
+                      </Text>
+                    </motion.button>
+                  );
+                })}
 
                 {visibleGroups.map((group, groupIndex) => {
                   // activeGroup tracks whatever section the settings pane is
@@ -1984,7 +2122,7 @@ function RailLabel({ children }: { children: React.ReactNode }) {
 }
 
 const SettingRow = memo(function SettingRow({
-  resource, entry, query, rowFilter, canEdit: allowed, problems, onDrill,
+  resource, entry, query, rowFilter, canEdit: allowed, problems, onDrill, fill,
 }: {
   resource: string;
   entry: SettingEntry;
@@ -1994,6 +2132,15 @@ const SettingRow = memo(function SettingRow({
   /** search text applied to the rows of a list, not just its label */
   rowFilter?: string;
   canEdit: boolean;
+  /**
+   * This row IS the pane, so it must fit inside it.
+   *
+   * A workspace hands its body a definite height. Left to size itself the row
+   * grew to whatever its list needed and hung over the bottom edge - the card
+   * border, the paging and the Add button all cut off. Filling instead means
+   * the rows area is the part that gives, and scrolls.
+   */
+  fill?: boolean;
   onDrill: (entry: SettingEntry) => void;
 }) {
   const theme = useMantineTheme();
@@ -2048,7 +2195,11 @@ const SettingRow = memo(function SettingRow({
     <Flex
       direction={wide ? 'column' : 'row'}
       align={wide ? 'stretch' : 'center'}
-      justify="space-between"
+      // `space-between` is for the NARROW layout, where it pushes the label
+      // left and the control right. Stacked and stretched to fill a workspace
+      // it did the same thing vertically: the heading at the top, the list
+      // pinned to the bottom, and a hole between them.
+      justify={wide ? 'flex-start' : 'space-between'}
       gap="sm"
       px="sm" py="xs"
       style={{
@@ -2059,12 +2210,18 @@ const SettingRow = memo(function SettingRow({
         borderRadius: theme.radius.xs,
         transition: 'background 0.15s, border-color 0.15s, opacity 0.15s',
         position: wide ? 'relative' : undefined,
+        ...(fill && wide ? { flex: 1, minHeight: 0, overflow: 'hidden' } : {}),
         // Dimmed rather than hidden: knowing the setting exists and why it is
         // inert is the useful part. Hiding it just makes people hunt for it.
         opacity: live ? 1 : 0.42,
       }}
     >
-      <Flex direction="column" gap="0.2vh" style={{ minWidth: 0, flex: 1 }}>
+      {/* `flex: 1` is for the NARROW layout, where it pushes the control to
+        * the right. Stacked into a workspace the main axis is vertical, so it
+        * grew the heading instead: measured in the stores workspace, the label
+        * block and the list were 288px each - half the pane spent on three
+        * lines of text, and the search box floating in the middle of it. */}
+      <Flex direction="column" gap="0.2vh" style={{ minWidth: 0, flex: wide ? '0 0 auto' : 1 }}>
         <Flex align="center" gap="xs" wrap="wrap">
           <Text ff="Akrobat Bold" size="sm" c="rgba(255,255,255,0.9)">
             <Highlight text={label} query={query} />
@@ -2106,8 +2263,21 @@ const SettingRow = memo(function SettingRow({
               in range - only the service behind an API key can answer that. */}
           {entry.validateWith && (
             <FieldValidator
+              resource={resource}
               callback={entry.validateWith}
               value={value}
+              disabled={!canEdit}
+            />
+          )}
+
+          {/* ...and whether to go and DO the thing, which is a separate
+              question from whether the value looks right. */}
+          {entry.action && (
+            <FieldAction
+              resource={resource}
+              entry={entry}
+              value={value}
+              section={entry.action.sendSection ? sectionValues(resource, entry.path) : undefined}
               disabled={!canEdit}
             />
           )}

@@ -29,6 +29,8 @@ export type ControlType =
   | 'blipSprite'
   | 'blipDisplay'
   | 'ped'
+  /** several ped models, shown as pictures rather than names */
+  | 'peds'
   | 'vehicle'
   | 'coords'
   | 'positions'
@@ -122,6 +124,17 @@ export type SettingColumn = {
   columns?: SettingColumn[];
   rowTemplate?: Record<string, unknown>;
   rowLabelKey?: string;
+  /**
+   * Limits taken from another field on the row - `x-boundsFrom`.
+   *
+   * A permit's weight limit is only meaningful inside the weights that fish
+   * actually reaches, and that range is a different pair of numbers for every
+   * species. Nothing static can say it, so the field points at the one that
+   * can.
+   */
+  boundsFrom?: { path: string };
+  /** which icon set an `icon` field's value belongs to - `x-iconSet` */
+  iconSet?: 'lucide' | 'fontawesome';
   /** which modal tab this field belongs to */
   tab?: string;
 };
@@ -204,6 +217,28 @@ export type SettingEntry = {
   rowLabelKey?: string;
   /** which column carries an inventory item name (drives the image slot) */
   rowItemKey?: string;
+  /** the schema declared `x-rowOrder`, so nothing should re-sort the fields */
+  rowOrdered?: boolean;
+  /** which band of the Bridges page this setting belongs in - `x-bridgeGroup` */
+  bridgeGroup?: 'interface' | 'bridge';
+  /** which icon set an `icon` setting's value belongs to - `x-iconSet` */
+  iconSet?: 'lucide' | 'fontawesome';
+  /**
+   * A button beside this setting that DOES something - `x-action`.
+   *
+   * Distinct from `x-validateWith`, which asks passively whether a value looks
+   * usable while you type. An action has an effect: "Test webhook" posts a real
+   * message to Discord, and doing that on every debounced keystroke would spam
+   * the channel. So it happens when asked, and only then.
+   */
+  action?: {
+    label: string;
+    /** server callback on the owning script, without its `<resource>:` prefix */
+    callback: string;
+    icon?: string;
+    /** send the whole SECTION rather than just this field's value */
+    sendSection?: boolean;
+  };
   /** explicit modal tabs; falls back to General + one tab per nested field */
   rowTabs?: RowTab[];
 
@@ -230,6 +265,28 @@ export type SettingGroup = {
   description?: string;
 };
 
+/**
+ * A whole page a script supplies, rather than a control inside a section.
+ *
+ * Some of what a per-script panel did was never configuration. Fishing's
+ * Players screen reads live server data, pages through it, and acts on it -
+ * there is no setting behind it to hang an `x-component` off, and pretending
+ * there is would put a fake entry in the config just to have somewhere to
+ * mount a screen.
+ *
+ * So a schema can declare pages the same way it declares sections, and the
+ * rail lists them under that script. dirk_lib supplies the frame, the theme
+ * and the loader; what goes inside stays in the script that owns it.
+ */
+export type ScriptPage = {
+  id: string;
+  label: string;
+  icon: string;
+  /** path inside the owning resource, e.g. `web/build/studio/players.js` */
+  component: string;
+  description?: string;
+};
+
 export type StudioScript = {
   resource: string;
   label: string;
@@ -239,6 +296,8 @@ export type StudioScript = {
   shared?: boolean;
   /** this script ships a design editor, so the rail lists a Design entry for it */
   designs?: boolean;
+  /** whole pages this script supplies - schema `x-pages` */
+  pages?: ScriptPage[];
   groups: SettingGroup[];
   entries: SettingEntry[];
   /**

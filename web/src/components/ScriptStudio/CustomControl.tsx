@@ -1,3 +1,4 @@
+import { singular } from './ui';
 import * as mantine from '@mantine/core';
 import { alpha, Flex, Text, useMantineTheme } from '@mantine/core';
 import * as cfxReact from 'dirk-cfx-react';
@@ -18,6 +19,8 @@ import * as reactDom from 'react-dom';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as jsxRuntime from 'react/jsx-runtime';
 import * as reactLeaflet from 'react-leaflet';
+import * as reactQuery from '@tanstack/react-query';
+import * as reactVirtual from '@tanstack/react-virtual';
 
 /**
  * A control the OWNING SCRIPT supplies, rendered inline in its section.
@@ -53,7 +56,7 @@ import * as reactLeaflet from 'react-leaflet';
  * through rendering, which is the difference between a clear message and a
  * white panel.
  */
-const CONTRACT_VERSION = 5;
+const CONTRACT_VERSION = 6;
 
 /** What a remote component is handed instead of importing it itself. */
 function sharedDeps() {
@@ -84,6 +87,15 @@ function sharedDeps() {
     // breakage react-leaflet is shared to avoid.
     reactDom,
     'react-dom': reactDom,
+    // Shared for the same reason React is: a query client lives in context,
+    // so a component bundling its own copy of react-query would read a
+    // DIFFERENT client - its own, with no provider above it - and every hook
+    // would throw. The virtualiser is here to keep a long player list cheap
+    // without every script shipping its own copy.
+    reactQuery,
+    '@tanstack/react-query': reactQuery,
+    reactVirtual,
+    '@tanstack/react-virtual': reactVirtual,
   };
 }
 
@@ -138,7 +150,7 @@ export type CustomProps = {
 // a bundle on every render would be absurd.
 const CACHE = new Map<string, Promise<React.ComponentType<CustomProps>>>();
 
-function load(resource: string, path: string): Promise<React.ComponentType<CustomProps>> {
+export function load(resource: string, path: string): Promise<React.ComponentType<CustomProps>> {
   const key = `${resource}:${path}`;
   const cached = CACHE.get(key);
   if (cached) return cached;
@@ -213,7 +225,7 @@ async function diagnose(resource: string, path: string, original: unknown): Prom
   return reply?._error ?? 'NoDiagnosis';
 }
 
-const REASONS: Record<string, string> = {
+export const REASONS: Record<string, string> = {
   NotStarted: 'that resource is not running',
   BadPath: 'the component path is not inside its web build',
   NotAConsumer: 'that resource does not use scriptConfig',
@@ -247,6 +259,8 @@ export function CustomControl({
    * supplied nothing but a prettier row.
    */
   const [editingRow, setEditingRow] = useState<number | null>(null);
+  /** a row being composed, not yet in the list */
+  const [creatingRow, setCreatingRow] = useState<Record<string, unknown> | null>(null);
 
   const bundles = useBundles();
   const language = useActiveLanguage();
@@ -272,10 +286,10 @@ export function CustomControl({
   const rowApi = rows
     ? {
       openRow: (index: number) => setEditingRow(index),
+      // Composed first, appended on save - the same rule the built-in list
+      // follows. Backing out of a new entry should leave nothing behind.
       addRow: () => {
-        const template = JSON.parse(JSON.stringify(entry?.rowTemplate ?? {}));
-        onChange([...rows, template]);
-        setEditingRow(rows.length);
+        setCreatingRow(JSON.parse(JSON.stringify(entry?.rowTemplate ?? {})));
       },
       deleteRow: (index: number) => onChange(rows.filter((_, i) => i !== index)),
     }
@@ -314,6 +328,22 @@ export function CustomControl({
             />
           </ComponentBoundary>
         </StudioFrame>
+
+        {creatingRow && rows && entry && (
+          <RowModal
+            entry={entry}
+            resource={resource}
+            row={creatingRow}
+            title={`New ${singular(entry.label).toLowerCase()}`}
+            disabled={!canEdit}
+            onSave={(next) => {
+              onChange([...rows, next]);
+              setCreatingRow(null);
+            }}
+            onDelete={() => setCreatingRow(null)}
+            onClose={() => setCreatingRow(null)}
+          />
+        )}
 
         {openRow !== null && rows && entry && (
           <RowModal

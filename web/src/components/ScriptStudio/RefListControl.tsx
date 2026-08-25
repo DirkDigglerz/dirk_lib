@@ -5,8 +5,10 @@ import { motion } from 'framer-motion';
 import { useState } from 'react';
 import { notify } from './Toasts';
 import { useInputStyles } from './Controls';
-import { effectiveValue, useStudio } from './store';
+import { effectiveValue, setValue, useStudio } from './store';
 import { ItemArt } from './ui';
+import { SettingControl } from './Controls';
+import { PickerDrawer } from './PickerDrawer';
 import type { SettingEntry } from './types';
 import { useChrome } from './studioLocale';
 
@@ -39,6 +41,9 @@ export function RefListControl({
   const entries = useStudio((state) => state.scripts.find((s) => s.resource === resource)?.entries ?? []);
 
   const rows = Array.isArray(value) ? (value as Row[]) : [];
+
+  /** Which referenced setting has its item picker open. */
+  const [picker, setPicker] = useState<SettingEntry | null>(null);
 
   /** follow `basic.fishGuttingItem` to whatever item it currently holds */
   const resolve = (ref: string): { itemName: string; setting?: SettingEntry } => {
@@ -82,16 +87,30 @@ export function RefListControl({
               </Flex>
             </Flex>
 
-            <Flex direction="column" gap="0.2vh" style={{ flex: 1, minWidth: 0 }}>
-              <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.1em" c="rgba(255,255,255,0.35)">
-                {t('refListControl.shown_as', 'Shown as')}
-              </Text>
-              <TextInput
-                value={String(row.label ?? '')}
-                onChange={(e) => setLabel(index, e.currentTarget.value)}
-                disabled={disabled}
-                styles={styles}
-              />
+            {/* Pick the ITEM, not a caption for it.
+              *
+              * This offered a "Shown as" text box, which edits the word this
+              * list prints - a thing nobody needs to change and nobody can see
+              * the effect of. What the tab is actually for is saying WHICH
+              * item is the fish knife, and that is the setting the row points
+              * at. So the row edits that, through the same picker the setting
+              * itself uses. */}
+            <Flex style={{ flex: 1, minWidth: 0, justifyContent: 'flex-end' }}>
+              {setting ? (
+                <SettingControl
+                  type="item"
+                  entry={setting}
+                  resource={resource}
+                  value={itemName}
+                  disabled={disabled}
+                  onChange={(next) => setValue(resource, setting, next)}
+                  onDrill={() => setPicker(setting)}
+                />
+              ) : (
+                <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">
+                  {t('refListControl.missing_setting', 'That setting no longer exists')}
+                </Text>
+              )}
             </Flex>
 
             {/* The old Misc tab could hand you one of these to test with, and
@@ -101,6 +120,17 @@ export function RefListControl({
           </Flex>
         );
       })}
+
+      {picker && (
+        <PickerDrawer
+          type="item"
+          label={picker.label}
+          value={effectiveValue(resource, picker)}
+          disabled={disabled}
+          onApply={(next) => setValue(resource, picker, next)}
+          onClose={() => setPicker(null)}
+        />
+      )}
 
       {rows.length === 0 && (
         <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">{t('refListControl.nothing_referenced', 'Nothing referenced')}</Text>

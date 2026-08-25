@@ -4,8 +4,8 @@
   "x-sections": [
     {
       "id": "general",
-      "label": "General",
-      "icon": "sliders-horizontal",
+      "label": "Basic",
+      "icon": "settings-2",
       "description": "Server-wide behaviour and units.",
       "paths": [
         "basic.debug",
@@ -14,7 +14,6 @@
         "basic.distanceUnit",
         "basic.keysWhileFishing",
         "basic.defaultControls",
-        "basic.disableBuiltInShop",
         "basic.stockResetIntervalSeconds"
       ]
     },
@@ -64,10 +63,11 @@
     {
       "id": "equipment",
       "label": "Equipment",
-      "icon": "anchor",
+      "icon": "backpack",
       "description": "Rods, reels, line, hooks and bait.",
       "paths": [
-        "equipment"
+        "equipment",
+        "basic.miscItems"
       ]
     },
     {
@@ -94,7 +94,7 @@
     {
       "id": "traps",
       "label": "Traps",
-      "icon": "box",
+      "icon": "grid-2x2",
       "description": "Placing, pulling and staleness of crab traps.",
       "paths": [
         "basic.maxTrapsPerPlayer",
@@ -109,7 +109,7 @@
     {
       "id": "gutting",
       "label": "Gutting",
-      "icon": "utensils",
+      "icon": "utensils-crossed",
       "description": "Processing a catch into meat, and the tools it needs.",
       "paths": [
         "basic.gutting",
@@ -124,23 +124,13 @@
       "icon": "scroll-text",
       "description": "Fishing licences, what they cost and who can revoke them.",
       "paths": [
+        "basic.disablePermits",
         "basic.permitItem",
         "basic.permitPrice",
         "basic.permitInterval",
         "basic.permitAccounts",
         "basic.replacePermitPrice",
-        "basic.permitRevokers",
-        "basic.disablePermits"
-      ]
-    },
-    {
-      "id": "items",
-      "label": "Items",
-      "icon": "package",
-      "description": "Loose items this script installs and references.",
-      "paths": [
-        "basic.guideBookItem",
-        "basic.miscItems"
+        "basic.permitRevokers"
       ]
     },
     {
@@ -167,10 +157,12 @@
       "id": "stores",
       "label": "Stores",
       "icon": "store",
-      "description": "Shops, their peds and their blips.",
+      "description": "Shops, their peds and their blips - and whether the built-in ones run at all.",
       "paths": [
+        "basic.disableBuiltInShop",
         "stores"
-      ]
+      ],
+      "workspace": true
     },
     {
       "id": "tournaments",
@@ -193,7 +185,7 @@
     {
       "id": "logging",
       "label": "Logging",
-      "icon": "scroll-text",
+      "icon": "webhook",
       "description": "Discord webhooks for fishing events.",
       "paths": [
         "logging"
@@ -201,16 +193,33 @@
     }
   ],
   "x-mapPaths": [
-    { "path": "zones", "shape": "polygon" },
-    { "path": "depthOverride", "shape": "polygon", "color": "#f59e0b" },
-    { "path": "seaBoundary", "shape": "polygon", "color": "#3b82f6" }
+    {
+      "path": "zones",
+      "shape": "polygon"
+    },
+    {
+      "path": "depthOverride",
+      "shape": "polygon",
+      "color": "#f59e0b"
+    },
+    {
+      "path": "seaBoundary",
+      "shape": "polygon",
+      "color": "#3b82f6"
+    }
   ],
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "description": "dirk_fishing script settings schema. Defines structure, types, constraints and default values. Used by Lua at runtime and TypeScript at build time.",
   "properties": {
     "basic": {
-      "required": ["guideBookItem", "fishFinderItem", "fishFinderTabletModel", "permitItem", "fishGuttingItem"],
+      "required": [
+        "guideBookItem",
+        "fishFinderItem",
+        "fishFinderTabletModel",
+        "permitItem",
+        "fishGuttingItem"
+      ],
       "type": "object",
       "description": "Core fishing script settings",
       "properties": {
@@ -292,10 +301,18 @@
           "default": 100,
           "minimum": 0,
           "maximum": 100,
-          "description": "% chance bait is consumed when a cast expires without a bite"
+          "description": "% chance bait is consumed when a cast expires without a bite",
+          "x-control": "chance"
         },
         "cellFishDensity": {
-          "x-validate": [{"must": {"ascending": true}, "message": "Minimum density is above the maximum"}],
+          "x-validate": [
+            {
+              "must": {
+                "ascending": true
+              },
+              "message": "Minimum density is above the maximum"
+            }
+          ],
           "type": "array",
           "default": [
             30,
@@ -308,7 +325,8 @@
           "default": 0.025,
           "minimum": 0,
           "maximum": 0.85,
-          "description": "How much each successful catch \"spooks\" that species in the local area (0-0.85). Higher = harder to keep catching the same species. Default 0.025 ≈ 34 catches to fully spook a cell. Tier-1 starter species are exempt."
+          "description": "How much each successful catch \"spooks\" that species in the local area (0-0.85). Higher = harder to keep catching the same species. Default 0.025 ≈ 34 catches to fully spook a cell. Tier-1 starter species are exempt.",
+          "x-control": "chance"
         },
         "fishFinderItem": {
           "type": "string",
@@ -334,7 +352,18 @@
           "description": "Enable the boat anchor system"
         },
         "anchorItem": {
-          "x-validate": [{"when": {"path": "basic.usingAnchor", "equals": true}, "must": {"isSet": true}, "message": "Needed while the anchor system is on"}],
+          "x-validate": [
+            {
+              "when": {
+                "path": "basic.usingAnchor",
+                "equals": true
+              },
+              "must": {
+                "isSet": true
+              },
+              "message": "Needed while the anchor system is on"
+            }
+          ],
           "type": "string",
           "default": "anchor",
           "description": "Item name for the boat anchor",
@@ -364,6 +393,10 @@
             "shouldClose": true,
             "unique": true,
             "stack": false
+          },
+          "x-enabledWhen": {
+            "path": "basic.disablePermits",
+            "equals": false
           }
         },
         "fishGuttingItem": {
@@ -410,11 +443,30 @@
             }
           },
           "default": [
-            { "ref": "basic.fishGuttingItem", "label": "Fish Knife" },
-            { "ref": "basic.crushingItem",    "label": "Meat Mallet" },
-            { "ref": "basic.permitItem",      "label": "Fishing Permit" },
-            { "ref": "basic.anchorItem",      "label": "Boat Anchor" },
-            { "ref": "basic.fishFinderItem",  "label": "Fish Finder" }
+            {
+              "ref": "basic.fishGuttingItem",
+              "label": "Fish Knife"
+            },
+            {
+              "ref": "basic.crushingItem",
+              "label": "Meat Mallet"
+            },
+            {
+              "ref": "basic.permitItem",
+              "label": "Fishing Permit"
+            },
+            {
+              "ref": "basic.anchorItem",
+              "label": "Boat Anchor"
+            },
+            {
+              "ref": "basic.fishFinderItem",
+              "label": "Fish Finder"
+            },
+            {
+              "ref": "basic.guideBookItem",
+              "label": "Guidebook"
+            }
           ]
         },
         "fishMeatItem": {
@@ -466,7 +518,8 @@
               "default": 1.25,
               "minimum": 0,
               "maximum": 5,
-              "description": "Flat price multiplier on the source species’ market price when selling filleted meat. 1.25 = +25% over the raw fish per-kg price."
+              "description": "Flat price multiplier on the source species’ market price when selling filleted meat. 1.25 = +25% over the raw fish per-kg price.",
+              "x-control": "multiplier"
             },
             "minWeightFraction": {
               "type": "number",
@@ -487,28 +540,32 @@
               "default": 0.5,
               "minimum": 0,
               "maximum": 1,
-              "description": "How much the minigame accuracy can push the cut yield above the skill baseline. Accuracy is now a strict multiplicative gate — 0% accuracy always yields 0 meat regardless of skill. At 100% accuracy, yield = skillFraction × (1 + minigameAccuracyWeight). Default 0.5 = up to 1.5× the skill yield on a perfect cut. 0 = accuracy still gates 0%, but no upper bonus."
+              "description": "How much the minigame accuracy can push the cut yield above the skill baseline. Accuracy is now a strict multiplicative gate — 0% accuracy always yields 0 meat regardless of skill. At 100% accuracy, yield = skillFraction × (1 + minigameAccuracyWeight). Default 0.5 = up to 1.5× the skill yield on a perfect cut. 0 = accuracy still gates 0%, but no upper bonus.",
+              "x-control": "balance"
             },
             "skillEasing": {
               "type": "number",
               "default": 0.6,
               "minimum": 0,
               "maximum": 1,
-              "description": "How strongly fishing skill softens the minigame (slower pulse, wider sweet-spot tolerance). 0 = species-difficulty only; 1 = high-skill players have a much easier minigame."
+              "description": "How strongly fishing skill softens the minigame (slower pulse, wider sweet-spot tolerance). 0 = species-difficulty only; 1 = high-skill players have a much easier minigame.",
+              "x-control": "forgiveness"
             },
             "rarityHardness": {
               "type": "number",
               "default": 0.5,
               "minimum": 0,
               "maximum": 1,
-              "description": "How strongly species rarity makes the minigame harder (faster pulse, longer cut path). 0 = same difficulty for every fish; 1 = rare fish are significantly harder to cut cleanly."
+              "description": "How strongly species rarity makes the minigame harder (faster pulse, longer cut path). 0 = same difficulty for every fish; 1 = rare fish are significantly harder to cut cleanly.",
+              "x-control": "difficulty"
             },
             "cutBuffer": {
               "type": "number",
               "default": 0.55,
               "minimum": 0,
               "maximum": 0.95,
-              "description": "How forgiving the cut line is on the gutting minigame. Anywhere within this fraction of the line's tolerance band counts as a PERFECT on-line cut (no accuracy penalty) — only drift past it starts costing. 0 = must trace dead-centre; 0.9 = very forgiving. Default 0.55."
+              "description": "How forgiving the cut line is on the gutting minigame. Anywhere within this fraction of the line's tolerance band counts as a PERFECT on-line cut (no accuracy penalty) — only drift past it starts costing. 0 = must trace dead-centre; 0.9 = very forgiving. Default 0.55.",
+              "x-control": "forgiveness"
             },
             "randomRewards": {
               "type": "array",
@@ -578,7 +635,30 @@
                   ],
                   "chance": 0.05
                 }
-              ]
+              ],
+              "x-rowControls": {
+                "chance": "chance"
+              },
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    }
+                  },
+                  "chance": {
+                    "type": "number"
+                  }
+                }
+              }
             }
           }
         },
@@ -586,13 +666,21 @@
           "type": "number",
           "default": 500,
           "minimum": 0,
-          "description": "Price of the global fishing permit"
+          "description": "Price of the global fishing permit",
+          "x-enabledWhen": {
+            "path": "basic.disablePermits",
+            "equals": false
+          }
         },
         "permitInterval": {
           "type": "number",
           "default": 168,
           "minimum": 1,
-          "description": "Global permit duration in hours. 168 = 1 week, 720 = 1 month."
+          "description": "Global permit duration in hours. 168 = 1 week, 720 = 1 month.",
+          "x-enabledWhen": {
+            "path": "basic.disablePermits",
+            "equals": false
+          }
         },
         "permitAccounts": {
           "minItems": 1,
@@ -601,13 +689,21 @@
             "cash",
             "bank"
           ],
-          "description": "Payment accounts accepted when buying a permit"
+          "description": "Payment accounts accepted when buying a permit",
+          "x-enabledWhen": {
+            "path": "basic.disablePermits",
+            "equals": false
+          }
         },
         "replacePermitPrice": {
           "type": "number",
           "default": 100,
           "minimum": 0,
-          "description": "Cost to replace a lost permit card"
+          "description": "Cost to replace a lost permit card",
+          "x-enabledWhen": {
+            "path": "basic.disablePermits",
+            "equals": false
+          }
         },
         "permitRevokers": {
           "type": "object",
@@ -618,7 +714,11 @@
             "type": "number",
             "minimum": 0
           },
-          "description": "Map of group name -> minimum grade required to revoke fishing permits via the back-of-card UI when shown in person. Empty object disables in-world revocation."
+          "description": "Map of group name -> minimum grade required to revoke fishing permits via the back-of-card UI when shown in person. Empty object disables in-world revocation.",
+          "x-enabledWhen": {
+            "path": "basic.disablePermits",
+            "equals": false
+          }
         },
         "skillSettings": {
           "type": "object",
@@ -631,7 +731,14 @@
               "description": "Level players start fishing at"
             },
             "maxLevel": {
-              "x-validate": [{"must": {"gteField": "basic.skillSettings.baseLevel"}, "message": "Max level is below the starting level"}],
+              "x-validate": [
+                {
+                  "must": {
+                    "gteField": "basic.skillSettings.baseLevel"
+                  },
+                  "message": "Max level is below the starting level"
+                }
+              ],
               "type": "number",
               "default": 99,
               "minimum": 2,
@@ -647,7 +754,8 @@
               "type": "number",
               "default": 1,
               "minimum": 0.1,
-              "description": "XP curve multiplier. Higher value = slower levelling."
+              "description": "XP curve multiplier. Higher value = slower levelling.",
+              "x-control": "progression"
             },
             "extraXpForRelease": {
               "type": "number",
@@ -686,7 +794,8 @@
           "default": 1,
           "minimum": 0.01,
           "maximum": 2,
-          "description": "Multiplier on the per-tick catch chance for traps (every 90 seconds). 0.5 = default, 1.0 = same odds as rod fishing, 2.0 = double. Per-tick chance = biteChance × abundance × this value × baitWeight."
+          "description": "Multiplier on the per-tick catch chance for traps (every 90 seconds). 0.5 = default, 1.0 = same odds as rod fishing, 2.0 = double. Per-tick chance = biteChance × abundance × this value × baitWeight.",
+          "x-control": "multiplier"
         },
         "trapStaleTimeHours": {
           "type": "number",
@@ -710,7 +819,8 @@
           "default": 3,
           "minimum": 0,
           "maximum": 100,
-          "description": "Base percentage chance (0-100) that a trap will break each fill tick. Actual break chance is: chanceOfBreak * (1 - strength) — and it re-rolls EVERY fill tick, so it compounds over a fill cycle. Keep it low (a strength-0.3 trap at 10% breaks ~7%/tick, which is brutal). 0 = traps never break."
+          "description": "Base percentage chance (0-100) that a trap will break each fill tick. Actual break chance is: chanceOfBreak * (1 - strength) — and it re-rolls EVERY fill tick, so it compounds over a fill cycle. Keep it low (a strength-0.3 trap at 10% breaks ~7%/tick, which is brutal). 0 = traps never break.",
+          "x-control": "chance"
         },
         "bigFishDifficulty": {
           "type": "object",
@@ -742,6 +852,10 @@
               "maximum": 0.5,
               "description": "How much faster the catch bar drains while off-target for a max-weight fish. 0 = no change, 0.5 = up to 50% harsher."
             }
+          },
+          "x-enabledWhen": {
+            "path": "basic.bigFishDifficulty.enabled",
+            "equals": true
           }
         },
         "stockResetIntervalSeconds": {
@@ -752,8 +866,12 @@
         },
         "keysWhileFishing": {
           "type": "array",
-          "default": [249],
-          "items": { "type": "number" },
+          "default": [
+            249
+          ],
+          "items": {
+            "type": "number"
+          },
           "description": "GTA control IDs that stay usable while fishing / placing traps. The rod UI normally disables every control, which also blocks voice. 249 = push-to-talk. Add more control IDs as needed — see https://docs.fivem.net/docs/game-references/controls/."
         },
         "disableBuiltInShop": {
@@ -838,27 +956,68 @@
     },
     "theme": {
       "type": "object",
-      "x-enabledWhen": { "path": "theme.useOverride", "equals": true },
+      "x-enabledWhen": {
+        "path": "theme.useOverride",
+        "equals": true
+      },
       "description": "Optional per-resource theme override. When useOverride is on, dirk_fishing's NUIs use these values instead of the global dirk_lib theme. Mirrors the dirk_lib appearance fields.",
       "default": {
         "useOverride": false,
         "primaryColor": "dirk",
         "primaryShade": 5,
-        "customTheme": ["#f0f4ff","#d9e3ff","#bfcfff","#a6bbff","#8ca7ff","#7393ff","#5a7fff","#406bff","#2547ff","#0b33ff"]
+        "customTheme": [
+          "#f0f4ff",
+          "#d9e3ff",
+          "#bfcfff",
+          "#a6bbff",
+          "#8ca7ff",
+          "#7393ff",
+          "#5a7fff",
+          "#406bff",
+          "#2547ff",
+          "#0b33ff"
+        ]
       },
       "properties": {
-        "useOverride":  { "type": "boolean", "default": false, "description": "Master switch — when off this resource follows the global dirk_lib theme." },
+        "useOverride": {
+          "type": "boolean",
+          "default": false,
+          "description": "Master switch — when off this resource follows the global dirk_lib theme."
+        },
         "primaryColor": {
-          "x-control": "mantineColor", "type": "string",  "default": "dirk", "description": "Mantine palette name (or 'custom' to use the customTheme stops)." },
+          "x-control": "mantineColor",
+          "type": "string",
+          "default": "dirk",
+          "description": "Mantine palette name (or 'custom' to use the customTheme stops)."
+        },
         "primaryShade": {
-          "x-control": "shade", "type": "integer", "default": 5, "minimum": 0, "maximum": 9, "description": "Shade index 0-9 within the active palette." },
-        "customTheme":  {
+          "x-control": "shade",
+          "type": "integer",
+          "default": 5,
+          "minimum": 0,
+          "maximum": 9,
+          "description": "Shade index 0-9 within the active palette."
+        },
+        "customTheme": {
           "type": "array",
-          "default": ["#f0f4ff","#d9e3ff","#bfcfff","#a6bbff","#8ca7ff","#7393ff","#5a7fff","#406bff","#2547ff","#0b33ff"],
+          "default": [
+            "#f0f4ff",
+            "#d9e3ff",
+            "#bfcfff",
+            "#a6bbff",
+            "#8ca7ff",
+            "#7393ff",
+            "#5a7fff",
+            "#406bff",
+            "#2547ff",
+            "#0b33ff"
+          ],
           "minItems": 10,
           "maxItems": 10,
           "description": "10-stop custom palette used when primaryColor = 'custom'.",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -875,15 +1034,20 @@
           "type": "array",
           "default": [],
           "description": "Job / gang / ACE group names granted config-edit access (checked via IsPlayerAceAllowed).",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         },
         "identifiers": {
           "type": "array",
           "default": [],
           "description": "Specific players granted access — stored as the framework persistent id (citizenid on qb/qbx, license on esx). dirk_lib also matches raw FiveM identifiers (license:/discord:/...).",
-          "items": { "type": "string" }
+          "items": {
+            "type": "string"
+          }
         }
-      }
+      },
+      "x-icon": "shield-check"
     },
     "baitDig": {
       "type": "object",
@@ -908,7 +1072,8 @@
           "default": 25,
           "minimum": 0,
           "maximum": 100,
-          "description": "% chance of finding a random item while digging"
+          "description": "% chance of finding a random item while digging",
+          "x-control": "chance"
         },
         "xpPerDig": {
           "type": "number",
@@ -993,7 +1158,30 @@
               ],
               "chance": 0.18
             }
-          ]
+          ],
+          "x-rowControls": {
+            "chance": "chance"
+          },
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "array",
+                "items": {
+                  "type": "integer"
+                }
+              },
+              "chance": {
+                "type": "number"
+              }
+            }
+          }
         },
         "tools": {
           "type": "array",
@@ -1002,7 +1190,8 @@
             "useable": true,
             "shouldClose": true,
             "unique": true,
-            "stack": false
+            "stack": false,
+            "weight": 1000
           },
           "items": {
             "type": "object",
@@ -1118,7 +1307,8 @@
             }
           ]
         }
-      }
+      },
+      "x-workspace": true
     },
     "depthOverride": {
       "type": "array",
@@ -1321,7 +1511,32 @@
             }
           ]
         }
-      ]
+      ],
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "depth": {
+            "type": "integer"
+          },
+          "zone": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "equipment": {
       "type": "object",
@@ -1334,7 +1549,8 @@
             "useable": true,
             "shouldClose": true,
             "unique": true,
-            "stack": false
+            "stack": false,
+            "weight": 300
           },
           "description": "Fishing rods",
           "items": {
@@ -1358,7 +1574,8 @@
               "castDistance": {
                 "type": "array",
                 "items": {
-                  "type": "number"
+                  "type": "number",
+                  "minimum": 0
                 },
                 "minItems": 2,
                 "maxItems": 2
@@ -1529,12 +1746,16 @@
               "model": "prop_blue_rod_4",
               "lvlRequired": 1
             }
-          ]
+          ],
+          "x-component": "web/build/studio/equipment-list.js",
+          "x-componentFull": true
         },
         "reel": {
           "type": "array",
           "x-arrayKey": "name",
-          "x-installItemList": true,
+          "x-installItemList": {
+            "weight": 500
+          },
           "description": "Fishing reels",
           "items": {
             "type": "object",
@@ -1676,12 +1897,16 @@
               "depthLimit": 25,
               "lvlRequired": 1
             }
-          ]
+          ],
+          "x-component": "web/build/studio/equipment-list.js",
+          "x-componentFull": true
         },
         "line": {
           "type": "array",
           "x-arrayKey": "name",
-          "x-installItemList": true,
+          "x-installItemList": {
+            "weight": 50
+          },
           "description": "Fishing lines",
           "items": {
             "type": "object",
@@ -1805,12 +2030,16 @@
               "strength": 0.05,
               "lvlRequired": 1
             }
-          ]
+          ],
+          "x-component": "web/build/studio/equipment-list.js",
+          "x-componentFull": true
         },
         "hook": {
           "type": "array",
           "x-arrayKey": "name",
-          "x-installItemList": true,
+          "x-installItemList": {
+            "weight": 10
+          },
           "description": "Fishing hooks",
           "items": {
             "type": "object",
@@ -2002,12 +2231,16 @@
               "strength": 1,
               "lvlRequired": 97
             }
-          ]
+          ],
+          "x-component": "web/build/studio/equipment-list.js",
+          "x-componentFull": true
         },
         "bait": {
           "type": "array",
           "x-arrayKey": "name",
-          "x-installItemList": true,
+          "x-installItemList": {
+            "weight": 50
+          },
           "description": "Fishing bait items",
           "items": {
             "type": "object",
@@ -2035,7 +2268,39 @@
                 "type": "boolean"
               },
               "digQuantity": {
-                "x-validate": [{"must": {"anyOf": [{"allOf": [{"path": "self.digQuantity", "isSet": true}, {"path": "self.digMaterials", "isSet": true}]}, {"allOf": [{"path": "self.digQuantity", "isSet": false}, {"path": "self.digMaterials", "isSet": false}]}]}, "message": "Dig quantity and dig materials must be set together"}],
+                "x-validate": [
+                  {
+                    "must": {
+                      "anyOf": [
+                        {
+                          "allOf": [
+                            {
+                              "path": "self.digQuantity",
+                              "isSet": true
+                            },
+                            {
+                              "path": "self.digMaterials",
+                              "isSet": true
+                            }
+                          ]
+                        },
+                        {
+                          "allOf": [
+                            {
+                              "path": "self.digQuantity",
+                              "isSet": false
+                            },
+                            {
+                              "path": "self.digMaterials",
+                              "isSet": false
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    "message": "Dig quantity and dig materials must be set together"
+                  }
+                ],
                 "type": "array",
                 "items": {
                   "type": "number"
@@ -2336,12 +2601,16 @@
               "sellPrice": 4,
               "lvlRequired": 1
             }
-          ]
+          ],
+          "x-component": "web/build/studio/equipment-list.js",
+          "x-componentFull": true
         },
         "weight": {
           "type": "array",
           "x-arrayKey": "name",
-          "x-installItemList": true,
+          "x-installItemList": {
+            "weightField": "weight"
+          },
           "description": "Sinker weights",
           "items": {
             "type": "object",
@@ -2450,12 +2719,16 @@
               "weight": 750,
               "lvlRequired": 85
             }
-          ]
+          ],
+          "x-component": "web/build/studio/equipment-list.js",
+          "x-componentFull": true
         },
         "trap": {
           "type": "array",
           "x-arrayKey": "name",
-          "x-installItemList": true,
+          "x-installItemList": {
+            "weight": 2500
+          },
           "description": "Fishing traps for catching crabs, lobsters, and other trap-only species",
           "items": {
             "type": "object",
@@ -2527,12 +2800,68 @@
               "lvlRequired": 50,
               "strength": 0.95
             }
-          ]
+          ],
+          "x-component": "web/build/studio/equipment-list.js",
+          "x-componentFull": true
         }
       }
     },
     "fish": {
-      "x-rowTabs": [{"id": "general", "label": "General", "icon": "general", "keys": ["name", "label", "description", "infoUnlockLvl", "baseXp", "basePricePerUnit", "permitRequired", "permitPrice", "permitInterval", "permitWeightLimit", "permitCatchLimit"]}, {"id": "stats", "label": "Stats", "icon": "stats", "keys": ["biteChance", "fightChance", "abundance", "strengthPerUnit", "weightLimits", "trapOnly"]}, {"id": "ecology", "label": "Ecology", "icon": "ecology", "keys": ["waterTypes", "depth", "baitTypes"]}, {"id": "gutting", "label": "Gutting", "icon": "gutting", "keys": ["minigameType", "crushCircleCount", "chanceOfWorms", "fishMeatItemOverride", "rewardItems"]}],
+      "x-rowTabs": [
+        {
+          "id": "general",
+          "label": "General",
+          "icon": "general",
+          "keys": [
+            "name",
+            "label",
+            "description",
+            "infoUnlockLvl",
+            "baseXp",
+            "basePricePerUnit",
+            "permitRequired",
+            "permitPrice",
+            "permitInterval",
+            "permitWeightLimit",
+            "permitCatchLimit"
+          ]
+        },
+        {
+          "id": "stats",
+          "label": "Stats",
+          "icon": "stats",
+          "keys": [
+            "biteChance",
+            "fightChance",
+            "abundance",
+            "strengthPerUnit",
+            "weightLimits",
+            "trapOnly"
+          ]
+        },
+        {
+          "id": "ecology",
+          "label": "Ecology",
+          "icon": "ecology",
+          "keys": [
+            "waterTypes",
+            "depth",
+            "baitTypes"
+          ]
+        },
+        {
+          "id": "gutting",
+          "label": "Gutting",
+          "icon": "gutting",
+          "keys": [
+            "minigameType",
+            "crushCircleCount",
+            "chanceOfWorms",
+            "fishMeatItemOverride",
+            "rewardItems"
+          ]
+        }
+      ],
       "type": "array",
       "x-arrayKey": "name",
       "x-installItemList": {
@@ -2559,29 +2888,47 @@
           "biteChance": {
             "type": "number",
             "minimum": 0,
-            "maximum": 1
+            "maximum": 1,
+            "x-control": "chance"
           },
           "fightChance": {
             "type": "number",
             "minimum": 0,
-            "maximum": 1
+            "maximum": 1,
+            "x-control": "chance"
           },
           "abundance": {
             "type": "number",
             "minimum": 0,
-            "maximum": 2
+            "maximum": 2,
+            "x-control": "rarity"
           },
           "weightLimits": {
-            "x-validate": [{"must": {"ascending": true}, "message": "Minimum weight is above the maximum"}],
+            "x-validate": [
+              {
+                "must": {
+                  "ascending": true
+                },
+                "message": "Minimum weight is above the maximum"
+              }
+            ],
             "type": "array",
             "items": {
-              "type": "number"
+              "type": "number",
+              "minimum": 0
             },
             "minItems": 2,
             "maxItems": 2
           },
           "waterTypes": {
-            "x-validate": [{"must": {"minLength": 1}, "message": "Pick at least one water type"}],
+            "x-validate": [
+              {
+                "must": {
+                  "minLength": 1
+                },
+                "message": "Pick at least one water type"
+              }
+            ],
             "type": "array",
             "items": {
               "type": "string",
@@ -2592,10 +2939,18 @@
             }
           },
           "depth": {
-            "x-validate": [{"must": {"ascending": true}, "message": "Minimum depth is below the maximum"}],
+            "x-validate": [
+              {
+                "must": {
+                  "ascending": true
+                },
+                "message": "Minimum depth is below the maximum"
+              }
+            ],
             "type": "array",
             "items": {
-              "type": "number"
+              "type": "number",
+              "minimum": 0
             },
             "minItems": 2,
             "maxItems": 2
@@ -2629,41 +2984,101 @@
             "type": "boolean"
           },
           "permitPrice": {
-            "x-validate": [{"when": {"path": "self.permitRequired", "equals": true}, "must": {"isSet": true}, "message": "Needed when this fish requires a permit"}],
+            "x-validate": [
+              {
+                "when": {
+                  "path": "self.permitRequired",
+                  "equals": true
+                },
+                "must": {
+                  "isSet": true
+                },
+                "message": "Needed when this fish requires a permit"
+              }
+            ],
             "type": "number",
-            "minimum": 0
+            "minimum": 0,
+            "x-enabledWhen": {
+              "path": "self.permitRequired",
+              "equals": true
+            }
           },
           "permitInterval": {
-            "x-validate": [{"when": {"path": "self.permitRequired", "equals": true}, "must": {"isSet": true}, "message": "Needed when this fish requires a permit"}],
+            "x-validate": [
+              {
+                "when": {
+                  "path": "self.permitRequired",
+                  "equals": true
+                },
+                "must": {
+                  "isSet": true
+                },
+                "message": "Needed when this fish requires a permit"
+              }
+            ],
             "type": "number",
-            "minimum": 0
+            "minimum": 0,
+            "x-enabledWhen": {
+              "path": "self.permitRequired",
+              "equals": true
+            }
           },
           "permitWeightLimit": {
-            "x-validate": [{"must": {"ascending": true}, "message": "Minimum weight is above the maximum"}],
+            "x-validate": [
+              {
+                "must": {
+                  "ascending": true
+                },
+                "message": "Minimum weight is above the maximum"
+              }
+            ],
             "type": "array",
             "items": {
-              "type": "number"
+              "type": "number",
+              "minimum": 0
             },
             "minItems": 2,
-            "maxItems": 2
+            "maxItems": 2,
+            "x-enabledWhen": {
+              "path": "self.permitRequired",
+              "equals": true
+            },
+            "x-boundsFrom": {
+              "path": "self.weightLimits"
+            }
           },
           "permitCatchLimit": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "x-enabledWhen": {
+              "path": "self.permitRequired",
+              "equals": true
+            }
           },
           "chanceOfWorms": {
             "type": "number",
             "minimum": 0,
-            "maximum": 1
+            "maximum": 1,
+            "x-control": "chance"
           },
           "minigameType": {
             "type": "string",
-            "enum": ["cut", "crush"],
+            "enum": [
+              "cut",
+              "crush"
+            ],
             "default": "cut",
             "description": "Which gutting minigame plays for this species. 'cut' = drag along a line (fish), 'crush' = click circles before they vanish (crustaceans, shelled species)."
           },
           "crushCircleCount": {
-            "x-validate": [{"must": {"ascending": true}, "message": "Minimum count is above the maximum"}],
+            "x-validate": [
+              {
+                "must": {
+                  "ascending": true
+                },
+                "message": "Minimum count is above the maximum"
+              }
+            ],
             "type": "array",
             "items": {
               "type": "integer",
@@ -2672,7 +3087,10 @@
             },
             "minItems": 2,
             "maxItems": 2,
-            "default": [6, 10],
+            "default": [
+              6,
+              10
+            ],
             "description": "Min/max number of circles spawned in the crush minigame. A random count in this range is rolled each play. Ignored when minigameType is 'cut'."
           },
           "fishMeatItemOverride": {
@@ -2770,7 +3188,10 @@
           "trapOnly": true,
           "chanceOfWorms": 0,
           "minigameType": "crush",
-          "crushCircleCount": [6, 10]
+          "crushCircleCount": [
+            6,
+            10
+          ]
         },
         {
           "name": "freshwaterprawn",
@@ -2803,7 +3224,10 @@
           "trapOnly": true,
           "chanceOfWorms": 0,
           "minigameType": "crush",
-          "crushCircleCount": [5, 8]
+          "crushCircleCount": [
+            5,
+            8
+          ]
         },
         {
           "name": "stonecrab",
@@ -2839,7 +3263,10 @@
           "permitInterval": 24,
           "chanceOfWorms": 0,
           "minigameType": "crush",
-          "crushCircleCount": [6, 10]
+          "crushCircleCount": [
+            6,
+            10
+          ]
         },
         {
           "name": "dungenesscrab",
@@ -2876,7 +3303,10 @@
           "permitInterval": 24,
           "chanceOfWorms": 0,
           "minigameType": "crush",
-          "crushCircleCount": [6, 10]
+          "crushCircleCount": [
+            6,
+            10
+          ]
         },
         {
           "name": "whitecrappie",
@@ -3702,7 +4132,10 @@
           "permitInterval": 24,
           "chanceOfWorms": 0,
           "minigameType": "crush",
-          "crushCircleCount": [8, 12]
+          "crushCircleCount": [
+            8,
+            12
+          ]
         },
         {
           "name": "kingcrab",
@@ -3739,7 +4172,10 @@
           "permitInterval": 48,
           "chanceOfWorms": 0,
           "minigameType": "crush",
-          "crushCircleCount": [8, 12]
+          "crushCircleCount": [
+            8,
+            12
+          ]
         },
         {
           "name": "snappingturtle",
@@ -3776,7 +4212,10 @@
           "permitInterval": 72,
           "chanceOfWorms": 0,
           "minigameType": "crush",
-          "crushCircleCount": [7, 11]
+          "crushCircleCount": [
+            7,
+            11
+          ]
         },
         {
           "name": "yellowfintuna",
@@ -3910,7 +4349,10 @@
           "permitInterval": 72,
           "chanceOfWorms": 0.15,
           "minigameType": "crush",
-          "crushCircleCount": [7, 11]
+          "crushCircleCount": [
+            7,
+            11
+          ]
         },
         {
           "name": "bluefintuna",
@@ -3945,11 +4387,63 @@
           "permitInterval": 72,
           "chanceOfWorms": 0.15
         }
-      ]
+      ],
+      "x-component": "web/build/studio/fish-list.js",
+      "x-componentFull": true,
+      "x-rowControls": {
+        "rewardItems.chance": "chance"
+      }
     },
     "zones": {
-      "x-rowControls": {"description": "text"},
-      "x-validateRows": {"permitPrice": [{"when": {"path": "self.permitRequired", "equals": true}, "must": {"isSet": true}, "message": "Needed when this zone requires a permit"}], "permitInterval": [{"when": {"path": "self.permitRequired", "equals": true}, "must": {"isSet": true}, "message": "Needed when this zone requires a permit"}]},
+      "x-rowControls": {
+        "description": "text",
+        "densityModifier": "multiplier",
+        "abundanceModifier": "multiplier",
+        "weightModifier": "multiplier",
+        "biteChanceModifier": "multiplier",
+        "xpModifier": "multiplier",
+        "moneyModifier": "multiplier",
+        "permitPrice": {
+          "control": "integer",
+          "enabledWhen": {
+            "path": "self.permitRequired",
+            "equals": true
+          }
+        },
+        "permitInterval": {
+          "control": "integer",
+          "enabledWhen": {
+            "path": "self.permitRequired",
+            "equals": true
+          }
+        }
+      },
+      "x-validateRows": {
+        "permitPrice": [
+          {
+            "when": {
+              "path": "self.permitRequired",
+              "equals": true
+            },
+            "must": {
+              "isSet": true
+            },
+            "message": "Needed when this zone requires a permit"
+          }
+        ],
+        "permitInterval": [
+          {
+            "when": {
+              "path": "self.permitRequired",
+              "equals": true
+            },
+            "must": {
+              "isSet": true
+            },
+            "message": "Needed when this zone requires a permit"
+          }
+        ]
+      },
       "type": "array",
       "x-arrayKey": "name",
       "description": "Named fishing zones with spawn and modifier overrides",
@@ -5434,11 +5928,168 @@
             }
           ]
         }
-      ]
+      ],
+      "x-rowOrder": [
+        "name",
+        "label",
+        "lvlRequired",
+        "description",
+        "permitRequired",
+        "permitPrice",
+        "permitInterval"
+      ],
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "lvlRequired": {
+            "type": "integer"
+          },
+          "description": {
+            "type": "string"
+          },
+          "densityModifier": {
+            "type": "number"
+          },
+          "abundanceModifier": {
+            "type": "number"
+          },
+          "weightModifier": {
+            "type": "number"
+          },
+          "biteChanceModifier": {
+            "type": "number"
+          },
+          "xpModifier": {
+            "type": "number"
+          },
+          "moneyModifier": {
+            "type": "number"
+          },
+          "perFishModifiers": {
+            "type": "object",
+            "description": "Per-species overrides for this zone, keyed by fish name.",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "abundanceModifier": {
+                  "type": "number"
+                },
+                "weightModifier": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "permitRequired": {
+            "type": "boolean"
+          },
+          "permitPrice": {
+            "type": "integer"
+          },
+          "permitInterval": {
+            "type": "integer"
+          },
+          "zone": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
+      }
     },
     "stores": {
-      "x-rowControls": {"description": "text", "blip.color": "blipColor", "blip.sprite": "blipSprite", "blip.display": "blipDisplay", "categories.description": "text"},
-      "x-validateRows": {"stock.variance": [{"must": {"ascending": true}, "message": "Minimum variance is above the maximum"}], "stock.name": [{"must": {"anyOf": [{"path": "self.name", "isSet": true}, {"path": "self.ref", "isSet": true}]}, "message": "A stock line needs an item or a reference"}]},
+      "x-rowOrder": [
+        "id",
+        "name",
+        "description",
+        "icon",
+        "type"
+      ],
+      "x-rowControls": {
+        "description": "text",
+        "blip.color": "blipColor",
+        "blip.sprite": "blipSprite",
+        "blip.display": "blipDisplay",
+        "categories.description": "text",
+        "type": {
+          "control": "enum",
+          "options": [
+            {
+              "value": "equipment",
+              "label": "Equipment store"
+            },
+            {
+              "value": "fishMarket",
+              "label": "Fish market"
+            }
+          ]
+        },
+        "stock.category": {
+          "control": "pickOne",
+          "optionsFrom": {
+            "path": "parent.categories",
+            "key": "name",
+            "labelKey": "name"
+          },
+          "anyLabel": "Uncategorised"
+        },
+        "id": "string",
+        "name": "string",
+        "icon": {
+          "control": "icon",
+          "iconSet": "fontawesome"
+        },
+        "models": "peds",
+        "openingHours": "range",
+        "locations": "positions",
+        "paymentMethods": "accounts",
+        "categories.icon": {
+          "control": "icon",
+          "iconSet": "fontawesome"
+        }
+      },
+      "x-validateRows": {
+        "stock.variance": [
+          {
+            "must": {
+              "ascending": true
+            },
+            "message": "Minimum variance is above the maximum"
+          }
+        ],
+        "stock.name": [
+          {
+            "must": {
+              "anyOf": [
+                {
+                  "path": "self.name",
+                  "isSet": true
+                },
+                {
+                  "path": "self.ref",
+                  "isSet": true
+                }
+              ]
+            },
+            "message": "A stock line needs an item or a reference"
+          }
+        ]
+      },
       "type": "array",
       "x-arrayKey": "id",
       "description": "Fishing equipment stores and fish markets",
@@ -7230,7 +7881,135 @@
             }
           ]
         }
-      ]
+      ],
+      "x-enabledWhen": {
+        "path": "basic.disableBuiltInShop",
+        "equals": false
+      },
+      "items": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                },
+                "z": {
+                  "type": "number"
+                },
+                "w": {
+                  "type": "number"
+                }
+              }
+            }
+          },
+          "blip": {
+            "type": "object",
+            "properties": {
+              "color": {
+                "type": "integer"
+              },
+              "scale": {
+                "type": "number"
+              },
+              "sprite": {
+                "type": "integer"
+              },
+              "display": {
+                "type": "integer"
+              },
+              "shortRange": {
+                "type": "boolean"
+              }
+            }
+          },
+          "openingHours": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "paymentMethods": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "icon": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "stock": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "price": {
+                  "type": "integer"
+                },
+                "ref": {
+                  "type": "string"
+                },
+                "variance": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          },
+          "lvlRequired": {
+            "type": "integer"
+          }
+        }
+      }
     },
     "seaBoundary": {
       "type": "array",
@@ -7520,7 +8299,18 @@
           "x": -841.46,
           "y": -1259.4
         }
-      ]
+      ],
+      "items": {
+        "type": "object",
+        "properties": {
+          "x": {
+            "type": "number"
+          },
+          "y": {
+            "type": "number"
+          }
+        }
+      }
     },
     "tournaments": {
       "type": "array",
@@ -7908,9 +8698,14 @@
             "description": "Species that count toward this tournament. Empty = any species."
           },
           "location": {
-            "x-control": "coords",
             "type": "string",
-            "description": "Optional fishing zone name. Leave blank for any location."
+            "description": "Optional fishing zone name. Leave blank for any location.",
+            "x-optionsFrom": {
+              "path": "zones",
+              "key": "name",
+              "labelKey": "label"
+            },
+            "x-anyLabel": "Anywhere"
           },
           "prizeMode": {
             "type": "string",
@@ -7948,7 +8743,14 @@
             "description": "Signup fee in dollars. Set to 0 for free tournaments."
           },
           "minParticipants": {
-            "x-validate": [{"must": {"lteField": "self.maxParticipants"}, "message": "Minimum entrants is above the maximum"}],
+            "x-validate": [
+              {
+                "must": {
+                  "lteField": "self.maxParticipants"
+                },
+                "message": "Minimum entrants is above the maximum"
+              }
+            ],
             "type": "number",
             "default": 1,
             "minimum": 1,
@@ -7971,7 +8773,18 @@
             "description": "Unix ms timestamp of start (one-off tournaments)."
           },
           "endsAt": {
-            "x-validate": [{"when": {"path": "self.recurring", "isSet": false}, "must": {"gtField": "self.startsAt"}, "message": "Ends before it starts"}],
+            "x-validate": [
+              {
+                "when": {
+                  "path": "self.recurring",
+                  "isSet": false
+                },
+                "must": {
+                  "gtField": "self.startsAt"
+                },
+                "message": "Ends before it starts"
+              }
+            ],
             "type": "number",
             "default": 0,
             "description": "Unix ms timestamp of end (one-off tournaments)."
@@ -8020,7 +8833,10 @@
     },
     "dailyChallenges": {
       "type": "object",
-      "x-enabledWhen": { "path": "dailyChallenges.enabled", "equals": true },
+      "x-enabledWhen": {
+        "path": "dailyChallenges.enabled",
+        "equals": true
+      },
       "description": "Daily challenges. Each player is rolled one challenge per day, filtered by their level. Progress tracks on fish caught; rewards pay out on claim.",
       "properties": {
         "enabled": {
@@ -8176,7 +8992,14 @@
                 "description": "Challenge type. catch_count: any N fish. catch_species: N of one randomly-picked species from fishPool. catch_weight: total weight in grams."
               },
               "minLevel": {
-                "x-validate": [{"must": {"lteField": "self.maxLevel"}, "message": "Min level is above the max level"}],
+                "x-validate": [
+                  {
+                    "must": {
+                      "lteField": "self.maxLevel"
+                    },
+                    "message": "Min level is above the max level"
+                  }
+                ],
                 "type": "number",
                 "default": 1,
                 "minimum": 1,
@@ -8189,7 +9012,14 @@
                 "description": "Maximum player level for this template to be eligible."
               },
               "targetMin": {
-                "x-validate": [{"must": {"lteField": "self.targetMax"}, "message": "Target min is above the target max"}],
+                "x-validate": [
+                  {
+                    "must": {
+                      "lteField": "self.targetMax"
+                    },
+                    "message": "Target min is above the target max"
+                  }
+                ],
                 "type": "number",
                 "default": 3,
                 "minimum": 1,
@@ -8231,7 +9061,10 @@
     },
     "logging": {
       "type": "object",
-      "x-enabledWhen": { "path": "logging.enabled", "equals": true },
+      "x-enabledWhen": {
+        "path": "logging.enabled",
+        "equals": true
+      },
       "description": "Discord webhook logging. Posts server-side events (sales, catches, etc.) to a Discord channel via a webhook. The webhook URL is server-only and never sent to any client. Everything is OFF by default - set a webhook URL, turn logging on, then enable the events you want.",
       "properties": {
         "enabled": {
@@ -8244,7 +9077,13 @@
           "type": "string",
           "default": "",
           "x-serverOnly": true,
-          "description": "Discord webhook URL that logs are posted to. SERVER-ONLY - stripped from every client/admin-panel snapshot and never leaves the server. If blank, nothing is logged. Get one from Discord > Edit Channel > Integrations > Webhooks."
+          "description": "Discord webhook URL that logs are posted to. SERVER-ONLY - stripped from every client/admin-panel snapshot and never leaves the server. If blank, nothing is logged. Get one from Discord > Edit Channel > Integrations > Webhooks.",
+          "x-action": {
+            "label": "Test webhook",
+            "callback": "admin:testWebhook",
+            "icon": "send",
+            "sendSection": true
+          }
         },
         "username": {
           "type": "string",
@@ -8321,5 +9160,17 @@
         }
       }
     }
-  }
+  },
+  "x-managedElsewhere": [
+    "basic.guideBookItem"
+  ],
+  "x-pages": [
+    {
+      "id": "players",
+      "label": "Players",
+      "icon": "users",
+      "component": "web/build/studio/players.js",
+      "description": "Everyone who has fished, what they have earned, and their pots and permits."
+    }
+  ]
 }

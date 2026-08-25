@@ -1,5 +1,6 @@
 import { alpha, Flex, Image, Text, useMantineTheme } from '@mantine/core';
 import { AnimatePresence, motion } from 'framer-motion';
+import { openLink } from 'dirk-cfx-react';
 import { X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { ChangelogModal } from './ChangelogPage';
@@ -354,16 +355,22 @@ function DispatchCard({
                   {entry.action.label}
                 </motion.button>
               ) : (
-                <motion.a
-                  href={entry.action.url}
-                  target="_blank"
-                  rel="noreferrer noopener"
+                /* `openLink`, not an anchor.
+                 *
+                 * A CEF page has no browser to hand a target to - an <a> here
+                 * either did nothing or tried to navigate the panel itself out
+                 * of existence. The library's helper calls the game's own
+                 * openLink native, which is what opens the player's actual
+                 * browser, and falls back to window.open outside the game. */
+                <motion.button
+                  type="button"
+                  onClick={() => openLink(entry.action!.url!)}
                   whileHover={{ background: alpha(kind.color, 0.16) }}
                   whileTap={{ scale: 0.97 }}
                   style={style}
                 >
                   {entry.action.label}
-                </motion.a>
+                </motion.button>
               );
             })()}
             {entry.stamp && (

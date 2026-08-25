@@ -5,8 +5,10 @@ import {
   KeyRound, Layers, Loader2, Lock, MessageSquare, Package, Phone, Plug, Radio,
   Shirt, Siren, SquarePen, Target, TrendingUp, TriangleAlert, Warehouse, XCircle,
 } from 'lucide-react';
-import { useState } from 'react';
-import { MOCK_BRIDGES, RESOURCE_REGISTRY, type BridgeRow } from './mockBridges';
+import { useMemo, useState } from 'react';
+import { useBridgeRows, useBridgeState, type BridgeRow, type BridgeState } from './bridgeState';
+import { setValue } from './store';
+import type { SettingEntry } from './types';
 import { useChrome } from './studioLocale';
 
 /**
@@ -18,6 +20,105 @@ import { useChrome } from './studioLocale';
  */
 export function BridgesPage() {
   const t = useChrome();
+  const rows = useBridgeRows();
+  const { state, loading } = useBridgeState(rows.names);
+
+  const dependencies = useMemo((): BridgeRow[] => {
+    if (!state) return [];
+
+    // Whatever dirk_lib's own manifest requires, reported back. Naming
+    // oxmysql here would be a second copy of the dependency block, and this
+    // page existed for a week saying "not running" about it purely because it
+    // was not one of the resources the dropdowns ask about.
+    const required: BridgeRow[] = Object.entries(state.resources)
+      .filter(([, info]) => info.required)
+      .map(([name, info]) => ({
+        key: name, label: t('bridge.required', 'Required'), icon: 'box',
+        value: name, readOnly: true,
+        fixed: {
+          ok: info.running,
+          resolved: name,
+          version: info.version,
+          note: info.running
+            ? t('bridge.running', 'Running')
+            : t('bridge.notRunning', 'Not running — dirk_lib cannot start without it'),
+        },
+      }));
+
+    if (state.server.minimum) {
+      required.push({
+        key: 'server', label: t('bridge.serverBuild', 'Server build'), icon: 'box',
+        value: `/server:${state.server.minimum}`, readOnly: true,
+        fixed: {
+          ok: state.server.ok,
+          resolved: state.server.artifact ? `build ${state.server.artifact}` : t('bridge.unknownBuild', 'unknown'),
+          note: state.server.ok
+            ? `${t('bridge.meetsMinimum', 'Meets the minimum')} (${state.server.minimum})`
+            : `${t('bridge.belowMinimum', 'Below the minimum')} (${state.server.minimum})`,
+        },
+      });
+    }
+
+    if (state.onesync.required) {
+      required.push({
+        key: 'onesync', label: 'OneSync', icon: 'box', value: '/onesync', readOnly: true,
+        fixed: {
+          ok: state.onesync.ok,
+          resolved: state.onesync.mode || 'off',
+          note: state.onesync.ok ? t('bridge.enabled', 'Enabled') : t('bridge.disabled', 'Disabled'),
+        },
+      });
+    }
+
+    return required;
+  }, [state, t]);
+
+  /** One card's worth of row, built from the setting it edits. */
+  const toRow = (entry: SettingEntry): BridgeRow => {
+    const key = entry.path.slice('bridging.'.length);
+    return {
+      key,
+      label: entry.label,
+      icon: key.toLowerCase(),
+      value: rows.value(entry),
+      options: entry.options?.map((option) => String(option.value)),
+      detected: state?.detected?.[key],
+      // itemImgPath is a FOLDER, not a resource - it takes typed text
+      kind: entry.type === 'string' && !entry.options?.length ? 'path' : 'resource',
+      entry,
+    };
+  };
+
+  if (loading) {
+    return (
+      <Flex align="center" justify="center" style={{ flex: 1 }}>
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ repeat: Infinity, duration: 0.8, ease: 'linear' }}
+          style={{ display: 'flex' }}
+        >
+          <Loader2 size="2.4vh" color="rgba(255,255,255,0.4)" />
+        </motion.div>
+      </Flex>
+    );
+  }
+
+  // Reporting "nothing installed" because the question failed would be a lie
+  // about the server, on the one page people open to find out about it.
+  if (!state) {
+    return (
+      <Flex direction="column" align="center" justify="center" gap="xs" style={{ flex: 1 }}>
+        <TriangleAlert size="2.4vh" color="#E0776B" />
+        <Text ff="Akrobat Bold" size="sm" c="#E0776B">
+          {t('bridgesPage.failed', 'Could not read this server')}
+        </Text>
+        <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.4)">
+          {t('bridgesPage.failedHint', 'dirk_lib did not answer — nothing here would be true')}
+        </Text>
+      </Flex>
+    );
+  }
+
   return (
     <Flex
       direction="column" gap="lg" p="md"
@@ -27,25 +128,30 @@ export function BridgesPage() {
       <BridgeGroup
         icon={Box}
         title={t('bridgesPage.dependencies', 'Dependencies')}
-        description="dirk_lib will not start without these"
-        rows={MOCK_BRIDGES.dependencies}
+        description={t('bridgesPage.dependenciesHint', 'dirk_lib will not start without these')}
+        rows={dependencies}
+        resource={rows.resource}
+        state={state}
       />
       <BridgeGroup
         icon={Layers}
         title={t('bridgesPage.interface', 'Interface')}
-        description="Who draws notifications, progress bars and prompts"
-        rows={MOCK_BRIDGES.interface}
+        description={t('bridgesPage.interfaceHint', 'Who draws notifications, progress bars and prompts')}
+        rows={rows.interface.map(toRow)}
+        resource={rows.resource}
+        state={state}
       />
       <BridgeGroup
         icon={Plug}
         title={t('bridgesPage.bridges', 'Bridges')}
-        description="What each script detected, and whether it took"
-        rows={MOCK_BRIDGES.bridges}
+        description={t('bridgesPage.bridgesHint', 'What dirk_lib detected, and whether it took')}
+        rows={rows.bridges.map(toRow)}
+        resource={rows.resource}
+        state={state}
       />
 
       <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.28)">
-        Every bridge dirk_lib knows about is on this page - it is generated from the same schema the
-        server reads, so it cannot fall behind.
+        {t('bridgesPage.footer', 'Every bridge dirk_lib knows about is on this page — the rows are its own settings, so it cannot fall behind the schema. Changes save with the bar below.')}
       </Text>
     </Flex>
   );
@@ -61,12 +167,14 @@ const ICONS: Record<string, React.ElementType> = {
 };
 
 function BridgeGroup({
-  icon: Icon, title, description, rows,
+  icon: Icon, title, description, rows, resource, state,
 }: {
   icon: React.ElementType;
   title: string;
   description: string;
   rows: BridgeRow[];
+  resource: string;
+  state: BridgeState;
 }) {
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
@@ -80,7 +188,9 @@ function BridgeGroup({
       </Flex>
 
       <Flex gap="xs" wrap="wrap">
-        {rows.map((row) => <BridgeCard key={row.key} row={row} />)}
+        {rows.map((row) => (
+          <BridgeCard key={row.key} row={row} resource={resource} state={state} />
+        ))}
       </Flex>
     </Flex>
   );
@@ -101,7 +211,7 @@ type Verdict = {
  * Takes the translator rather than calling one: this is a plain function, not a
  * component, so there is no hook to call here.
  */
-function verdictFor(row: BridgeRow, value: string, t: Translate): Verdict {
+function verdictFor(row: BridgeRow, value: string, state: BridgeState, t: Translate): Verdict {
   // server build / OneSync are not resources, so they carry their own verdict
   if (row.fixed) {
     return {
@@ -109,6 +219,27 @@ function verdictFor(row: BridgeRow, value: string, t: Translate): Verdict {
       resolved: row.fixed.resolved,
       version: row.fixed.version,
       note: row.fixed.note,
+    };
+  }
+
+  // A FOLDER, not a resource. `auto` follows whatever inventory was detected,
+  // and asking "is that path running" has no meaning - the old check reported
+  // a red cross on a perfectly good image path.
+  if (row.kind === 'path') {
+    const resolved = value && value !== 'auto' ? value : state.detected.itemImgPath;
+    if (!resolved) {
+      return {
+        tone: 'bad',
+        resolved: t('bridge.noPath', 'no path'),
+        note: t('bridge.noPathHint', 'No inventory detected, so there is nothing to follow'),
+      };
+    }
+    return {
+      tone: 'ok',
+      resolved,
+      note: value === 'auto'
+        ? t('bridge.followsInventory', 'Follows the detected inventory')
+        : t('bridge.pathSet', 'Set by hand'),
     };
   }
 
@@ -124,35 +255,41 @@ function verdictFor(row: BridgeRow, value: string, t: Translate): Verdict {
     return {
       tone: 'ok',
       resolved: found,
-      version: RESOURCE_REGISTRY[found]?.version,
+      version: state.resources[found]?.version,
       note: t('bridge.autoDetected', 'Auto detected'),
     };
   }
 
-  const state = RESOURCE_REGISTRY[value];
-  if (!state?.running) {
+  const found = state.resources[value];
+  if (!found?.running) {
     return { tone: 'bad', resolved: value, note: t('bridge.forcedNotRunning', 'Forced, but not running on this server') };
   }
-  return { tone: 'ok', resolved: value, version: state.version, note: t('bridge.forcedRunning', 'Forced, and running') };
+  return { tone: 'ok', resolved: value, version: found.version, note: t('bridge.forcedRunning', 'Forced, and running') };
 }
 
-function BridgeCard({ row }: { row: BridgeRow }) {
+function BridgeCard({
+  row, resource, state,
+}: { row: BridgeRow; resource: string; state: BridgeState }) {
   const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const RowIcon = ICONS[row.icon] ?? Plug;
 
-  const [value, setValue] = useState(row.value);
   const [checking, setChecking] = useState(false);
-  const verdict = verdictFor(row, value, t);
+  // The staged value, not a local copy of it. This card kept its own useState
+  // and never wrote anywhere: picking a different inventory moved the dropdown
+  // and changed precisely nothing, which on a page about what is connected is
+  // worse than not offering the choice.
+  const value = row.value;
+  const verdict = verdictFor(row, value, state, t);
   const bad = verdict.tone === 'bad';
   const statusColor = bad ? '#E0776B' : color;
 
   // Switching re-checks the resource, so picking something that is not
   // installed tells you straight away instead of at the next restart.
   const change = (next: string | null) => {
-    if (!next) return;
-    setValue(next);
+    if (!next || !row.entry) return;
+    setValue(resource, row.entry, next);
     setChecking(true);
     setTimeout(() => setChecking(false), 320);
   };
@@ -189,7 +326,7 @@ function BridgeCard({ row }: { row: BridgeRow }) {
           // anything else is a literal path the UIs load images from
           <TextInput
             value={value}
-            onChange={(e) => setValue(e.currentTarget.value)}
+            onChange={(e) => row.entry && setValue(resource, row.entry, e.currentTarget.value)}
             placeholder={t('bridgesPage.auto', 'auto')}
             styles={{
               input: {

@@ -151,3 +151,14 @@ code {
   font-family: 'Akrobat SemiBold';
   border-radius: var(--studio-dropdown-radius, inherit);
 }
+
+/* A button that is busy, saying so. Used by the field-action button while its
+   request is in flight - a spinner rather than a disabled label, because some
+   of these post to a service and genuinely take a second. */
+@keyframes studio-spin {
+  to { transform: rotate(360deg); }
+}
+
+.studio-spin {
+  animation: studio-spin 0.9s linear infinite;
+}

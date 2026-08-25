@@ -5,6 +5,7 @@
 -- forwards the selected resource back for dispatch.
 
 local chooserOpen = false
+local studioOpen = false
 
 local function closeChooser()
   if not chooserOpen then return end
@@ -30,6 +31,27 @@ end)
 -- is the simplest race-free signal.
 exports('isScriptConfigChooserOpen', function()
   return chooserOpen
+end)
+
+--- Is one of dirk_lib's admin surfaces actually on screen?
+---
+--- Read by src/nuiBridge before it will do anything on an admin's behalf.
+---
+--- The point is WHERE this lives. `studioOpen` is set by
+--- `dirk_lib:openScriptStudio`, a server-triggered event the server only fires
+--- after its permission check - so it cannot be set from the NUI. A player who
+--- opens CEF devtools can send any `fetchNui` they like, but they cannot make
+--- this true, and every acting callback refuses while it is false.
+---
+--- Without it, "can you reach this" was answered by "can you run Lua on your
+--- client", when the honest answer was "can you press F12".
+--- An EXPORT rather than a global: nuiBridge is a `require`d module loaded
+--- from a shared script, so whether it can see a global this client script
+--- declares depends on module environments and load order. An export is the
+--- same answer without either question, and is how the chooser above already
+--- reports itself.
+exports('isDirkAdminUiOpen', function()
+  return studioOpen or chooserOpen
 end)
 
 RegisterNuiCallback('SCRIPT_CONFIG_CHOOSER_PICK', function(data, cb)
@@ -67,8 +89,6 @@ end)
 -- player may edit; the VALUES are pulled per resource from that resource's own
 -- permission-gated `getFullScriptConfig`, so server-only values keep travelling
 -- through the one path that checks who is asking.
-
-local studioOpen = false
 
 local function closeStudio()
   if not studioOpen then return end

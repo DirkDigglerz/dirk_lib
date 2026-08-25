@@ -53,6 +53,33 @@ end
 return function(frameworkBridge)
   -- Normalised { jobs, gangs } regardless of the underlying framework. Bounced
   -- through the server because grade/label data is not all client-readable.
+
+--- Refuse anything that ACTS unless the admin panel is really open.
+---
+--- These callbacks exist to serve Script Studio: they teleport the admin's ped,
+--- hand out items, spawn vehicles, run a test suite, and forward requests to
+--- other resources. None of that has any meaning with the panel shut.
+---
+--- The threat this closes is not a modded client. A modded client can already
+--- trigger server events directly and always could. It is CEF devtools: without
+--- this, every one of these was one `fetch` away for any player who opened the
+--- console, which is a far lower bar than a Lua injector.
+---
+--- The flag lives in src/scriptConfig/client.lua and is set by a
+--- server-triggered event that fires only after the server's permission check,
+--- so nothing reachable from the NUI can turn it on.
+---
+--- Server-side checks still stand behind this; it is the outer door, not the
+--- only one.
+local function adminUiOpen()
+  -- pcall'd: this module is required from a shared script, so on the server
+  -- context the export does not exist at all - and a hard error there would
+  -- take out whatever called it.
+  local ok, open = pcall(function() return exports.dirk_lib:isDirkAdminUiOpen() end)
+  return ok and open == true
+end
+
+
   RegisterNuiCallback('GET_FRAMEWORK_GROUPS', function(_, cb)
     CreateThread(function()
       local ok, data = pcall(lib.callback.await, 'dirk_lib:getFrameworkGroups')
@@ -93,6 +120,7 @@ return function(frameworkBridge)
   end)
 
   RegisterNuiCallback('RUN_TESTS', function(data, cb)
+    if not adminUiOpen() then cb({ success = false, _error = 'NotOpen' }) return end
     CreateThread(function()
       local resource = type(data) == 'table' and data.resource or nil
       if type(resource) ~= 'string' or resource == '' then
@@ -136,6 +164,99 @@ return function(frameworkBridge)
     end)
   end)
 
+  -- ── dirk-cfx-react's admin tools ────────────────────────────────────
+  --
+  -- The Goto and Set buttons beside a coordinate do NOT call GET_POSITION or
+  -- GOTO_POSITION - those are the older pair. They speak the library's admin
+  -- tool protocol, which dirk_lib had no handler for at all, so both buttons
+  -- did precisely nothing.
+  --
+  -- The contract, read from the library: `ADMIN_TOOL_BEGIN` starts a tool and
+  -- the panel waits for a NUI message named `<id>_RESULT` (or `<id>_CANCELLED`)
+  -- to resolve it; `ADMIN_TOOL_INVOKE` is fire-and-forget.
+  local activeTool = nil
+
+  local function finishTool(id, data)
+    activeTool = nil
+    lib.hideInstructions()
+    SetNuiFocus(true, true)
+    SendNuiMessage(json.encode({
+      action = ('%s_%s'):format(id, data and 'RESULT' or 'CANCELLED'),
+      data = data,
+    }))
+  end
+
+  RegisterNuiCallback('ADMIN_TOOL_BEGIN', function(data, cb)
+    if not adminUiOpen() then cb({ success = false, _error = 'NotOpen' }) return end
+    local id = type(data) == 'table' and data.id or nil
+    if type(id) ~= 'string' then return cb({ ok = false }) end
+
+    if id ~= 'capturePosition' then
+      -- Nothing else is implemented here yet; say so rather than leaving the
+      -- panel waiting on a promise that will never settle.
+      cb({ ok = false })
+      SendNuiMessage(json.encode({ action = ('%s_CANCELLED'):format(id) }))
+      return
+    end
+
+    cb({ ok = true })
+    activeTool = id
+
+    -- dirk_lib's OWN instruction card, not one drawn by the panel: every
+    -- in-world prompt in every dirk script comes from here, so a coordinate
+    -- pick should look like all of them rather than like a second design.
+    -- The library hands us the wording; this just shows it.
+    local instructions = type(data.instructions) == 'table' and data.instructions or {}
+    lib.showInstructions({
+      title = instructions.title or 'Pick Position',
+      hint = instructions.hint or 'Walk to where you want this set',
+      keys = instructions.keys or {
+        { key = 'E', action = 'Set' },
+        { key = 'BACKSPACE', action = 'Cancel' },
+      },
+    })
+
+    -- Hands the game back to the player: the panel hides itself while a tool
+    -- is running, so this is what lets them walk to the spot.
+    SetNuiFocus(false, false)
+
+    CreateThread(function()
+      while activeTool == id do
+        Wait(0)
+        -- E to set, Backspace to cancel. Drawn from the instructions the
+        -- library shows, so the keys match what is on screen.
+        if IsControlJustPressed(0, 38) then
+          local ped = PlayerPedId()
+          local pos = GetEntityCoords(ped)
+          finishTool(id, {
+            x = pos.x, y = pos.y, z = pos.z, w = GetEntityHeading(ped),
+          })
+        elseif IsControlJustPressed(0, 177) then
+          finishTool(id, nil)
+        end
+      end
+    end)
+  end)
+
+  RegisterNuiCallback('ADMIN_TOOL_INVOKE', function(data, cb)
+    if not adminUiOpen() then cb({ success = false, _error = 'NotOpen' }) return end
+    cb({ ok = true })
+    local id = type(data) == 'table' and data.id or nil
+    if id ~= 'gotoCoord' then return end
+
+    local value = data.value
+    if type(value) ~= 'table' then return end
+    local ped = PlayerPedId()
+    -- The ped root sits about a metre above the visual ground, so drop it by
+    -- one rather than arriving mid-air.
+    SetEntityCoords(ped,
+      (tonumber(value.x) or 0) + 0.0,
+      (tonumber(value.y) or 0) + 0.0,
+      (tonumber(value.z) or 0) - 1.0,
+      false, false, false, false)
+    SetEntityHeading(ped, (tonumber(value.w) or 0.0) % 360.0)
+  end)
+
   -- World position, for any coordinate control in the panel.
   --
   -- dirk-cfx-react's Vector4 buttons call these BY NAME with no resource
@@ -145,12 +266,14 @@ return function(frameworkBridge)
   -- exactly how they behaved. Kept identical to the copies in dirk_fishing and
   -- dirk_druglabsv2 so a coordinate behaves the same wherever it is edited.
   RegisterNuiCallback('GET_POSITION', function(_, cb)
+    if not adminUiOpen() then cb({ success = false, _error = 'NotOpen' }) return end
     local ped = PlayerPedId()
     local pos = GetEntityCoords(ped)
     cb({ x = pos.x, y = pos.y, z = pos.z, w = GetEntityHeading(ped) })
   end)
 
   RegisterNuiCallback('GOTO_POSITION', function(data, cb)
+    if not adminUiOpen() then cb({ success = false, _error = 'NotOpen' }) return end
     cb({})
     if type(data) ~= 'table' then return end
     local x = tonumber(data.x) or 0.0
@@ -170,6 +293,7 @@ return function(frameworkBridge)
   -- permission to edit the OWNING script, so this callback existing is not a
   -- way to hand yourself items.
   RegisterNuiCallback('GIVE_ITEM', function(data, cb)
+    if not adminUiOpen() then cb({ success = false, _error = 'NotOpen' }) return end
     CreateThread(function()
       local resource = type(data) == 'table' and data.resource or nil
       local item = type(data) == 'table' and data.item or nil
@@ -192,7 +316,169 @@ return function(frameworkBridge)
     end)
   end)
 
+  --- Ask the OWNING SCRIPT something, from inside its own Studio page.
+  ---
+  --- A page supplied by dirk_fishing renders inside dirk_lib's NUI frame, so
+  --- `fetchNui` posts to dirk_lib - not to fishing. Fishing's own callbacks are
+  --- simply never reached, and because fetchNui falls back to its mock data on
+  --- a failed fetch, the page showed invented players and said nothing.
+  ---
+  --- So the request comes here and is forwarded to the server callback the page
+  --- names. Two things keep that honest:
+  ---
+  ---  * the callback name MUST start with `<resource>:`, so a page can only
+  ---    ever reach the script that supplied it;
+  ---  * the answering script does its own permission check, exactly as it did
+  ---    when its own panel asked - nothing here grants access.
+  --- What the Bridges page cannot read out of a schema.
+  ---
+  --- The OPTIONS for every bridge are already in dirk_lib's own schema - each
+  --- setting's enum is the list of things it can be - so the page builds the
+  --- rows from settings it already has. What no schema can say is what this
+  --- particular server is running, and that is all this answers:
+  ---
+  ---   * which resources are actually up, and at what version;
+  ---   * what auto-detection picked, for a setting left on "auto";
+  ---   * the fixed facts from the manifest - server build, OneSync, oxmysql.
+  ---
+  --- The resource NAMES come from the caller rather than a list kept here, so
+  --- adding a supported inventory means editing the schema and nothing else.
+  --- A list in two places is a list that disagrees with itself.
+  RegisterNuiCallback('GET_BRIDGE_STATE', function(data, cb)
+    if not adminUiOpen() then cb({ success = false, _error = 'NotOpen' }) return end
+    CreateThread(function()
+      local wanted = type(data) == 'table' and data.resources or nil
+      local resourceName = GetCurrentResourceName()
+
+      local resources = {}
+      if type(wanted) == 'table' then
+        for _, name in ipairs(wanted) do
+          if type(name) == 'string' and name ~= '' and name ~= 'auto' then
+            local state = GetResourceState(name)
+            local running = state == 'started' or state == 'starting'
+            resources[name] = {
+              running = running,
+              state = state,
+              -- Only meaningful for something that is actually up; a stopped
+              -- resource still has a manifest and reporting its version reads
+              -- as "installed and fine".
+              version = running and GetResourceMetadata(name, 'version', 0) or nil,
+            }
+          end
+        end
+      end
+
+      -- dirk_lib's OWN declared dependencies, whatever the caller asked about.
+      --
+      -- The caller sends the resources its dropdowns can offer, and oxmysql is
+      -- not one of them - it is not a bridge, it is a hard requirement. So it
+      -- came back unknown and the card read "not running" on a server that
+      -- plainly has it. Read from the manifest rather than named here, so the
+      -- page follows the dependency block instead of a second copy of it.
+      local minimumBuild, needsOneSync = nil, false
+
+      -- Read from the MANIFEST TEXT, not from resource metadata.
+      --
+      -- Which key a `dependencies { }` block lands under is not something to
+      -- be confident about from memory, and being wrong is silent: the loop
+      -- runs zero times and the section renders as a heading with nothing
+      -- beneath it. The file itself is not ambiguous.
+      local manifest = LoadResourceFile(resourceName, 'fxmanifest.lua')
+        or LoadResourceFile(resourceName, '__resource.lua')
+        or ''
+      local block = manifest:match('dependencies%s*%{(.-)%}') or ''
+
+      for dep in block:gmatch("['\"]([^'\"]+)['\"]") do
+        local build = dep:match('^/server:(%d+)$')
+        if build then
+          minimumBuild = tonumber(build)
+        elseif dep == '/onesync' then
+          needsOneSync = true
+        elseif dep:sub(1, 1) ~= '/' then
+          -- a real resource, not a server feature
+          local state = GetResourceState(dep)
+          local running = state == 'started' or state == 'starting'
+          resources[dep] = {
+            running = running,
+            state = state,
+            version = running and GetResourceMetadata(dep, 'version', 0) or nil,
+            required = true,
+          }
+        end
+      end
+
+      -- `lib.detectResources` re-runs detection rather than handing back the
+      -- snapshot taken when dirk_lib booted - an inventory that started after
+      -- the library would otherwise show as missing forever.
+      local detected = (lib.detectResources and lib.detectResources()) or {}
+
+      local build = tonumber(GetConvar('sv_enforceGameBuild', '0')) or 0
+      -- Published by the server into GlobalState: the `version` convar this
+      -- used to read is server-side only, so on the client it was always empty
+      -- and the card reported "unknown" on a perfectly fine server.
+      local artifact = tonumber(GlobalState.dirkServerBuild) or 0
+
+      local onesync = GetConvar('onesync', 'off')
+
+      cb({
+        success   = true,
+        detected  = detected,
+        resources = resources,
+        -- Both read from the manifest above, so the page reports what this
+        -- build of dirk_lib actually asks for rather than a number written
+        -- here that has to be remembered when the manifest changes.
+        server = {
+          artifact  = artifact > 0 and artifact or nil,
+          minimum   = minimumBuild,
+          ok        = not minimumBuild or artifact == 0 or artifact >= minimumBuild,
+          gameBuild = build > 0 and build or nil,
+        },
+        onesync = {
+          mode     = onesync,
+          required = needsOneSync,
+          ok       = not needsOneSync or (onesync ~= 'off' and onesync ~= ''),
+        },
+      })
+    end)
+  end)
+
+  RegisterNuiCallback('STUDIO_REQUEST', function(data, cb)
+    if not adminUiOpen() then cb({ success = false, _error = 'NotOpen' }) return end
+    CreateThread(function()
+      local resource = type(data) == 'table' and data.resource or nil
+      local callback = type(data) == 'table' and data.callback or nil
+
+      if type(resource) ~= 'string' or type(callback) ~= 'string' then
+        cb({ success = false, _error = 'BadRequest' })
+        return
+      end
+
+      -- Its own script, and no other. Without this a page could name any
+      -- callback on the server and this would dutifully await it.
+      if callback:sub(1, #resource + 1) ~= resource .. ':' then
+        cb({ success = false, _error = 'NotYourCallback' })
+        return
+      end
+
+      if GetResourceState(resource) ~= 'started' then
+        cb({ success = false, _error = 'NotStarted' })
+        return
+      end
+
+      local ok, result, err = pcall(lib.callback.await, callback, data.payload)
+      if not ok then
+        cb({ success = false, _error = 'CallbackFailed' })
+        return
+      end
+      -- `result` is whatever the script returns - usually a table, sometimes a
+      -- boolean with the reason alongside it. Both are passed through as they
+      -- are; reading them is the page's business, not this bridge's.
+      cb({ success = result ~= nil, data = result, _error = err })
+    end)
+  end)
+
   RegisterNuiCallback('SPAWN_VEHICLE', function(data, cb)
+    if not adminUiOpen() then cb({ success = false, _error = 'NotOpen' }) return end
     CreateThread(function()
       local model = type(data) == 'table' and data.model or nil
       if type(model) ~= 'string' or model == '' then

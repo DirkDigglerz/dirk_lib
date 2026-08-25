@@ -167,6 +167,32 @@ export function effectiveValue(resource: string, entry: SettingEntry): unknown {
   return staged.kind === 'reset' ? entry.default : staged.value;
 }
 
+/**
+ * Every setting in the same top-level section, with staged edits applied.
+ *
+ * For an action that needs its neighbours. Testing a webhook posts a preview
+ * of the events that are switched ON, so the URL alone does not say what to
+ * send - and it has to be the value in the box, not the one saved an hour ago,
+ * or pressing Test would check something other than what you just typed.
+ */
+export function sectionValues(resource: string, path: string): Record<string, unknown> {
+  const section = path.split('.')[0];
+  if (!section) return {};
+
+  const entries = useStudio.getState().scripts
+    .find((script) => script.resource === resource)?.entries ?? [];
+
+  const out: Record<string, unknown> = {};
+  for (const entry of entries) {
+    if (entry.path !== section && !entry.path.startsWith(`${section}.`)) continue;
+    // Keyed by the name the SCRIPT knows it as - `logging.webhookUrl` reaches
+    // the script as `webhookUrl`, which is what its own callback reads.
+    const key = entry.path === section ? section : entry.path.slice(section.length + 1);
+    out[key] = effectiveValue(resource, entry);
+  }
+  return out;
+}
+
 /** Differs from the shipped default - drives the MODIFIED chip. */
 /**
  * Is this setting live right now, given whatever its master switch says?

@@ -1,8 +1,10 @@
 import { alpha, Flex, Text, useMantineTheme } from '@mantine/core';
 import { Modal } from 'dirk-cfx-react';
 import { useState } from 'react';
+import { useItems } from 'dirk-cfx-react';
+import { PickerDrawer } from './PickerDrawer';
 import { FieldRow } from './FieldRow';
-import { ItemArt, StudioButton } from './ui';
+import { fieldGatedOff, ItemArt, rowIdentity, singular, StudioButton } from './ui';
 import type { SettingColumn } from './types';
 import { useChrome } from './studioLocale';
 
@@ -18,31 +20,51 @@ type Row = Record<string, unknown>;
  * click to edit. This is the same idea one level down.
  */
 export function NestedRowModal({
-  column, row, index, onSave, onDelete, onClose, disabled,
+  column, resource, row, index, onSave, onDelete, onClose, disabled, parentRow,
 }: {
   column: SettingColumn;
+  /** the script this row belongs to, for options resolved from its config */
+  resource?: string;
   row: Row;
   index: number;
   onSave: (next: Row) => void;
   onDelete: () => void;
   onClose: () => void;
   disabled?: boolean;
+  /** the row this table sits inside, for options sourced from it */
+  parentRow?: Record<string, unknown>;
 }) {
   const t = useChrome();
+  /**
+   * A field in a NESTED row can open a picker too.
+   *
+   * This modal rendered its fields with no drill handler at all, so the item
+   * picker on a reward-pool row - a nested table inside the fish editor - did
+   * nothing whatsoever when clicked.
+   */
+  const [picker, setPicker] = useState<
+    { column: SettingColumn; value: unknown; apply: (next: unknown) => void } | null
+  >(null);
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const [draft, setDraft] = useState<Row>(() => JSON.parse(JSON.stringify(row)));
 
   const children = column.columns ?? [];
-  const itemKey = children.find((child) => child.type === 'item')?.key
-    ?? children.find((child) => child.key === 'name' || child.key === 'item')?.key;
+  // The same rule the list behind this modal uses. It had its own, with no
+  // check at all, so a category called "Rods" arrived here as an item: a
+  // broken picture at the top, and a name and description the form then made
+  // read-only because it thought the inventory owned them.
+  const items = useItems();
+  const { itemKey } = rowIdentity(children, [draft], items);
   const itemName = itemKey ? String(draft[itemKey] ?? '') : '';
 
-  const singular = column.label.replace(/s$/, '');
+  const gatedOff = (child: SettingColumn) => fieldGatedOff(child, draft);
+
+  const one = singular(column.label);
 
   return (
     <Modal
-      title={`${singular} ${index + 1}`}
+      title={`${one} ${index + 1}`}
       description={`Inside ${column.label.toLowerCase()}`}
       iconColor={color}
       onClose={onClose}
@@ -68,10 +90,21 @@ export function NestedRowModal({
             <FieldRow
               key={child.key}
               column={child}
+              resource={resource}
+              row={draft}
+              parentRow={parentRow}
               value={draft[child.key] ?? child.default}
               itemName={itemName}
-              disabled={disabled}
+              disabled={disabled || gatedOff(child)}
+              dimmed={gatedOff(child)}
               onChange={(next) => setDraft((prev) => ({ ...prev, [child.key]: next }))}
+              onPick={(nested, access) => setPicker({
+                column: nested ?? child,
+                value: nested ? access?.read() : draft[child.key],
+                apply: (next) => (access
+                  ? access.write(next)
+                  : setDraft((prev) => ({ ...prev, [child.key]: next }))),
+              })}
             />
           ))}
 
@@ -81,6 +114,18 @@ export function NestedRowModal({
             </Text>
           )}
         </Flex>
+
+        {picker && (
+          <PickerDrawer
+            type={picker.column.type}
+            label={picker.column.label}
+            iconSet={picker.column.iconSet}
+            value={picker.value}
+            disabled={disabled}
+            onApply={(next) => picker.apply(next)}
+            onClose={() => setPicker(null)}
+          />
+        )}
 
         <Flex
           align="center" justify="space-between" px="sm" py="xs"
