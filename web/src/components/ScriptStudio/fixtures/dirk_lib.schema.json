@@ -1,7 +1,9 @@
 {
   "x-managedElsewhere": [
     "bridging",
-    "access"
+    "access",
+    "logger.local",
+    "logger.routes"
   ],
   "x-label": "Shared Settings",
   "x-icon": "library",
@@ -641,10 +643,12 @@
           "type": "array",
           "x-arrayKey": "id",
           "x-serverOnly": true,
-          "description": "Send matching log lines to a Discord webhook, as well as keeping them here. Leave a filter empty to mean 'any' - a route with no filters at all forwards everything.",
+          "description": "Send matching log lines on to Discord, as well as keeping them here. Pick a channel if you have a bot set up, or paste a webhook URL. Leave a filter empty to mean 'any' - a redirect with no filters at all forwards everything.",
           "x-rowOrder": [
             "label",
             "enabled",
+            "kind",
+            "channelId",
             "url",
             "resources",
             "events",
@@ -652,13 +656,7 @@
           ],
           "x-rowControls": {
             "url": {
-              "control": "secret",
-              "action": {
-                "label": "Test",
-                "callback": "testLogRoute",
-                "icon": "send",
-                "sendSection": true
-              }
+              "control": "secret"
             },
             "resources": "tags",
             "events": "tags",
@@ -678,6 +676,20 @@
                   "label": "Error"
                 }
               ]
+            },
+            "channelId": {
+              "control": "discordChannel"
+            },
+            "label": {
+              "action": {
+                "label": "Test",
+                "callback": "testLogRoute",
+                "icon": "send",
+                "sendSection": true
+              }
+            },
+            "kind": {
+              "control": "redirectKind"
             }
           },
           "items": {
@@ -687,35 +699,140 @@
                 "type": "string"
               },
               "label": {
-                "type": "string"
+                "type": "string",
+                "title": "Name",
+                "description": "What to call this redirect. Only shown to you."
               },
               "enabled": {
-                "type": "boolean"
+                "type": "boolean",
+                "title": "Active",
+                "description": "Turn off to stop forwarding without deleting it.",
+                "default": true
               },
               "url": {
-                "type": "string"
+                "type": "string",
+                "x-enabledWhen": {
+                  "path": "kind",
+                  "equals": "webhook"
+                },
+                "title": "Webhook URL",
+                "description": "From the Discord channel: Edit Channel > Integrations > Webhooks."
               },
               "resources": {
                 "type": "array",
                 "items": {
                   "type": "string"
-                }
+                },
+                "title": "Scripts",
+                "description": "Only forward lines from these scripts. Empty means all of them."
               },
               "events": {
                 "type": "array",
                 "items": {
                   "type": "string"
-                }
+                },
+                "title": "Events",
+                "description": "Only forward these events. Empty means all of them."
               },
               "levels": {
                 "type": "array",
                 "items": {
                   "type": "string"
-                }
+                },
+                "title": "Levels",
+                "description": "Only forward these levels. Empty means all of them."
+              },
+              "channelId": {
+                "type": "string",
+                "description": "Post to this Discord channel as your bot. Needs a bot token and guild set up under Discord. Leave empty to use a webhook URL instead.",
+                "x-enabledWhen": {
+                  "path": "kind",
+                  "equals": "channel"
+                },
+                "title": "Channel"
+              },
+              "kind": {
+                "type": "string",
+                "default": "webhook",
+                "description": "How this redirect reaches Discord.",
+                "title": "Send using"
               }
             }
           },
-          "default": []
+          "default": [],
+          "x-rowTabs": [
+            {
+              "id": "destination",
+              "label": "Where it goes",
+              "icon": "send",
+              "keys": [
+                "label",
+                "enabled",
+                "kind",
+                "channelId",
+                "url"
+              ]
+            },
+            {
+              "id": "filters",
+              "label": "What to send",
+              "icon": "filter",
+              "keys": [
+                "resources",
+                "events",
+                "levels"
+              ]
+            }
+          ],
+          "title": "Redirects",
+          "x-validateRows": {
+            "label": [
+              {
+                "must": {
+                  "path": "self",
+                  "isSet": true
+                },
+                "message": "Give this redirect a name so you can tell them apart"
+              }
+            ],
+            "url": [
+              {
+                "when": {
+                  "path": "kind",
+                  "equals": "webhook"
+                },
+                "must": {
+                  "path": "self",
+                  "isSet": true
+                },
+                "message": "Paste the webhook URL from the Discord channel"
+              },
+              {
+                "when": {
+                  "path": "kind",
+                  "equals": "webhook"
+                },
+                "must": {
+                  "path": "self",
+                  "minLength": 40
+                },
+                "message": "That does not look like a Discord webhook URL"
+              }
+            ],
+            "channelId": [
+              {
+                "when": {
+                  "path": "kind",
+                  "equals": "channel"
+                },
+                "must": {
+                  "path": "self",
+                  "isSet": true
+                },
+                "message": "Pick the channel to post in"
+              }
+            ]
+          }
         }
       }
     }

@@ -1,0 +1,43 @@
+#!/bin/sh
+# Stay in step with the release action's version bump.
+#
+# Pushing to main triggers the Release workflow, which bumps fxmanifest.lua and
+# commits that back to main. So the moment a release finishes, this machine is
+# one commit behind - and the next push is a rejection followed by a merge that
+# has to be untangled by hand, over a one-line change nobody made.
+#
+# Rebasing here means the bump is pulled in BEFORE the push rather than
+# colliding with it. The working tree is already clean at this point (git has
+# staged the push), so this is the last safe moment to do it automatically.
+#
+# Only for main. A feature branch has no bumper racing it.
+
+remote="$1"
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main) ;;
+    *) continue ;;
+  esac
+
+  # Never rebase over uncommitted work - that is the caller's to resolve.
+  if ! git diff --quiet || ! git diff --cached --quiet; then
+    echo "pre-push: uncommitted changes, skipping the auto-rebase." >&2
+    continue
+  fi
+
+  git fetch --quiet "$remote" main 2>/dev/null || continue
+
+  behind=$(git rev-list --count HEAD.."$remote"/main 2>/dev/null || echo 0)
+  [ "$behind" = "0" ] && continue
+
+  echo "pre-push: $behind commit(s) on main you do not have (probably a version bump). Rebasing." >&2
+  if git rebase --quiet "$remote"/main; then
+    echo "pre-push: rebased. Version is now $(grep -oE "version[[:space:]]+'[^']+'" fxmanifest.lua | head -1)." >&2
+  else
+    git rebase --abort 2>/dev/null
+    echo "pre-push: rebase failed - resolve by hand, nothing was pushed." >&2
+    exit 1
+  fi
+done
+
+exit 0

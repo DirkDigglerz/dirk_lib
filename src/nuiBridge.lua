@@ -344,6 +344,56 @@ end
   --- The resource NAMES come from the caller rather than a list kept here, so
   --- adding a supported inventory means editing the schema and nothing else.
   --- A list in two places is a list that disagrees with itself.
+  --- Discord channels the bot can see, for the redirect picker.
+  RegisterNuiCallback('GET_DISCORD_CHANNELS', function(_, cb)
+    if not adminUiOpen() then cb({ success = false, _error = 'NotOpen' }) return end
+    CreateThread(function()
+      local ok, result, err = pcall(lib.callback.await, 'dirk_lib:getDiscordChannels')
+      if not ok or not result then
+        cb({ success = false, _error = err or 'NoAnswer' })
+        return
+      end
+      cb({ success = true, data = result })
+    end)
+  end)
+
+  --- Who can open Script Studio.
+  ---
+  --- The rows, who is online to add, and whether this viewer may change any
+  --- of it - in one call, because the page needs all three to draw and asking
+  --- separately just means three round trips for one screen.
+  RegisterNuiCallback('GET_ADMINS', function(_, cb)
+    if not adminUiOpen() then cb({ success = false, _error = 'NotOpen' }) return end
+    CreateThread(function()
+      local ok, result, err = pcall(lib.callback.await, 'dirk_lib:getAdmins')
+      if not ok or not result then
+        cb({ success = false, _error = err or 'NoAnswer' })
+        return
+      end
+      cb({ success = true, data = result })
+    end)
+  end)
+
+  --- Add or update one access entry. Refused for anyone but a master, on the
+  --- server - this check is only about not drawing a button that will fail.
+  RegisterNuiCallback('PUT_ADMIN', function(data, cb)
+    if not adminUiOpen() then cb({ success = false, _error = 'NotOpen' }) return end
+    CreateThread(function()
+      local ok, success, err = pcall(lib.callback.await, 'dirk_lib:putAdmin',
+        type(data) == 'table' and data or {})
+      cb({ success = ok and success == true, _error = (not success) and (err or 'Failed') or nil })
+    end)
+  end)
+
+  RegisterNuiCallback('REMOVE_ADMIN', function(data, cb)
+    if not adminUiOpen() then cb({ success = false, _error = 'NotOpen' }) return end
+    CreateThread(function()
+      local ok, success, err = pcall(lib.callback.await, 'dirk_lib:removeAdmin',
+        type(data) == 'table' and data or {})
+      cb({ success = ok and success == true, _error = (not success) and (err or 'Failed') or nil })
+    end)
+  end)
+
   RegisterNuiCallback('GET_BRIDGE_STATE', function(data, cb)
     if not adminUiOpen() then cb({ success = false, _error = 'NotOpen' }) return end
     CreateThread(function()

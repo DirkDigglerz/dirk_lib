@@ -26,7 +26,6 @@ import { BridgesPage } from './BridgesPage';
 import { AdminsPage } from './AdminsPage';
 import { CataloguePage } from './CataloguePage';
 import { MinigamesPage } from './MinigamesPage';
-import { DesignPage } from './DesignPage';
 import { JsonModal } from './JsonModal';
 import { PaletteControl } from './PaletteControl';
 import { GroupsControl, KeyValueControl } from './MapControls';
@@ -1034,7 +1033,6 @@ export default function ScriptStudio() {
                   : activePage === 'logs' ? <LogsPage canEdit={canEdit} />
                   : activePage === 'items' ? <CataloguePage kind="items" query={query} />
                   : activePage === 'vehicles' ? <CataloguePage kind="vehicles" query={query} />
-                  : activePage === 'design' ? <DesignPage resource={activeResource} />
                   : activePage === 'changelog' ? <ChangelogPage resource={activeResource} />
                   : activePage === 'tests' ? <TestsPage resource={activeResource} />
                   : activePage === 'minigames' ? <MinigamesPage />
@@ -1743,7 +1741,11 @@ function Sidebar({
                     It stays inside the script rather than in the global ACCESS /
                     LIBRARY bands because designs belong to a script: dirk_loading's
                     are not dirk_multichar's. Only shown for scripts declaring one. */}
-                {entry.designs && (
+                {/* PARKED with the design page itself - see tsconfig `exclude`.
+                    Nothing in this release declares `designs` (only dirk_loading
+                    does, and it is not on scriptConfig yet), so this only ever
+                    routed somewhere that is not mounted. */}
+                {false && entry.designs && (
                   <motion.button
                     type="button"
                     onClick={() => onPickPage('design')}
