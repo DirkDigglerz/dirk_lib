@@ -1,15 +1,18 @@
 import { alpha, Flex, Text, TextInput, useMantineTheme } from '@mantine/core';
-import { ConfirmModal, Modal } from 'dirk-cfx-react';
+import { ConfirmModal, Modal, copyToClipboard } from 'dirk-cfx-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Check, Eye, Lock, Pencil, Search, Shield, ShieldCheck, Trash2, UserPlus, Users,
+  Check, Copy, Eye, Lock, Pencil, Search, Shield, ShieldCheck, Trash2, UserPlus, Users,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
-  MOCK_ACE_GRANTS, MOCK_ADMINS, MOCK_ONLINE,
   type AceGrant, type AceGrantLevel, type AdminEntry, type AdminLevel, type OnlinePlayer,
 } from './mockAdmins';
+import {
+  useAdminMutations, useAdmins, type AdminKind, type AdminRow as AdminRowData,
+} from './adminsData';
 import { useStudio } from './store';
+import { notify } from './Toasts';
 import { StudioButton } from './ui';
 import { useChrome } from './studioLocale';
 
@@ -21,26 +24,52 @@ import { useChrome } from './studioLocale';
  * when the database is wrong (so it cannot be revoked here), and everything
  * else is managed on this page.
  */
+/** A stored row, as the existing row UI wants it. */
+function toEntry(row: AdminRowData): AdminEntry & { kind: AdminKind } {
+  return {
+    id: String(row.id),
+    kind: row.kind,
+    name: row.name || row.subject || (row.kind === 'principal' ? 'Unknown group' : 'Unknown'),
+    identifier: row.subject ?? '',
+    source: 'panel',
+    level: row.level,
+    scripts: row.scripts ?? [],
+    addedBy: row.addedBy,
+    addedAt: row.addedAt ? new Date(row.addedAt * 1000).toISOString().slice(0, 10) : undefined,
+  };
+}
+
 export function AdminsPage({ canEdit }: { canEdit: boolean }) {
   const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const scripts = useStudio((s) => s.scripts);
 
-  const [admins, setAdmins] = useState<AdminEntry[]>(MOCK_ADMINS);
+  const { data } = useAdmins();
+  const { put, remove } = useAdminMutations();
+
+  // Managing access is master-only, which is stricter than editing settings:
+  // an admin who could add rows could grant themselves everything. The server
+  // enforces it; this only decides whether to draw the buttons.
+  const canManage = canEdit && !!data?.canManage;
+
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<AdminEntry | null>(null);
   const [revoking, setRevoking] = useState<AdminEntry | null>(null);
 
-  const grouped = useMemo(() => ({
-    config: admins.filter((a) => a.source === 'config'),
-    panel: admins.filter((a) => a.source === 'panel'),
-  }), [admins]);
+  // ONE list. A group and a person are the same kind of grant - the same two
+  // levels, the same per-script scope - and splitting them into two blocks
+  // made one question ("who can get in") look like two.
+  const people = useMemo(() => (data?.rows ?? []).map(toEntry), [data]);
 
-  const save = (entry: AdminEntry) => {
-    setAdmins((prev) => (prev.some((a) => a.id === entry.id)
-      ? prev.map((a) => (a.id === entry.id ? entry : a))
-      : [...prev, entry]));
+  const save = (entry: AdminEntry & { kind?: AdminKind }) => {
+    put.mutate({
+      kind: entry.kind ?? 'identifier',
+      subject: entry.identifier,
+      name: entry.name,
+      level: entry.level,
+      scripts: entry.scripts,
+    });
     setEditing(null);
     setAdding(false);
   };
@@ -51,44 +80,60 @@ export function AdminsPage({ canEdit }: { canEdit: boolean }) {
       className="studio-scroll"
       style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}
     >
-      <AceBlock canEdit={canEdit} />
-
       {/* the route back in */}
       <Block
         icon={Lock}
-        title={t('adminsPage.config_file', 'Config file')}
-        description="Server-side, survives updates, cannot be revoked from this panel"
+        title={t('adminsPage.master_group', 'Master group')}
+        description="Set in server.cfg, always has every script, cannot be revoked from this panel"
       >
         <Flex direction="column" gap="xxs">
-          {grouped.config.map((entry) => (
-            <AdminRow key={entry.id} entry={entry} scripts={scripts.length} locked />
-          ))}
+          <Flex align="center" gap="xs">
+            <ShieldCheck size="1.5vh" color={color} />
+            <Text ff="monospace" size="xs" c="rgba(255,255,255,0.85)">
+              {data?.masterGroup || 'group.admin'}
+            </Text>
+            {data?.masterGroupIsDefault && (
+              <Pill label={t('adminsPage.default', 'default')} color="rgba(255,255,255,0.4)" muted />
+            )}
+          </Flex>
+          {/* How to change it. Only ever read by someone who is already in -
+              anyone locked OUT cannot open this page, which is why the same
+              thing is in the docs. */}
+          <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.35)">
+            {t(
+              'adminsPage.master_group_hint',
+              'Set this in server.cfg and restart dirk_lib. Comma-separate to accept more than one.',
+            )}
+          </Text>
+          <CopyLine
+            text={`setr ${data?.masterGroupConvar || 'dirk_lib_master_group'} "${data?.masterGroup || 'group.admin,admin'}"`}
+          />
         </Flex>
       </Block>
 
       {/* the day-to-day list */}
       <Block
         icon={Users}
-        title={t('adminsPage.panel_admins', 'Panel admins')}
-        description="Added here, stored in the database"
-        action={canEdit && (
-          <StudioButton label={t('adminsPage.add_admin', 'Add admin')} icon={UserPlus} primary onClick={() => setAdding(true)} />
+        title={t('adminsPage.who_has_access', 'Who has access')}
+        description="People and groups you have granted, beyond the master group"
+        action={canManage && (
+          <StudioButton label={t('adminsPage.add', 'Add')} icon={UserPlus} primary onClick={() => setAdding(true)} />
         )}
       >
         <Flex direction="column" gap="xxs">
-          {grouped.panel.map((entry) => (
+          {people.map((entry) => (
             <AdminRow
               key={entry.id}
               entry={entry}
               scripts={scripts.length}
-              canEdit={canEdit}
+              canEdit={canManage}
               onEdit={() => setEditing(entry)}
               onRevoke={() => setRevoking(entry)}
             />
           ))}
-          {grouped.panel.length === 0 && (
+          {people.length === 0 && (
             <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.3)">
-              {t('adminsPage.nobody_has_been_added_here_yet', 'Nobody has been added here yet.')}
+              {t('adminsPage.nobody_yet', 'Only the master group has access. Add someone to change that.')}
             </Text>
           )}
         </Flex>
@@ -108,7 +153,7 @@ export function AdminsPage({ canEdit }: { canEdit: boolean }) {
             description={`${revoking.name} loses access to Script Studio immediately. Anything they already saved stays.`}
             confirmLabel="Revoke"
             onConfirm={() => {
-              setAdmins((prev) => prev.filter((a) => a.id !== revoking.id));
+              remove.mutate(Number(revoking.id));
               setRevoking(null);
             }}
             onClose={() => setRevoking(null)}
@@ -117,6 +162,46 @@ export function AdminsPage({ canEdit }: { canEdit: boolean }) {
         )}
       </AnimatePresence>
     </Flex>
+  );
+}
+
+/** A line of config, copyable - never something to retype from a screen. */
+function CopyLine({ text }: { text: string }) {
+  const theme = useMantineTheme();
+  const color = theme.colors[theme.primaryColor][5];
+  const [done, setDone] = useState(false);
+
+  return (
+    <motion.button
+      type="button"
+      whileHover={{ backgroundColor: alpha(theme.colors.dark[5], 0.55) }}
+      onClick={() => {
+        // Always the cfx-react helper: in game the DOM clipboard API is not
+        // available the way it is in a browser.
+        copyToClipboard(text);
+        setDone(true);
+        notify('success', 'Copied');
+        setTimeout(() => setDone(false), 1500);
+      }}
+      style={{
+        display: 'flex', alignItems: 'center', gap: '0.6vh',
+        background: alpha(theme.colors.dark[6], 0.7),
+        border: `0.1vh solid ${alpha(theme.colors.dark[4], 0.6)}`,
+        borderRadius: '0.4vh',
+        padding: '0.5vh 0.7vh',
+        cursor: 'pointer',
+        textAlign: 'left',
+        width: 'fit-content',
+        maxWidth: '100%',
+      }}
+    >
+      <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.7)" style={{ wordBreak: 'break-all' }}>
+        {text}
+      </Text>
+      {done
+        ? <Check size="1.2vh" color={color} style={{ flexShrink: 0 }} />
+        : <Copy size="1.2vh" color="rgba(255,255,255,0.35)" style={{ flexShrink: 0 }} />}
+    </motion.button>
   );
 }
 
@@ -141,131 +226,6 @@ const LEVELS: { value: AceGrantLevel; label: string; icon?: React.ElementType; c
  * directly in cfg still works and shows here locked, because we can see it but
  * cannot take it away.
  */
-function AceBlock({ canEdit }: { canEdit: boolean }) {
-  const t = useChrome();
-  const theme = useMantineTheme();
-  const color = theme.colors[theme.primaryColor][5];
-  const [grants, setGrants] = useState<AceGrant[]>(MOCK_ACE_GRANTS);
-  const [adding, setAdding] = useState('');
-
-  const setLevel = (principal: string, level: AceGrantLevel) =>
-    setGrants((prev) => prev.map((g) => (g.principal === principal ? { ...g, level } : g)));
-
-  const add = () => {
-    const principal = adding.trim();
-    if (!principal || grants.some((g) => g.principal === principal)) return;
-    setGrants((prev) => [...prev, { principal, level: 'view', addedBy: 'Dirk' }]);
-    setAdding('');
-  };
-
-  const remove = (principal: string) =>
-    setGrants((prev) => prev.filter((g) => g.principal !== principal));
-
-  return (
-    <Block
-      icon={Shield}
-      title={t('adminsPage.ace_groups', 'ACE groups')}
-      description="Stored here and re-applied on every start — no server.cfg edits"
-    >
-      <Flex direction="column" gap="xxs">
-        {grants.map((grant) => {
-          const none = grant.level === 'none';
-          return (
-            <Flex
-              key={grant.principal}
-              align="center" gap="sm" px="sm" py="0.7vh"
-              style={{
-                background: alpha(theme.colors.dark[8], none ? 0.3 : 0.5),
-                border: `0.1vh solid ${alpha(theme.colors.dark[5], 0.3)}`,
-                borderRadius: theme.radius.xs,
-              }}
-            >
-              {grant.fromCfg && <Lock size="1.3vh" color="rgba(255,255,255,0.4)" />}
-
-              <Text
-                ff="monospace" size="xs"
-                c={none ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.85)'}
-                style={{ minWidth: '20vh' }}
-              >
-                {grant.principal}
-              </Text>
-
-              {grant.fromCfg ? (
-                <Flex align="center" gap="xs" style={{ flex: 1 }}>
-                  <Pill icon={ShieldCheck} label={t('adminsPage.can_edit', 'Can edit')} color={color} />
-                  <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">
-                    granted in server.cfg — cannot be changed here
-                  </Text>
-                </Flex>
-              ) : (
-                <Flex align="center" gap="xxs" style={{ flex: 1 }}>
-                  {LEVELS.map((level) => {
-                    const on = grant.level === level.value;
-                    const tint = level.color ?? color;
-                    return (
-                      <motion.button
-                        key={level.value}
-                        type="button"
-                        disabled={!canEdit}
-                        onClick={() => setLevel(grant.principal, level.value)}
-                        whileTap={canEdit ? { scale: 0.97 } : undefined}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: '0.4vh',
-                          padding: '0.35vh 0.8vh',
-                          background: on ? alpha(tint, 0.16) : 'transparent',
-                          border: `0.1vh solid ${on ? alpha(tint, 0.5) : alpha(theme.colors.dark[4], 0.45)}`,
-                          borderRadius: theme.radius.xs,
-                          cursor: canEdit ? 'pointer' : 'not-allowed',
-                          opacity: canEdit ? 1 : 0.5,
-                        }}
-                      >
-                        {level.icon && <level.icon size="1.1vh" color={on ? tint : 'rgba(255,255,255,0.35)'} />}
-                        <Text
-                          ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.05em"
-                          c={on ? tint : 'rgba(255,255,255,0.45)'}
-                        >
-                          {level.label}
-                        </Text>
-                      </motion.button>
-                    );
-                  })}
-                </Flex>
-              )}
-
-              {grant.addedBy && !grant.fromCfg && (
-                <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.28)" style={{ flexShrink: 0 }}>
-                  added by {grant.addedBy}
-                </Text>
-              )}
-
-              {!grant.fromCfg && canEdit && (
-                <RowButton icon={Trash2} label={t('adminsPage.remove', 'Remove')} danger onClick={() => remove(grant.principal)} />
-              )}
-            </Flex>
-          );
-        })}
-
-        {canEdit && (
-          <Flex gap="xs" align="center" pt="xxs">
-            <TextInput
-              value={adding}
-              onChange={(e) => setAdding(e.currentTarget.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
-              placeholder={t('adminsPage.add_a_group_e_g_group_headadmin', 'Add a group, e.g. group.headadmin')}
-              styles={inputStyles(theme, true)}
-              style={{ flex: 1, maxWidth: '44vh' }}
-            />
-            <StudioButton label={t('adminsPage.add_group', 'Add group')} onClick={add} />
-            <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.28)">
-              {t('adminsPage.fivem_cannot_list_groups_so_they_are_add', 'FiveM cannot list groups, so they are added by name.')}
-            </Text>
-          </Flex>
-        )}
-      </Flex>
-    </Block>
-  );
-}
-
 function Block({
   icon: Icon, title, description, action, children,
 }: {
@@ -296,7 +256,7 @@ function Block({
 function AdminRow({
   entry, scripts, locked, canEdit, onEdit, onRevoke,
 }: {
-  entry: AdminEntry;
+  entry: AdminEntry & { kind?: AdminKind };
   scripts: number;
   locked?: boolean;
   canEdit?: boolean;
@@ -326,12 +286,17 @@ function AdminRow({
         }}
       >
         {locked ? <Lock size="1.5vh" color="rgba(255,255,255,0.5)" />
-          : <Users size="1.5vh" color={entry.online ? color : 'rgba(255,255,255,0.4)'} />}
+          : entry.kind === 'principal'
+            ? <Shield size="1.5vh" color="rgba(255,255,255,0.4)" />
+            : <Users size="1.5vh" color={entry.online ? color : 'rgba(255,255,255,0.4)'} />}
       </Flex>
 
       <Flex direction="column" style={{ minWidth: '18vh', lineHeight: 1.2 }}>
         <Flex align="center" gap="xs">
           <Text ff="Akrobat Bold" size="xs" c="rgba(255,255,255,0.9)">{entry.name}</Text>
+          {entry.kind === 'principal' && (
+            <Pill label={t('adminsPage.group_pill', 'group')} color="rgba(255,255,255,0.4)" muted />
+          )}
           {entry.online && (
             <Flex w="0.6vh" h="0.6vh" style={{ background: color, borderRadius: '50%' }} />
           )}
@@ -420,8 +385,8 @@ function RowButton({
 function AdminModal({
   entry, onSave, onClose,
 }: {
-  entry: AdminEntry | null;
-  onSave: (next: AdminEntry) => void;
+  entry: (AdminEntry & { kind?: AdminKind }) | null;
+  onSave: (next: AdminEntry & { kind: AdminKind }) => void;
   onClose: () => void;
 }) {
   const t = useChrome();
@@ -429,17 +394,32 @@ function AdminModal({
   const color = theme.colors[theme.primaryColor][5];
   const scripts = useStudio((s) => s.scripts);
 
+  // A person or an ACE group. Same grant either way - the same two levels and
+  // the same per-script scope - so this is one field, not a second page.
+  const [kind, setKind] = useState<AdminKind>(entry?.kind ?? 'identifier');
   const [name, setName] = useState(entry?.name ?? '');
   const [identifier, setIdentifier] = useState(entry?.identifier ?? '');
   const [level, setLevel] = useState<AdminLevel>(entry?.level ?? 'edit');
   const [scope, setScope] = useState<string[]>(entry?.scripts ?? []);
   const [query, setQuery] = useState('');
 
+  const { data } = useAdmins();
+  const online = data?.online ?? [];
+
+  // Who already has access, so the picker can say so rather than letting
+  // someone add a person twice and wonder why nothing changed.
+  const alreadyGranted = useMemo(
+    () => new Set((data?.rows ?? [])
+      .filter((r) => r.kind === 'identifier' && r.subject)
+      .map((r) => r.subject as string)),
+    [data],
+  );
+
   const players = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    return MOCK_ONLINE.filter((p) =>
+    return online.filter((p) =>
       !needle || p.name.toLowerCase().includes(needle) || p.identifier.includes(needle));
-  }, [query]);
+  }, [online, query]);
 
   const pick = (player: OnlinePlayer) => {
     setName(player.name);
@@ -452,11 +432,15 @@ function AdminModal({
       : [...prev, resource]));
   };
 
-  const valid = identifier.trim().length > 6;
+  // A group name is short (`group.mod`); an identifier is long. Checking the
+  // same length for both refused perfectly good group names.
+  const valid = kind === 'principal'
+    ? identifier.trim().length > 2
+    : identifier.trim().length > 6;
 
   return (
     <Modal
-      title={entry ? `Edit ${entry.name}` : 'Add admin'}
+      title={entry ? `Edit ${entry.name}` : 'Grant access'}
       icon={UserPlus}
       iconColor={color}
       description="Access to Script Studio"
@@ -467,8 +451,8 @@ function AdminModal({
     >
       <Flex direction="column" flex={1} style={{ minHeight: 0 }}>
         <Flex flex={1} style={{ minHeight: 0 }}>
-          {/* who */}
-          {!entry && (
+          {/* who - only for a person; a group is typed, not picked */}
+          {!entry && kind === 'identifier' && (
             <Flex
               direction="column" w="34vh"
               style={{ borderRight: `0.1vh solid ${alpha(theme.colors.dark[4], 0.4)}`, flexShrink: 0, minHeight: 0 }}
@@ -509,8 +493,10 @@ function AdminModal({
                           {player.identifier}
                         </Text>
                       </Flex>
-                      {player.existing && (
-                        <Pill label={player.existing === 'config' ? 'in config' : 'has access'} color="rgba(255,255,255,0.4)" muted />
+                      {player.master ? (
+                        <Pill label="master" color="rgba(255,255,255,0.4)" muted />
+                      ) : alreadyGranted.has(player.identifier) && (
+                        <Pill label="has access" color="rgba(255,255,255,0.4)" muted />
                       )}
                       {chosen && <Check size="1.4vh" color={color} />}
                     </motion.button>
@@ -522,14 +508,46 @@ function AdminModal({
 
           {/* what */}
           <Flex direction="column" gap="sm" p="sm" flex={1} className="studio-scroll" style={{ overflowY: 'auto', minHeight: 0 }}>
-            <Field label={t('adminsPage.name', 'Name')}>
-              <TextInput value={name} onChange={(e) => setName(e.currentTarget.value)}
-                placeholder={t('adminsPage.shown_in_logs', 'Shown in logs')} styles={inputStyles(theme)} style={{ width: '100%' }} />
-            </Field>
+            {/* A group grants everyone in it at once, without touching
+                server.cfg - stored here, so it survives a restart, which a
+                runtime add_ace does not. */}
+            {!entry && (
+              <Field label={t('adminsPage.grant_to', 'Grant to')}>
+                <Flex gap="xs">
+                  <Choice
+                    active={kind === 'identifier'} icon={Users}
+                    label={t('adminsPage.a_person', 'A person')}
+                    description="Pick from online, or paste an identifier"
+                    onClick={() => { setKind('identifier'); setIdentifier(''); setName(''); }}
+                  />
+                  <Choice
+                    active={kind === 'principal'} icon={Shield}
+                    label={t('adminsPage.a_group', 'A group')}
+                    description="Everyone with an ACE permission"
+                    onClick={() => { setKind('principal'); setIdentifier(''); setName(''); }}
+                  />
+                </Flex>
+              </Field>
+            )}
 
-            <Field label={t('adminsPage.identifier', 'Identifier')} hint="Server-side only — never sent to a regular player">
+            {kind === 'identifier' && (
+              <Field label={t('adminsPage.name', 'Name')}>
+                <TextInput value={name} onChange={(e) => setName(e.currentTarget.value)}
+                  placeholder={t('adminsPage.shown_in_logs', 'Shown in logs')} styles={inputStyles(theme)} style={{ width: '100%' }} />
+              </Field>
+            )}
+
+            <Field
+              label={kind === 'principal'
+                ? t('adminsPage.group', 'Group')
+                : t('adminsPage.identifier', 'Identifier')}
+              hint={kind === 'principal'
+                ? 'An ACE permission your server.cfg grants, e.g. group.mod'
+                : 'Server-side only — never sent to a regular player'}
+            >
               <TextInput value={identifier} onChange={(e) => setIdentifier(e.currentTarget.value)}
-                placeholder={t('adminsPage.license2', 'license2:...')} styles={inputStyles(theme, true)} style={{ width: '100%' }} />
+                placeholder={kind === 'principal' ? 'group.mod' : t('adminsPage.license2', 'license2:...')}
+                styles={inputStyles(theme, true)} style={{ width: '100%' }} />
             </Field>
 
             <Field label={t('adminsPage.level', 'Level')}>
@@ -541,7 +559,7 @@ function AdminModal({
               </Flex>
             </Field>
 
-            <Field label={t('adminsPage.scope', 'Scope')} hint="Which scripts they may configure">
+            <Field label={t('adminsPage.scope', 'Scope')} hint="Which scripts this grant covers">
               <Flex direction="column" gap="xxs">
                 <Choice
                   active={scope.length === 0}
@@ -598,14 +616,15 @@ function AdminModal({
               disabled={!valid}
               onClick={() => onSave({
                 id: entry?.id ?? `db-${Date.now()}`,
-                name: name || 'Unnamed',
+                kind,
+                name: name || (kind === 'principal' ? identifier.trim() : 'Unnamed'),
                 identifier: identifier.trim(),
                 source: 'panel',
                 level,
                 scripts: scope,
                 addedBy: 'Dirk',
                 addedAt: '2026-08-19',
-                online: MOCK_ONLINE.some((p) => p.identifier === identifier),
+                online: online.some((p) => p.identifier === identifier),
               })}
             />
           </Flex>

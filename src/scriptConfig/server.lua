@@ -47,6 +47,8 @@ local function getMasterGroup()
   return cv
 end
 
+local scriptConfigAdmins = require '@dirk_lib.src.scriptConfig.admins'
+
 local function isMasterEditor(src)
   for perm in (getMasterGroup()):gmatch('[^,]+') do
     perm = perm:match('^%s*(.-)%s*$')  -- trim whitespace around each value
@@ -171,6 +173,44 @@ end
 -- src=0 (server console) always returns true.
 function CanEditScriptConfigResource(src, resourceName) end -- forward decl
 
+--- What level of access does src have to this resource: 'edit', 'view', nil.
+---
+--- Levels are new; access used to be a yes/no. Everything that existed before
+--- grants 'edit', so nothing anyone already has changes - 'view' only ever
+--- comes from a row someone deliberately added in the panel.
+local function resolveLevel(src, resourceName, ctx)
+  if not src or src == 0 then return 'edit' end
+  if isMasterEditor(src) then return 'edit' end
+
+  ctx = ctx or resolveMatchCtx(src)
+
+  -- Per-script PUSH: the access block the consumer declared in its own
+  -- schema.json. Predates levels, so it means edit, and it is checked first
+  -- because it is the cheaper of the two.
+  if pushedOverrideAllows(src, resourceName, ctx) then return 'edit' end
+
+  -- Rows added from the panel. Matching an identifier uses the same context
+  -- as everything else; matching a principal asks the native, which resolves
+  -- the whole ACE tree.
+  return scriptConfigAdmins.levelFor(resourceName, function(row)
+    if row.kind == 'principal' then
+      return IsPlayerAceAllowed(src, row.subject)
+    end
+    return playerHasIdentifier(row.subject, ctx)
+  end)
+end
+
+ResolveScriptConfigLevel = resolveLevel
+
+--- The master list and whether it is just the default.
+---
+--- Read by adminsApi rather than rebuilt there: the default lives here, and a
+--- second copy of it drifts from this one - which it had, three different
+--- values in three places.
+function ScriptConfigMasterGroup()
+  return getMasterGroup(), GetConvar('dirk_lib_master_group', '__unset__') == '__unset__'
+end
+
 local function canEditResource(src, resourceName, ctx)
   if not src or src == 0 then return true end
   if isMasterEditor(src) then return true end
@@ -183,14 +223,7 @@ local function canEditResource(src, resourceName, ctx)
   -- identifiers). The caller may pass a precomputed ctx — the chooser resolves
   -- it ONCE for the whole resource sweep — otherwise resolve lazily here. Done
   -- after the master short-circuit so admins never pay for it.
-  ctx = ctx or resolveMatchCtx(src)
-
-  -- Per-script PUSH: the access block the consumer declared in its
-  -- own schema.json and pushed via registerScriptConfigOverrides. Additive —
-  -- it can only GRANT access, never remove it.
-  if pushedOverrideAllows(src, resourceName, ctx) then return true end
-
-  return false
+  return resolveLevel(src, resourceName, ctx) == 'edit'
 end
 
 CanEditScriptConfigResource = canEditResource
@@ -204,6 +237,29 @@ CanEditScriptConfigResource = canEditResource
 exports('canEditScriptConfig', function(src, resourceName)
   return canEditResource(src, resourceName)
 end)
+
+-- 'edit' | 'view' | nil. What the panel gates reads on: a view user may open a
+-- script and read its settings, but must never receive the server-only values
+-- or be able to write.
+exports('getScriptConfigLevel', function(src, resourceName)
+  return ResolveScriptConfigLevel(src, resourceName)
+end)
+
+exports('canViewScriptConfig', function(src, resourceName)
+  return ResolveScriptConfigLevel(src, resourceName) ~= nil
+end)
+
+-- Master is the `dirk_lib_master_group` convar and nothing else. Managing
+-- access is gated on this rather than on edit, so an admin cannot widen their
+-- own access.
+exports('isScriptConfigMaster', function(src)
+  if not src or src == 0 then return true end
+  return isMasterEditor(src)
+end)
+
+exports('listScriptConfigAdmins', function() return scriptConfigAdmins.all() end)
+exports('putScriptConfigAdmin', function(entry) return scriptConfigAdmins.put(entry) end)
+exports('removeScriptConfigAdmin', function(id) return scriptConfigAdmins.remove(id) end)
 
 local function collectRegisteredConfigs(src)
   local list = {}
@@ -220,7 +276,7 @@ local function collectRegisteredConfigs(src)
   for i = 0, total - 1 do
     local name = GetResourceByFindIndex(i)
     if name and GetResourceState(name) == 'started' and hasScriptConfigTag(name) then
-      if not src or canEditResource(src, name, ctx) then
+      if not src or resolveLevel(src, name, ctx) then
         local rawSchema = LoadResourceFile(name, 'schema.json')
         if rawSchema then
           local ok = pcall(json.decode, rawSchema)
@@ -699,3 +755,5 @@ end)
 -- live entirely client-side now — convars replicate via `setr` and resource
 -- metadata is readable from a client NUI callback. See init.lua's
 -- GET_SCRIPT_CONFIG_MASTER_GROUP / GET_SCRIPT_CONFIG_RESOURCES handlers.)
+
+require '@dirk_lib.src.scriptConfig.adminsApi'

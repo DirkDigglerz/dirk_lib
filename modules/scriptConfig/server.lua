@@ -790,6 +790,7 @@ scriptConfig = nil
 local client_version = 0
 local currentVer     = '0.0.0'
 local canEditScript  = function() return true end
+local canViewScript  = function() return true end
 local changeLog = {}
 local lastEditorMeta = nil
 local scriptConfigWatchers = {}
@@ -1008,6 +1009,20 @@ local function registerScriptConfig(schema, canEditFn, rules)
     if ok and allowed then return true end
     if canEditFn then return canEditFn(src) end
     return false
+  end
+
+  -- May OPEN the script and read its settings. Everyone who can edit can
+  -- view; a view-level admin can do this and nothing else.
+  --
+  -- Split from canEditScript because the two guard genuinely different things:
+  -- reading the config, versus changing it or being handed the server-only
+  -- values. Before levels existed there was nothing to split.
+  canViewScript = function(src)
+    if canEditScript(src) then return true end
+    local ok, allowed = pcall(function()
+      return exports.dirk_lib:canViewScriptConfig(src, scriptName)
+    end)
+    return ok and allowed == true
   end
   serverOnlyPaths      = extractServerOnly(schema, nil)
   local renames        = extractRenames(schema, nil)
@@ -1275,7 +1290,7 @@ local function registerScriptConfig(schema, canEditFn, rules)
     if type(CanEditScriptConfigResource) == 'function' then
       if not CanEditScriptConfigResource(source, scriptName) then return end
     end
-    if not canEditScript(source) then
+    if not canViewScript(source) then
       return
     end
     TriggerClientEvent(('%s:openScriptConfig'):format(scriptName), source)
@@ -1571,7 +1586,7 @@ end)
 
 lib.callback.register(('%s:getFullScriptConfig'):format(scriptName), function(src)
   if not scriptConfig then return nil, 'NotReady' end
-  if not canEditScript(src) then return nil, 'NoPermission' end
+  if not canViewScript(src) then return nil, 'NoPermission' end
   return true, nil, { config = scriptConfig, clientVersion = client_version }
 end)
 
@@ -1614,7 +1629,7 @@ end)
 -- the admin panel's MissingItemsBanner.
 lib.callback.register(('%s:getMissingItems'):format(scriptName), function(src)
   if not scriptConfig then return false, 'NotReady' end
-  if not canEditScript(src) then return false, 'NoPermission' end
+  if not canViewScript(src) then return false, 'NoPermission' end
 
   local ok, result = pcall(function()
     return require '@dirk_lib/modules/scriptConfig/installItems'.audit(settingsSchema, scriptConfig)
@@ -1628,7 +1643,7 @@ end)
 
 lib.callback.register(('%s:getScriptConfigHistory'):format(scriptName), function(src, payload)
   if not scriptConfig then return nil, 'NotReady' end
-  if not canEditScript(src) then return nil, 'NoPermission' end
+  if not canViewScript(src) then return nil, 'NoPermission' end
 
   return getScriptConfigHistory(payload)
 end)
@@ -1736,6 +1751,14 @@ local toRet = {
   -- check. canEditScriptConfig handles src == 0 / console → true.
   hasPerm = function(src)
     return exports.dirk_lib:canEditScriptConfig(src, GetCurrentResourceName())
+  end,
+
+  -- May LOOK. Everyone who can edit can view; a view-level admin can do this
+  -- and nothing else. Use this to guard reads, and hasPerm to guard writes -
+  -- guarding a read with hasPerm locks view admins out of pages they are
+  -- meant to be able to see.
+  canView = function(src)
+    return exports.dirk_lib:canViewScriptConfig(src, GetCurrentResourceName())
   end,
 
   reset = function()

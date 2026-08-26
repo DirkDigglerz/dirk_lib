@@ -50,6 +50,8 @@ export const ACE_OBJECTS: { object: string; grants: string }[] = [
 export type AceGrantLevel = 'edit' | 'view' | 'none';
 
 export type AceGrant = {
+  /** the stored row, when this came from the database rather than a cfg */
+  id?: number;
   principal: string;
   level: AceGrantLevel;
   /**
