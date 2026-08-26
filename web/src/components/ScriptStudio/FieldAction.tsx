@@ -33,6 +33,8 @@ type Result = {
 
 /** Why the server refused, in words rather than a code. */
 const REASONS: Record<string, string> = {
+  NoChannel: 'Pick a channel first',
+  NoUrl: 'Paste a webhook URL first',
   NoPermission: 'You are not allowed to do that',
   NotAuthorized: 'You are not allowed to do that',
   BadUrl: 'That does not look like a valid URL',

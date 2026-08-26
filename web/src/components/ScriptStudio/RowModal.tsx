@@ -2,12 +2,13 @@ import { alpha, Flex, Text, useMantineTheme } from '@mantine/core';
 import { ConfirmModal, Modal } from 'dirk-cfx-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Activity, Gift, Info, Layers, Leaf, List, Package, Plus, Trash2,
+  Activity, Gift, Info, Layers, Leaf, List, Package, Plus, Trash2, TriangleAlert,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { FieldRow } from './FieldRow';
 import { PickerDrawer } from './PickerDrawer';
 import { fieldGatedOff, ItemArt, StudioButton } from './ui';
+import { validateRow } from './rowValidation';
 import type { SettingColumn, SettingEntry } from './types';
 import { useChrome } from './studioLocale';
 
@@ -25,7 +26,7 @@ const TAB_ICONS: Record<string, React.ElementType> = {
  * scalars in General, each nested table in a tab of its own.
  */
 export function RowModal({
-  entry, row, title, onSave, onDelete, onClose, disabled, resource,
+  entry, row, title, onSave, onDelete, onClose, disabled, resource, creating,
 }: {
   entry: SettingEntry;
   /** the owning script, so cross-referencing fields can resolve their options */
@@ -34,6 +35,8 @@ export function RowModal({
   title: string;
   onSave: (next: Row) => void;
   onDelete: () => void;
+  /** this row does not exist yet, so there is nothing to delete */
+  creating?: boolean;
   onClose: () => void;
   disabled?: boolean;
 }) {
@@ -123,6 +126,18 @@ export function RowModal({
    * itself out and leave no way back.
    */
   const gatedOff = (column: SettingColumn) => fieldGatedOff(column, draft);
+
+  /**
+   * What is wrong with this row, if anything.
+   *
+   * Checked against EVERY column, not just the ones on the tab you are
+   * looking at - a row is saved whole, so a problem hiding on the other tab
+   * still stops the save, and the message says which tab to look on.
+   */
+  const problems = useMemo(() => validateRow(columns, draft), [columns, draft]);
+
+  const tabOf = (key: string) =>
+    tabs.find((tab) => tab.columns.some((c) => c.key === key));
 
   return (
     <>
@@ -215,10 +230,42 @@ export function RowModal({
             align="center" justify="space-between" px="sm" py="xs"
             style={{ borderTop: `0.1vh solid ${alpha(theme.colors.dark[4], 0.4)}`, flexShrink: 0 }}
           >
-            <StudioButton label={t('rowModal.delete', 'Delete')} danger icon={Trash2} onClick={onDelete} disabled={disabled} />
-            <Flex gap="xs">
+            {!creating && (
+              <StudioButton label={t('rowModal.delete', 'Delete')} danger icon={Trash2} onClick={onDelete} disabled={disabled} />
+            )}
+            <Flex align="center" gap="xs">
+              {/* Says WHAT is wrong before you press anything, rather than a
+                  disabled button with no explanation. Clicking jumps to the
+                  tab holding the offending field. */}
+              {problems.length > 0 && (
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    const tab = tabOf(problems[0].key);
+                    if (tab) setActiveTab(tab.id);
+                  }}
+                  whileTap={{ scale: 0.99 }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.5vh',
+                    background: 'transparent', border: 'none',
+                    cursor: 'pointer', padding: 0, maxWidth: '34vh',
+                  }}
+                >
+                  <TriangleAlert size="1.3vh" color="#E0B15F" style={{ flexShrink: 0 }} />
+                  <Text ff="Akrobat SemiBold" size="xxs" c="#E0B15F" truncate>
+                    {problems.length === 1
+                      ? problems[0].message
+                      : t('rowModal.n_problems', '{} things need fixing').replace('{}', String(problems.length))}
+                  </Text>
+                </motion.button>
+              )}
               <StudioButton label={t('rowModal.cancel', 'Cancel')} onClick={onClose} />
-              <StudioButton label={t('rowModal.save_entry', 'Save entry')} primary onClick={() => onSave(draft)} disabled={disabled} />
+              <StudioButton
+                label={t('rowModal.save_entry', 'Save entry')}
+                primary
+                onClick={() => onSave(draft)}
+                disabled={disabled || problems.length > 0}
+              />
             </Flex>
           </Flex>
         </Flex>

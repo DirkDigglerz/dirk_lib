@@ -265,6 +265,7 @@ export function ListRows({
             entry={entry}
             resource={resource}
             row={creating}
+            creating
             title={t('listRows.new_entry', 'New {}').replace('{}', singular(entry.label).toLowerCase())}
             disabled={disabled}
             onSave={(next) => {
