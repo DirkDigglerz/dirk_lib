@@ -114,6 +114,7 @@ const CONTROL_TYPES = new Set<string>([
   'icon',
   'custom',
   'keybindMap', 'groupGrades', 'weightMap',
+  'discordChannel', 'redirectKind',
 ]);
 
 /**
@@ -537,7 +538,10 @@ function buildColumnInner(
   isItem: boolean,
   siblings?: unknown[],
 ): SettingColumn {
-  const label = humanise(key);
+  // A declared `title` wins over the humanised key. Without this a column
+  // could only ever be called what its property is called, so `channelId`
+  // read as "Channel Id" and `url` as "Url" no matter what the schema said.
+  const label = typeof child.title === 'string' && child.title ? child.title : humanise(key);
   const min = child.minimum;
   const max = child.maximum;
 
@@ -681,7 +685,11 @@ function buildColumnInner(
 
     const allNumbers = rows.length > 0 && rows.every((r) => typeof r === 'number');
     if (allNumbers && rows.length === 2) return { key, label, type: 'range', min: pairMin, max: pairMax };
-    return { key, label, type: 'tags' };
+    // Whether these are numbers is declared, not inferred from the current
+    // value: an EMPTY list satisfies `every()` vacuously, so a list of script
+    // names with nothing in it yet read as numeric and turned the first name
+    // typed into 0.
+    return { key, label, type: 'tags', numeric: numericItems || allNumbers };
   }
 
   // An OPEN map of name -> weight, declared by additionalProperties. Falling
@@ -914,10 +922,29 @@ function nodeAt(schema: JsonSchema, path: string): JsonSchema | undefined {
 /**  declared on each array, gathered into the shape the walk wants. */
 function collectRowTabs(topLevel: JsonSchema): Record<string, RowTab[]> {
   const out: Record<string, RowTab[]> = {};
-  for (const [name, node] of Object.entries(topLevel)) {
-    const tabs = node?.['x-rowTabs'] as RowTab[] | undefined;
-    if (Array.isArray(tabs)) out[name] = tabs;
-  }
+
+  // Walks the whole tree, keyed by PATH.
+  //
+  // This only read top-level properties, so an array nested inside a section -
+  // `logger.routes` - declared tabs that were collected for nobody and its
+  // editor stayed a flat list with the row's internal key on show. Paths are
+  // what the lookup uses at the other end, so the key must be the full path
+  // rather than the property name, which is not unique across branches.
+  const walk = (node: JsonSchema | undefined, path: string) => {
+    if (!node || typeof node !== 'object') return;
+
+    const tabs = node['x-rowTabs'] as RowTab[] | undefined;
+    if (Array.isArray(tabs) && path) out[path] = tabs;
+
+    const props = node.properties as JsonSchema | undefined;
+    if (props) {
+      for (const [name, child] of Object.entries(props)) {
+        walk(child as JsonSchema, path ? `${path}.${name}` : name);
+      }
+    }
+  };
+
+  for (const [name, node] of Object.entries(topLevel)) walk(node as JsonSchema, name);
   return out;
 }
 
@@ -1209,7 +1236,7 @@ function walkObject(
       && !looksLikeCoords(fallback, child)) {
       walkObject(child, childPath, group, childServerOnly, out, overrides, mapPaths, {
         id: childPath,
-        label: humanise(key),
+        label: labelFor(key, node),
       }, rowTabs);
       continue;
     }
@@ -1219,7 +1246,7 @@ function walkObject(
 
     out.push({
       path: childPath,
-      label: humanise(key),
+      label: labelFor(key, node),
       help: child?.description,
       type: control,
       group,
@@ -1251,6 +1278,19 @@ function walkObject(
   }
 }
 
+
+/**
+ * What to call a setting: its declared `title`, else the humanised key.
+ *
+ * Without this a schema could rename a row's columns but not the setting that
+ * holds them, so a list titled "Redirects" still opened a modal called "New
+ * route".
+ */
+function labelFor(key: string, node?: JsonSchema): string {
+  const title = node?.title;
+  return typeof title === 'string' && title ? title : humanise(key);
+}
+
 function buildListEntry(
   path: string,
   key: string,
@@ -1280,7 +1320,7 @@ function buildListEntry(
     const custom = columnsFor(node, rows);
     return {
       path,
-      label: humanise(key),
+      label: labelFor(key, node),
       help: node?.description,
       type: 'custom',
       group,
@@ -1322,7 +1362,7 @@ function buildListEntry(
   if (numericRows && shapeRows.length === 2 && !namedControls) {
     return {
       path,
-      label: humanise(key),
+      label: labelFor(key, node),
       help: node?.description,
       type: 'range',
       group,
@@ -1340,7 +1380,7 @@ function buildListEntry(
   if (namedControls && (numericRows || rows.length === 0)) {
     return {
       path,
-      label: humanise(key),
+      label: labelFor(key, node),
       help: node?.description,
       type: 'controls',
       group,
@@ -1359,7 +1399,7 @@ function buildListEntry(
   if (isPalette) {
     return {
       path,
-      label: humanise(key),
+      label: labelFor(key, node),
       help: node?.description,
       type: 'palette',
       group,
@@ -1428,7 +1468,7 @@ function buildListEntry(
   if (!shippedAreObjects && (isScalarList || (!node?.items?.properties && rows.length === 0))) {
     return {
       path,
-      label: humanise(key),
+      label: labelFor(key, node),
       help: node?.description,
       type: 'list',
       group,
@@ -1446,7 +1486,7 @@ function buildListEntry(
 
   return {
     path,
-    label: humanise(key),
+    label: labelFor(key, node),
     help: node?.description,
     type: mapPaths.has(path) ? 'zones' : 'list',
     // A row holding sibling numeric x and y IS a point - a store, an ATM, a

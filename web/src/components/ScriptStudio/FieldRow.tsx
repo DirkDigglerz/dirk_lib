@@ -1,6 +1,7 @@
 import { alpha, Flex, Text, Tooltip, useMantineTheme } from '@mantine/core';
 import { resolveItemDescription, resolveItemLabel, useItems } from 'dirk-cfx-react';
 import { Info } from 'lucide-react';
+import { RedirectKindControl } from './RedirectKindControl';
 import { SettingControl } from './Controls';
 import { opensPicker } from './PickerDrawer';
 import { RangeControl, SliderControl, TagsControl } from './RichControls';
@@ -33,7 +34,8 @@ export function isWideColumn(type: SettingColumn['type']): boolean {
     || type === 'keyvalue' || type === 'groups'
     || type === 'keybindMap' || type === 'mantineColor' || type === 'shade'
     || type === 'groupGrades' || type === 'weekdays' || type === 'positions'
-    || type === 'pickList' || type === 'weightMap';
+    || type === 'pickList' || type === 'weightMap'
+    || type === 'redirectKind';
 }
 
 /**
@@ -253,11 +255,16 @@ export function FieldRow({
         />
       )}
 
+      {column.type === 'redirectKind' && (
+        <RedirectKindControl value={value} disabled={disabled} onChange={onChange} />
+      )}
+
       {column.type === 'tags' && (
         <TagsControl
           value={value}
           disabled={disabled}
-          numeric={Array.isArray(value) && value.every((v) => typeof v === 'number')}
+          numeric={column.numeric
+            ?? (Array.isArray(value) && value.length > 0 && value.every((v) => typeof v === 'number'))}
           onChange={onChange}
         />
       )}

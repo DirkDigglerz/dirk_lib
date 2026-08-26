@@ -57,6 +57,10 @@ export type ControlType =
   | 'model'
   | 'keyvalue'
   | 'weightMap'
+  /** a Discord channel the bot can post in, picked from the live list */
+  | 'discordChannel'
+  /** webhook URL or Discord bot - which way a redirect reaches Discord */
+  | 'redirectKind'
   | 'keybindMap'
   | 'groupGrades'
   | 'refs'
@@ -80,6 +84,8 @@ export type SettingOption = {
   color?: string; value: string; label: string };
 
 export type SettingColumn = {
+  /** tags: the items are numbers - declared by the schema, never guessed */
+  numeric?: boolean;
   /** see SettingEntry.validateWith */
   validateWith?: string;
   /**

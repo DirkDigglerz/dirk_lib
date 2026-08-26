@@ -17,6 +17,7 @@ import { AnyIcon } from './Icon';
 import { ModelControl } from './ModelControl';
 import { PedsField } from './PedControl';
 import type { ControlType, SettingColumn, SettingEntry } from './types';
+import { DiscordChannelControl } from './DiscordChannelControl';
 import { useChrome } from './studioLocale';
 
 // One dispatch, keyed by the schema's control type. Adding a control here is
@@ -478,6 +479,13 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
     // One framework job or gang, declared with `x-groupPicker`. A plain text
     // box here is a silent failure waiting to happen: a typo makes, say, a
     // business nobody can ever staff, and nothing ever says so.
+    case 'discordChannel':
+      return (
+        <ControlShell width="30vh" className="studio-native">
+          <DiscordChannelControl value={value} disabled={disabled} onChange={onChange} />
+        </ControlShell>
+      );
+
     case 'group':
       return (
         <ControlShell width="40vh" className="studio-native">
