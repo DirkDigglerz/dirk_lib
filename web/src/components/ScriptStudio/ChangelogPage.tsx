@@ -5,6 +5,7 @@ import { ScrollText, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchInputStyles } from './Controls';
 import { useStudio } from './store';
+import { compareVersions, useRemoteChangelog } from './publicInfo';
 import { useChrome } from './studioLocale';
 
 /**
@@ -151,13 +152,33 @@ export function ChangelogBody({ resource }: { resource: string }) {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
+  /** what this server is actually running, for the "you are here" marker */
+  const installedVersion = script?.version;
+
+  // REMOTE first, the shipped file as the fallback.
+  //
+  // The question this page mostly answers is "should I update", and the file
+  // inside the resource cannot answer it - it describes the build you already
+  // have. It also cannot be read at all when a script forgot to put
+  // CHANGELOG.md in `escrow_ignore`, which is invisible in development and
+  // broken for every paying customer.
+  const remote = useRemoteChangelog(resource);
+
   useEffect(() => {
     let live = true;
-    setState(null);
     setError(null);
 
     if (isEnvBrowser()) {
       setState({ text: MOCK, version: '1.2.80' });
+      return () => { live = false; };
+    }
+
+    // Still loading the remote copy - say nothing yet rather than flashing the
+    // local one and replacing it a moment later.
+    if (remote.isLoading) return () => { live = false; };
+
+    if (remote.data) {
+      setState({ text: remote.data, version: installedVersion });
       return () => { live = false; };
     }
 
@@ -174,7 +195,7 @@ export function ChangelogBody({ resource }: { resource: string }) {
       .catch(() => { if (live) setError('CallbackFailed'); });
 
     return () => { live = false; };
-  }, [resource]);
+  }, [resource, remote.isLoading, remote.data, installedVersion]);
 
   const releases = useMemo(() => (state ? parse(state.text) : []), [state]);
 
@@ -245,6 +266,11 @@ export function ChangelogBody({ resource }: { resource: string }) {
           // The version on this server, called out - the point of reading a
           // changelog in the panel rather than on the store page.
           const current = !!installed && release.version === installed;
+          // Newer than the build on this server. Only visible at all because
+          // the list comes from the repo rather than from the resource - a
+          // shipped changelog cannot contain a release that came after it.
+          const ahead = !!installed && !current
+            && compareVersions(release.version, installed) > 0;
           return (
             <motion.div
               key={`${release.version}-${index}`}
@@ -268,6 +294,20 @@ export function ChangelogBody({ resource }: { resource: string }) {
                 </Text>
                 {release.date && (
                   <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.3)">{release.date}</Text>
+                )}
+                {ahead && (
+                  <div
+                    style={{
+                      background: alpha('#E0B15F', 0.12),
+                      border: `0.1vh solid ${alpha('#E0B15F', 0.35)}`,
+                      borderRadius: '0.3vh',
+                      padding: '0 0.55vh',
+                    }}
+                  >
+                    <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.06em" c="#E0B15F">
+                      {t('changelog.notInstalled', 'Not installed')}
+                    </Text>
+                  </div>
                 )}
                 {current && (
                   <div

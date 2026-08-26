@@ -1,6 +1,6 @@
 import { Flex } from '@mantine/core';
 import '@mantine/dates/styles.css';
-import { DirkProvider } from 'dirk-cfx-react';
+import { DirkProvider, copyToClipboard } from 'dirk-cfx-react';
 import { motion } from 'framer-motion';
 import React from "react";
 import { useNuiEvent } from '../hooks/useNuiEvent';
@@ -32,14 +32,10 @@ export const MotionFlex = motion.create(Flex);
 const App: React.FC = () => {
   useScriptConfigHooks();
 
-  useNuiEvent('COPY_TO_CLIPBOARD', (data: string) => {
-    const el = document.createElement('textarea');
-    el.value = data;
-    document.body.appendChild(el);
-    el.select();
-    document.execCommand('copy');
-    document.body.removeChild(el);
-  });
+  // Delegated rather than reimplemented: this was a second copy of
+  // cfx-react's copyToClipboard, character for character, and two copies of
+  // one behaviour are two things to fix when the browser moves on.
+  useNuiEvent('COPY_TO_CLIPBOARD', (data: string) => copyToClipboard(data));
 
 
   useNuiEvent('OPEN_LINK', (data: string) => {

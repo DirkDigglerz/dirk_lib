@@ -6,6 +6,7 @@ import {
   Package, PackagePlus,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useStudio } from './store';
 import { StudioButton } from './ui';
 import { useChrome } from './studioLocale';
 
@@ -352,6 +353,14 @@ function CatalogueRow({
     setResult(reply?.success
       ? { ok: true, message: kind === 'items' ? 'In your inventory' : 'Spawned' }
       : { ok: false, message: FAILURES[reply?._error ?? ''] ?? 'Could not do that' });
+
+    // A spawned vehicle is behind the panel. Closing is the whole point of
+    // pressing the button - you asked for it so you could look at it, and an
+    // item lands in an inventory you can check later, but a car does not.
+    if (reply?.success && kind !== 'items') {
+      useStudio.setState({ open: false, searches: {} });
+      fetchNui('CLOSE_SCRIPT_STUDIO');
+    }
   };
 
   return (

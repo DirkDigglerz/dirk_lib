@@ -1,10 +1,11 @@
 import { alpha, Flex, Image, Text, useMantineTheme } from '@mantine/core';
 import { AnimatePresence, motion } from 'framer-motion';
-import { openLink } from 'dirk-cfx-react';
+import { isEnvBrowser, openLink } from 'dirk-cfx-react';
 import { X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { ChangelogModal } from './ChangelogPage';
 import { useStudio } from './store';
+import { filterAnnouncements, usePublicInfo } from './publicInfo';
 import { useChrome } from './studioLocale';
 
 /**
@@ -176,19 +177,42 @@ function writeDismissed(ids: string[]) {
  * Scripts an undismissed announcement is about.
  *
  * Read by the rail to put a dot on that script's What's new tab. Falls back to
- * the mock spread for the same reason the page does - so the dot can be seen
- * before the endpoint exists.
+ * the mock spread in the browser for the same reason the page does.
  */
 export function useAnnouncedResources(): Set<string> {
-  const entries = useStudio((s) => s.dispatch);
+  const entries = usePublicFeed();
   return useMemo(() => {
-    const source = entries?.length ? entries : MOCK;
+    const source = entries?.length ? entries : (isEnvBrowser() ? MOCK : []);
     const out = new Set<string>();
     for (const entry of source) {
       if (entry.resource && (entry.kind === 'update' || entry.kind === 'action')) out.add(entry.resource);
     }
     return out;
   }, [entries]);
+}
+
+/**
+ * The announcements this server should see.
+ *
+ * Fetched from the public repo by the panel itself and filtered against what
+ * is actually installed - the feed is one file read by every server, so it
+ * cannot know which scripts are running or what version they are on. That
+ * matching only happens here.
+ *
+ * An empty result is a real answer - the feed genuinely has nothing to say -
+ * and in game that is what gets shown. The sample spread below is design
+ * scaffolding and appears in the browser only.
+ */
+function usePublicFeed(): DispatchEntry[] {
+  const { data } = usePublicInfo();
+  const scripts = useStudio((s) => s.scripts);
+
+  return useMemo(() => {
+    if (!data?.announcements?.length) return [];
+    const installed: Record<string, string> = {};
+    for (const script of scripts) installed[script.resource] = script.version;
+    return filterAnnouncements(data.announcements, installed);
+  }, [data, scripts]);
 }
 
 export function Dispatch() {
@@ -198,18 +222,19 @@ export function Dispatch() {
   /** which script's changelog is open over the page, if any */
   const [reading, setReading] = useState<string | null>(null);
 
-  // Real entries when the server has them, the mock spread otherwise, so this
-  // can be designed against something before the endpoint exists.
-  const entries = useStudio((s) => s.dispatch);
+  const entries = usePublicFeed();
 
   // Dismissing a REAL announcement is remembered for good. Dismissing a mock
   // one lasts the session: the stored list is not even consulted for them, so
   // an X clicked while this was being designed does not permanently hide the
   // sample content - which is exactly what it looked like had happened.
-  const usingMock = !entries?.length;
+  // Only ever in the browser. In game an empty feed means there is genuinely
+  // nothing to announce, and showing sample content there is worse than
+  // showing nothing - it reads as a real announcement about a real product.
+  const usingMock = isEnvBrowser() && !entries?.length;
 
   const shown = useMemo(() => {
-    const source = usingMock ? MOCK : entries;
+    const source = usingMock ? MOCK : (entries ?? []);
     const hidden = usingMock ? session : dismissed;
     const all = source.filter((e) => !hidden.includes(e.id));
     const rank = (e: DispatchEntry) => (e.featured ? 2 : e.pin ? 1 : 0);
