@@ -54,6 +54,21 @@ function discord.sendWebhook(url, payload)
   return exports.dirk_lib:discord_sendWebhook(url, payload)
 end
 
+-- Post to a channel AS THE BOT, the alternative to a webhook for servers that
+-- have already set one up. Same payload shape, so a caller can switch between
+-- the two without rewriting what it sends. Needs the bot to be in the guild
+-- and able to see and post in that channel.
+function discord.sendChannel(channelId, payload, guildId)
+  return exports.dirk_lib:discord_sendChannel(channelId, payload, guildId)
+end
+
+-- Text channels the bot can see, for offering a picker instead of asking for
+-- a webhook URL. A channel the bot cannot see is absent, which is honest:
+-- posting there would fail.
+function discord.getChannels(guildId)
+  return exports.dirk_lib:discord_getChannels(guildId)
+end
+
 -- Kept consumer-local — pulls identifiers off the player object via the
 -- runtime, which is identical in every server VM and doesn't need the
 -- bot token, so no benefit to bouncing through an export.

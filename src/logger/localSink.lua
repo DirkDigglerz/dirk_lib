@@ -47,6 +47,10 @@ local function ensureTable()
       `message`    TEXT         NOT NULL,
       `playerName` VARCHAR(64)      NULL,
       `identifier` VARCHAR(64)      NULL,
+      -- Every raw identifier for the same player, as a JSON array. Not
+      -- indexed: this is what you read once you have found a row, never what
+      -- you search by - that is `identifier`, which is.
+      `identifiers` TEXT            NULL,
       `serverId`   INT              NULL,
       `tags`       JSON             NULL,
       PRIMARY KEY (`id`),
@@ -58,6 +62,14 @@ local function ensureTable()
       KEY `idx_at`            (`at`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   ]])
+
+  -- Servers that already have the table predate `identifiers`, and CREATE
+  -- TABLE IF NOT EXISTS does nothing to an existing one. Adding it here is
+  -- idempotent: MySQL errors if the column exists, which is what the pcall is
+  -- for, and 8.0+/MariaDB 10.5+ accept IF NOT EXISTS outright.
+  if ok then
+    pcall(MySQL.query.await, 'ALTER TABLE `dirk_logs` ADD COLUMN `identifiers` TEXT NULL AFTER `identifier`')
+  end
 
   if not ok then
     lib.print.error('[lib.logger] could not create `dirk_logs`. Check the database user has CREATE permission; the local log sink is off until it exists.')
@@ -80,7 +92,7 @@ local function flush()
     -- `insert` with a table of value-lists is oxmysql's batch form: one
     -- statement, one round trip, however many rows are in it.
     MySQL.prepare(
-      'INSERT INTO `dirk_logs` (`at`,`resource`,`event`,`level`,`message`,`playerName`,`identifier`,`serverId`,`tags`) VALUES (?,?,?,?,?,?,?,?,?)',
+      'INSERT INTO `dirk_logs` (`at`,`resource`,`event`,`level`,`message`,`playerName`,`identifier`,`identifiers`,`serverId`,`tags`) VALUES (?,?,?,?,?,?,?,?,?,?)',
       chunk
     )
   end
@@ -98,29 +110,42 @@ local function playerFor(source)
   local name = GetPlayerName(src)
   if not name then return nil, nil, src end
 
+  -- The framework's persistent id (citizenid on qb/qbx, license on esx). The
+  -- function is `identifier`, not `getIdentifier` - the old name matched
+  -- nothing, so this branch never ran and every row stored a blank.
   local identifier
-  if lib.player and lib.player.getIdentifier then
-    local ok, found = pcall(lib.player.getIdentifier, src)
-    if ok then identifier = found end
+  if lib.player and lib.player.identifier then
+    local ok, found = pcall(lib.player.identifier, src)
+    if ok and type(found) == 'string' and found ~= '' then identifier = found end
   end
-  identifier = identifier or (GetPlayerIdentifierByType and GetPlayerIdentifierByType(src, 'license'))
 
-  return name, identifier, src
+  -- Every raw FiveM identifier as well: license, discord, steam, fivem, ip.
+  -- One column cannot answer "who was this" when the framework id is missing
+  -- or when you are chasing an alt - and these are already in memory.
+  local all = GetPlayerIdentifiers(src) or {}
+  if not identifier then
+    for i = 1, #all do
+      if all[i]:sub(1, 8) == 'license:' then identifier = all[i] break end
+    end
+    identifier = identifier or all[1]
+  end
+
+  return name, identifier, src, all
 end
 
 --- Who a line is about, as a table - shared with the Discord routes so both
 --- destinations name the same person the same way, resolved once.
 function sink.playerFor(source)
-  local name, identifier, serverId = playerFor(source)
+  local name, identifier, serverId, all = playerFor(source)
   if not name and not serverId then return nil end
-  return { name = name, identifier = identifier, source = serverId }
+  return { name = name, identifier = identifier, source = serverId, identifiers = all }
 end
 
 --- Take one line. Cheap, and never the caller's problem if it fails.
 function sink.write(resource, source, event, message, level, tags)
   if not config.enabled or not ready then return end
 
-  local name, identifier, serverId = playerFor(source)
+  local name, identifier, serverId, all = playerFor(source)
 
   if not buffer then
     buffer = {}
@@ -136,6 +161,7 @@ function sink.write(resource, source, event, message, level, tags)
     tostring(message or ''),
     name,
     identifier,
+    (all and #all > 0) and json.encode(all) or nil,
     serverId,
     (tags and next(tags)) and json.encode(tags) or nil,
   }

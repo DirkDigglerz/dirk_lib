@@ -20,6 +20,9 @@ local TTL = {
   roles   =  5 * 60 * 1000,
   members =       60 * 1000,
   member  =       30 * 1000,
+  -- Channels change about as often as roles do, and the list is only read
+  -- when someone opens a picker.
+  channels =  5 * 60 * 1000,
 }
 
 local cache = {}
@@ -161,6 +164,90 @@ local function getRoles(guildId)
     table.sort(out, function(a, b) return (a.position or 0) > (b.position or 0) end)
     return out
   end)
+end
+
+--- Text channels the bot can see, for picking one instead of pasting a webhook.
+---
+--- Only the types a message can be sent to: text (0), announcement (5) and
+--- threads (10/11/12). A category or a voice channel in the list is something
+--- to pick that then silently fails.
+---
+--- What comes back is what the BOT can see, which is not the same as what you
+--- can see - a channel the bot has no View Channel permission on is simply
+--- absent. That is the honest answer: posting there would fail anyway.
+local SENDABLE = { [0] = true, [5] = true, [10] = true, [11] = true, [12] = true }
+
+local function getChannels(guildId)
+  local token, gid, err = withCreds(guildId)
+  if err then return nil, err end
+  return cachedFetch(cacheKey(gid, 'channels'), TTL.channels, function()
+    local channels, ferr = fetchJson('GET', ('/guilds/%s/channels'):format(gid), token)
+    if not channels then return nil, ferr end
+
+    -- Categories are not sendable, but they name the groups, so they are kept
+    -- aside to label each channel rather than shown as choices.
+    local categories = {}
+    for _, c in ipairs(channels) do
+      if c.type == 4 then categories[c.id] = c.name end
+    end
+
+    local out = {}
+    for _, c in ipairs(channels) do
+      if SENDABLE[c.type] then
+        out[#out + 1] = {
+          id = c.id,
+          name = c.name,
+          category = c.parent_id and categories[c.parent_id] or nil,
+          position = c.position or 0,
+        }
+      end
+    end
+    table.sort(out, function(a, b)
+      if (a.category or '') ~= (b.category or '') then return (a.category or '') < (b.category or '') end
+      return a.position < b.position
+    end)
+    return out
+  end)
+end
+
+--- Post a message to a channel as the bot.
+---
+--- The alternative to a webhook, for servers that have already set up a bot.
+--- Same payload shape (`embeds`, `content`), so a caller can switch between
+--- them without rewriting what it sends.
+---
+--- Unlike a webhook this cannot choose a username or avatar - it is the bot,
+--- which is rather the point: one identity you control, and revoking it is
+--- revoking the bot rather than hunting down a URL somebody pasted.
+local function sendChannelMessage(channelId, payload, guildId)
+  if type(channelId) ~= 'string' or channelId == '' then return false, 'NoChannel' end
+  if type(payload) ~= 'table' then return false, 'BadPayload' end
+
+  local token, _, err = withCreds(guildId)
+  if err then return false, err end
+
+  local body = json.encode(payload)
+
+  local function post(attempt)
+    PerformHttpRequest(('https://discord.com/api/v10/channels/%s/messages'):format(channelId),
+      function(status, respBody)
+        if status == 429 and attempt < 3 then
+          local parsed = respBody and json.decode(respBody) or nil
+          local retry = (parsed and parsed.retry_after) or 1
+          SetTimeout(math.ceil(retry * 1000) + 100, function() post(attempt + 1) end)
+        elseif not status or status < 200 or status >= 300 then
+          lib.print.warn(('[lib.discord] channel POST failed (HTTP %s) - is the bot in the server, and can it see and post in that channel?')
+            :format(tostring(status)))
+        end
+      end, 'POST', body, {
+        ['Content-Type']  = 'application/json',
+        ['Authorization'] = ('Bot %s'):format(token),
+        ['User-Agent']    = USER_AGENT,
+      })
+  end
+
+  post(1)
+  return true
 end
 
 local function getMembers(guildId)
@@ -356,6 +443,8 @@ exports('discord_userHasAnyRole',function(userId, roleIds, gid)  return userHasA
 exports('discord_clearCache',    function(guildId)               clearCache(guildId) end)
 exports('discord_diagnose',      function(token, guildId)        return diagnose(token, guildId) end)
 exports('discord_sendWebhook',   function(url, payload)          return sendWebhook(url, payload) end)
+exports('discord_getChannels',   function(guildId)               return getChannels(guildId) end)
+exports('discord_sendChannel',   function(id, payload, guildId)  return sendChannelMessage(id, payload, guildId) end)
 
 -- Admin-gated NUI/callback for the /dirk_lib panel "Test Connection"
 -- button. Lives here so it's registered at boot — previously sat inside

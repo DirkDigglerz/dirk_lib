@@ -19,7 +19,7 @@ export type LogRow = {
   event: string;
   message: string;
   level: LogLevel;
-  player?: { name: string; identifier: string; source?: number };
+  player?: { name: string; identifier: string; identifiers?: string[]; source?: number };
   tags?: Record<string, string>;
 };
 

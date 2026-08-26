@@ -16,6 +16,7 @@
 -- the settings next to them.
 
 local sink = require '@dirk_lib.src.logger.localSink'
+local routes = require '@dirk_lib.src.logger.routes'
 
 local MAX_LIMIT = 100
 local DEFAULT_LIMIT = 50
@@ -79,7 +80,7 @@ end
 
 --- One page of log lines, newest first.
 lib.callback.register('dirk_lib:getLogs', function(source, query)
-  if not lib.scriptConfig.hasPerm(source) then return nil, 'NotAuthorized' end
+  if not lib.scriptConfig.canView(source) then return nil, 'NotAuthorized' end
   if not sink.isEnabled() then return { rows = {}, nextCursor = nil, off = true } end
 
   query = type(query) == 'table' and query or {}
@@ -104,7 +105,7 @@ lib.callback.register('dirk_lib:getLogs', function(source, query)
   args[#args + 1] = limit + 1
 
   local ok, rows = pcall(MySQL.query.await,
-    'SELECT `id`,`at`,`resource`,`event`,`level`,`message`,`playerName`,`identifier`,`serverId`,`tags`'
+    'SELECT `id`,`at`,`resource`,`event`,`level`,`message`,`playerName`,`identifier`,`identifiers`,`serverId`,`tags`'
     .. ' FROM `dirk_logs`' .. clause .. ' ORDER BY `id` DESC LIMIT ?', args)
 
   if not ok or type(rows) ~= 'table' then return nil, 'QueryFailed' end
@@ -125,6 +126,9 @@ lib.callback.register('dirk_lib:getLogs', function(source, query)
       player = row.playerName and {
         name = row.playerName,
         identifier = row.identifier,
+        -- Every raw identifier captured at the time, so a row still names
+        -- someone even if they have since changed framework id.
+        identifiers = row.identifiers and json.decode(row.identifiers) or nil,
         source = row.serverId,
       } or nil,
       tags = row.tags and json.decode(row.tags) or nil,
@@ -154,7 +158,7 @@ local facetCache = { at = 0, key = '', value = nil }
 local FACET_TTL = 60
 
 lib.callback.register('dirk_lib:getLogFacets', function(source, query)
-  if not lib.scriptConfig.hasPerm(source) then return nil, 'NotAuthorized' end
+  if not lib.scriptConfig.canView(source) then return nil, 'NotAuthorized' end
   if not sink.isEnabled() then return { resources = {}, events = {}, levels = {}, off = true } end
 
   query = type(query) == 'table' and query or {}
@@ -196,10 +200,19 @@ end)
 
 --- How much is being kept, and how big it is.
 lib.callback.register('dirk_lib:getLogHealth', function(source)
-  if not lib.scriptConfig.hasPerm(source) then return nil, 'NotAuthorized' end
+  if not lib.scriptConfig.canView(source) then return nil, 'NotAuthorized' end
+
+  -- Routes are reported either way: forwarding to Discord works whether or
+  -- not lines are also being kept here, and "the sink is off" must not read
+  -- as "nothing is being delivered".
+  local delivery = routes.health()
 
   if not sink.isEnabled() then
-    return { enabled = false, rows = 0, bytes = 0, retentionDays = sink.retentionDays() }
+    return {
+      enabled = false, rows = 0, bytes = 0,
+      retentionDays = sink.retentionDays(),
+      routes = delivery,
+    }
   end
 
   -- From information_schema rather than COUNT(*): an approximate row count and
@@ -216,36 +229,60 @@ lib.callback.register('dirk_lib:getLogHealth', function(source)
     rows = (ok and info and tonumber(info.rows)) or 0,
     bytes = (ok and info and tonumber(info.bytes)) or 0,
     retentionDays = sink.retentionDays(),
+    routes = delivery,
   }
 end)
 
---- Post a test line to one route's webhook.
+--- Post a test line to one redirect, whichever kind it is.
 ---
---- The button lives on the route row, which is where you have just pasted the
---- URL - the moment you actually want to know whether it works. It sends ONE
---- message, straight out, deliberately bypassing the batching queue: a test
---- you have to wait two seconds for reads as a test that failed.
+--- The button lives on the row, which is where you have just chosen the
+--- destination - the moment you actually want to know whether it works. It
+--- sends ONE message, straight out, deliberately bypassing the batching
+--- queue: a test you have to wait two seconds for reads as a test that failed.
 lib.callback.register('dirk_lib:testLogRoute', function(source, payload)
   if not lib.scriptConfig.hasPerm(source) then return { success = false, error = 'NoPermission' } end
 
-  local url = type(payload) == 'table' and (payload.value or payload.url) or nil
-  if type(url) ~= 'string' or not url:find('^https://[%w%.]*discord[app]*%.com/api/webhooks/') then
-    return { success = false, error = 'BadUrl' }
-  end
+  payload = type(payload) == 'table' and payload or {}
+  local label = payload.label or 'this redirect'
 
-  local label = (type(payload) == 'table' and payload.label) or 'this route'
-
-  lib.discord.sendWebhook(url, {
+  local embed = {
     embeds = { {
-      title = 'Log route connected',
+      title = 'Redirect connected',
       description = ('Lines matching **%s** will arrive here.'):format(label),
       color = 0x4AB569,
       footer = { text = ('%s - %s'):format(GetConvar('sv_projectName', 'FiveM server'), os.date('%Y-%m-%d %H:%M:%S')) },
     } },
-  })
+  }
 
-  -- sendWebhook is fire-and-forget, so this reports that it was SENT, not that
-  -- Discord liked it. Saying more than we know would be worse than saying this.
+  -- Follows `kind`, exactly as destOf in routes.lua does, so the test
+  -- exercises the path a real line would take rather than whichever
+  -- destination happens to be filled in.
+  local kind = payload.kind
+  if kind ~= 'webhook' and kind ~= 'channel' then
+    kind = (type(payload.channelId) == 'string' and payload.channelId ~= '') and 'channel' or 'webhook'
+  end
+
+  local channelId = payload.channelId
+  if kind == 'channel' then
+    if type(channelId) ~= 'string' or channelId == '' then
+      return { success = false, error = 'NoChannel' }
+    end
+    local ok, err = lib.discord.sendChannel(channelId, embed)
+    if not ok then return { success = false, error = tostring(err or 'Failed') } end
+    return { success = true, message = 'Test sent — check the channel' }
+  end
+
+  -- `url` first: the button sits on the row now, so `value` is whatever field
+  -- it was attached to (the label), not the destination.
+  local url = payload.url or payload.value
+  if type(url) ~= 'string' or not url:find('^https://[%w%.]*discord[app]*%.com/api/webhooks/') then
+    return { success = false, error = 'BadUrl' }
+  end
+
+  lib.discord.sendWebhook(url, embed)
+
+  -- Fire-and-forget, so this reports that it was SENT, not that Discord liked
+  -- it. Saying more than we know would be worse than saying this.
   return { success = true, message = 'Test sent — check the channel' }
 end)
 
@@ -296,6 +333,26 @@ exports('logger_adoptWebhook', function(payload)
   lib.scriptConfig.set('logger.routes', list)
   lib.print.info(('[lib.logger] moved the %s webhook into the shared log routes - configure it in /dirk_config > Logs from now on.'):format(resource))
   return true
+end)
+
+--- Discord channels the bot can post to, for the redirect picker.
+---
+--- Read-level, because it names channels rather than granting anything - and
+--- the alternative is asking someone to find a channel id in Discord's
+--- developer mode and paste it, which is how a redirect ends up pointing at
+--- the wrong place.
+lib.callback.register('dirk_lib:getDiscordChannels', function(source)
+  if not lib.scriptConfig.canView(source) then return nil, 'NotAuthorized' end
+
+  local ok, configured = pcall(function() return exports.dirk_lib:discord_isConfigured() end)
+  if not ok or not configured then return { configured = false, channels = {} } end
+
+  local got, channels, err = pcall(function() return exports.dirk_lib:discord_getChannels() end)
+  if not got or type(channels) ~= 'table' then
+    return { configured = true, channels = {}, error = tostring(err or 'Failed') }
+  end
+
+  return { configured = true, channels = channels }
 end)
 
 return true

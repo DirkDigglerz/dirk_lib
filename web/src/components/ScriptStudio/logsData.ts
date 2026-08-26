@@ -42,11 +42,29 @@ export function facetTotal(facets?: Facets): number | undefined {
   return facets.resources.reduce((sum, entry) => sum + entry.count, 0);
 }
 
+/** One Discord webhook's delivery health. Never carries the URL - that is a
+ *  secret, and this payload is read by anyone who can see the page. */
+export type RouteHealth = {
+  id?: string;
+  label?: string;
+  enabled: boolean;
+  resources?: string[];
+  events?: string[];
+  levels?: string[];
+  sent: number;
+  dropped: number;
+  /** unix seconds of the last successful post */
+  lastAt?: number;
+  /** lines waiting to go out right now */
+  queued: number;
+};
+
 export type LogHealth = {
   enabled: boolean;
   rows: number;
   bytes: number;
   retentionDays: number;
+  routes?: RouteHealth[];
 };
 
 /** Unwrap dirk_lib's bridge envelope, or say why not. */
@@ -115,6 +133,7 @@ export function useLogHealth() {
           rows: MOCK_DELIVERY.local.rows,
           bytes: 0,
           retentionDays: MOCK_DELIVERY.local.retentionDays,
+          routes: [],
         } as LogHealth;
       }
       return ask<LogHealth>('GET_LOG_HEALTH');

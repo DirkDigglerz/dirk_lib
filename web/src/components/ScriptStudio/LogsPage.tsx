@@ -12,7 +12,11 @@ import {
   MOCK_DELIVERY, MOCK_NOW, type LogLevel, type LogRow,
 } from './mockLogs';
 import { HistoryPanel } from './HistoryModal';
-import { setValue, useStudio } from './store';
+import { effectiveValue, setValue, useStudio } from './store';
+import { useLoggerSettings } from './loggerSettings';
+import { ListRows } from './ListRows';
+import { SettingControl } from './Controls';
+import type { SettingEntry } from './types';
 import { Chip, StudioButton } from './ui';
 import { useChrome } from './studioLocale';
 import { copyToClipboard } from 'dirk-cfx-react';
@@ -56,6 +60,7 @@ function LogsPageInner({ canEdit }: { canEdit: boolean }) {
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
   const [tab, setTab] = useState<Tab>('events');
+  const { data: health } = useLogHealth();
 
   return (
     <Flex direction="column" flex={1} style={{ minHeight: 0 }}>
@@ -70,13 +75,15 @@ function LogsPageInner({ canEdit }: { canEdit: boolean }) {
         <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.28)">
           {tab === 'events' && 'Filtered and paged on the server'}
           {tab === 'changes' && 'Every saved edit, and who made it'}
-          {tab === 'delivery' && `Kept for ${MOCK_DELIVERY.local.retentionDays} days`}
+          {tab === 'delivery' && (health?.enabled
+            ? `Kept for ${health.retentionDays} days`
+            : 'Not keeping logs on this server')}
         </Text>
       </Flex>
 
       {tab === 'events' && <EventsTab />}
       {tab === 'changes' && <ChangesTab canEdit={canEdit} />}
-      {tab === 'delivery' && <DeliveryTab accent={color} />}
+      {tab === 'delivery' && <DeliveryTab accent={color} canEdit={canEdit} />}
     </Flex>
   );
 }
@@ -87,6 +94,10 @@ function EventsTab() {
   const t = useChrome();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
+  // Whether lines are being kept at all - the chip below says so, because an
+  // empty Events tab with the sink off looks identical to a quiet server.
+  const { data: health } = useLogHealth();
+  const sinkOn = !!health?.enabled;
 
   const [range, setRange] = useState('24h');
   const [resource, setResource] = useState<string | null>(null);
@@ -256,8 +267,8 @@ function EventsTab() {
               />
             )}
             <Chip
-              label={MOCK_DELIVERY.local.enabled ? 'Local sink on' : 'Local sink off'}
-              color={MOCK_DELIVERY.local.enabled ? color : '#9ca3af'}
+              label={sinkOn ? 'Keeping logs' : 'Not keeping logs'}
+              color={sinkOn ? color : '#9ca3af'}
               dot
               size="control"
             />
@@ -364,8 +375,23 @@ function LogRowCard({
               {row.player && (
                 <Flex align="center" gap="xs" wrap="wrap">
                   <Detail label={t('logsPage.player', 'Player')} value={row.player.name} />
-                  <Detail label={t('logsPage.licence', 'Licence')} value={row.player.identifier} mono copyable />
+                  <Detail label={t('logsPage.identifier', 'Identifier')} value={row.player.identifier} mono copyable />
                   {row.player.source != null && <Detail label={t('logsPage.server_id', 'Server id')} value={String(row.player.source)} mono />}
+                  {/* Every raw identifier captured with the line - licence,
+                      discord, steam, fivem. The one above is what filtering
+                      matches on; these are what you take to a ban list. */}
+                  {row.player.identifiers?.map((id) => {
+                    const [type, ...rest] = id.split(':');
+                    return (
+                      <Detail
+                        key={id}
+                        label={type}
+                        value={rest.join(':')}
+                        mono
+                        copyable
+                      />
+                    );
+                  })}
                 </Flex>
               )}
 
@@ -430,10 +456,18 @@ function ChangesTab({ canEdit }: { canEdit: boolean }) {
 
 // ── Delivery ────────────────────────────────────────────────────────────────
 
-function DeliveryTab({ accent }: { accent: string }) {
+function DeliveryTab({ accent, canEdit }: { accent: string; canEdit: boolean }) {
   const t = useChrome();
   const theme = useMantineTheme();
-  const { service, local, webhooks } = MOCK_DELIVERY;
+  const { data: health, isLoading } = useLogHealth();
+  const settings = useLoggerSettings();
+
+  const routes = health?.routes ?? [];
+  const routeRows = (settings.value(settings.routes) as Record<string, unknown>[]) ?? [];
+
+  // Health is reported per URL by the server and never carries the URL, so it
+  // is matched back to its row by position - the same array, same order.
+  const healthFor = (i: number) => routes[i];
 
   return (
     <Flex
@@ -441,37 +475,80 @@ function DeliveryTab({ accent }: { accent: string }) {
       className="studio-scroll"
       style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}
     >
-      <DeliveryBlock title={t('logsPage.service', 'Service')} description="Where lines are streamed for long-term search">
+      <DeliveryBlock
+        title={t('logsPage.this_server', 'This server')}
+        description="Kept here, and read by the Events tab"
+      >
         <DeliveryRow
-          ok={service.ok}
-          title={service.name}
-          detail={service.note}
-          right={ago(service.lastAt)}
+          ok={!!health?.enabled}
+          title={health?.enabled
+            ? t('logsPage.local_sink_on', 'Keeping logs on this server')
+            : t('logsPage.local_sink_off', 'Not keeping logs')}
+          detail={health?.enabled
+            ? `${(health.rows ?? 0).toLocaleString()} lines · ${formatBytes(health.bytes ?? 0)} · kept ${health.retentionDays} days`
+            : t('logsPage.sink_off_detail', 'The Events tab has nothing to read while this is off.')}
+          right={isLoading ? '…' : undefined}
         />
+
+        {/* The settings themselves, not a link to them. This is the page
+            about where log lines go. */}
+        <Flex direction="column" gap="xs" pt="0.4vh">
+          {settings.enabled && (
+            <SettingLine entry={settings.enabled} resource={settings.resource} canEdit={canEdit} />
+          )}
+          {settings.retentionDays && (
+            <SettingLine entry={settings.retentionDays} resource={settings.resource} canEdit={canEdit} />
+          )}
+        </Flex>
       </DeliveryBlock>
 
-      <DeliveryBlock title={t('logsPage.this_server', 'This server')} description="What the Events tab reads from">
-        <DeliveryRow
-          ok={local.enabled}
-          title={local.enabled ? 'Local sink on' : 'Local sink off'}
-          detail={`${local.rows.toLocaleString()} rows · ${local.approxSize} · kept ${local.retentionDays} days`}
-          right={`pruned ${ago(local.lastPruneAt)}`}
-        />
-        <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.28)" pt="0.3vh">
-          {t('logsPage.rows_older_than_the_retention_window_are', 'Rows older than the retention window are deleted in batches overnight, so the table never locks.')}
-        </Text>
-      </DeliveryBlock>
+      <DeliveryBlock
+        title={t('logsPage.redirects', 'Redirects')}
+        description="Where these lines are sent on to, as well as kept here"
+      >
+        {routeRows.length > 0 && (
+          <Flex direction="column" gap="xxs" pb="0.4vh">
+            {routeRows.map((row, i) => {
+              const rh = healthFor(i);
+              const filters = [
+                Array.isArray(row.resources) && row.resources.length
+                  ? `${row.resources.length} script${row.resources.length === 1 ? '' : 's'}` : null,
+                Array.isArray(row.events) && row.events.length
+                  ? `${row.events.length} event${row.events.length === 1 ? '' : 's'}` : null,
+                Array.isArray(row.levels) && row.levels.length ? row.levels.join(', ') : null,
+              ].filter(Boolean).join(' · ');
 
-      <DeliveryBlock title={t('logsPage.webhooks', 'Webhooks')} description="Discord channels, per script and per situation">
-        {webhooks.map((hook) => (
-          <DeliveryRow
-            key={hook.scope}
-            ok={hook.ok}
-            title={hook.scope}
-            detail={hook.error ?? `${hook.channel} · as ${hook.username} · ${hook.sent24h.toLocaleString()} sent in 24h`}
-            right={hook.ok ? ago(hook.lastAt) : 'failing'}
+              return (
+                <DeliveryRow
+                  key={String(row.id ?? i)}
+                  ok={row.enabled !== false}
+                  title={String(row.label || t('logsPage.unnamed_route', 'Unnamed route'))}
+                  detail={[
+                    filters || t('logsPage.everything', 'everything'),
+                    rh ? `${rh.sent.toLocaleString()} sent` : null,
+                    rh?.dropped ? `${rh.dropped.toLocaleString()} dropped` : null,
+                    rh?.queued ? `${rh.queued} waiting` : null,
+                  ].filter(Boolean).join(' · ')}
+                  right={row.enabled === false
+                    ? t('logsPage.off', 'off')
+                    : (rh?.lastAt ? ago(rh.lastAt) : t('logsPage.nothing_yet', 'nothing yet'))}
+                />
+              );
+            })}
+          </Flex>
+        )}
+
+        {/* The editor itself - adding a webhook happens here, not in a
+            settings page two clicks away. */}
+        {settings.routes && (
+          <ListRows
+            entry={settings.routes}
+            resource={settings.resource}
+            rows={routeRows}
+            disabled={!canEdit}
+            onChange={(next) => setValue(settings.resource, settings.routes!, next)}
           />
-        ))}
+        )}
       </DeliveryBlock>
 
       <Flex
@@ -484,10 +561,46 @@ function DeliveryTab({ accent }: { accent: string }) {
       >
         <AlertTriangle size="1.5vh" color={accent} />
         <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.6)">
-          A line can go to all three at once. Webhook destinations resolve call-site first, then per-event,
-          then per-resource, then the default.
+          {t(
+            'logsPage.delivery_note',
+            'A webhook is as well as keeping lines here, never instead. Messages are batched, so a busy minute is a few posts rather than hundreds.',
+          )}
         </Text>
       </Flex>
+    </Flex>
+  );
+}
+
+/**
+ * One logger setting, drawn where it is relevant rather than in the rail.
+ *
+ * The SAME entry the settings page would have drawn, through the SAME control
+ * - so it is sized, styled and behaves identically, and writes through the
+ * store into the save bar, the change count and the history. Hand-rolling a
+ * Switch here is what produced two controls that looked nothing like the rest
+ * of the panel.
+ */
+function SettingLine({
+  entry, resource, canEdit,
+}: { entry: SettingEntry; resource: string; canEdit: boolean }) {
+  const value = effectiveValue(resource, entry);
+
+  return (
+    <Flex align="center" gap="sm" justify="space-between">
+      <Flex direction="column" style={{ minWidth: 0, flex: 1 }}>
+        <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.75)">{entry.label}</Text>
+        {entry.help && (
+          <Text ff="Akrobat SemiBold" size="xxs" c="rgba(255,255,255,0.3)">{entry.help}</Text>
+        )}
+      </Flex>
+      <SettingControl
+        type={entry.type}
+        entry={entry}
+        resource={resource}
+        value={value}
+        disabled={!canEdit}
+        onChange={(next) => setValue(resource, entry, next)}
+      />
     </Flex>
   );
 }
@@ -508,7 +621,7 @@ function DeliveryBlock({
 
 function DeliveryRow({
   ok, title, detail, right,
-}: { ok: boolean; title: string; detail: string; right: string }) {
+}: { ok: boolean; title: string; detail: string; right?: string }) {
   const theme = useMantineTheme();
   const tone = ok ? '#22c55e' : '#ef4444';
 
