@@ -90,7 +90,7 @@ export function SliderControl({
 
 /** A two-number bound - weight limits, depth range, crush circle count. */
 export function RangeControl({
-  value, onChange, disabled, suffix, min, max,
+  value, onChange, disabled, suffix, min, max, step,
 }: {
   value: unknown;
   onChange: (next: number[]) => void;
@@ -99,6 +99,8 @@ export function RangeControl({
   /** bounds from the schema's `items`, when it declares any */
   min?: number;
   max?: number;
+  /** smallest allowed change - 1 when the pair must be whole numbers */
+  step?: number;
 }) {
   const styles = useInputStyles();
   const theme = useMantineTheme();
@@ -117,6 +119,9 @@ export function RangeControl({
    */
   const clamp = (n: number) => {
     let out = Number.isFinite(n) ? n : 0;
+    // Snap BEFORE bounding, so a stepped range cannot land between steps and
+    // then be nudged off the end by the clamp.
+    if (step && step > 0) out = Math.round(out / step) * step;
     if (typeof min === 'number') out = Math.max(min, out);
     if (typeof max === 'number') out = Math.min(max, out);
     return out;
@@ -147,11 +152,16 @@ export function RangeControl({
     <Flex direction="column" gap="0.4vh" style={{ width: '100%' }}>
       {slidable && (
         <Flex direction="column" gap="0.2vh">
-          <Flex justify="space-between">
-            <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.3)">
+          <Flex justify="space-between" align="baseline">
+            <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.25)">
               {min}{suffix ? ` ${suffix}` : ''}
             </Text>
-            <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.3)">
+            {/* The pair itself, where you are already looking. Two number
+                boxes underneath said the same thing a second time. */}
+            <Text ff="Akrobat Bold" size="xs" c={sliderColor}>
+              {low}{suffix ? ` ${suffix}` : ''} – {high}{suffix ? ` ${suffix}` : ''}
+            </Text>
+            <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.25)">
               {max}{suffix ? ` ${suffix}` : ''}
             </Text>
           </Flex>
@@ -161,7 +171,7 @@ export function RangeControl({
             disabled={disabled}
             min={min}
             max={max}
-            step={(max - min) / 100 < 1 ? 0.01 : 1}
+            step={step ?? ((max - min) / 100 < 1 ? 0.01 : 1)}
             minRange={0}
             label={null}
             styles={{
@@ -176,6 +186,9 @@ export function RangeControl({
         </Flex>
       )}
 
+      {/* Only when there is nothing to drag. An open-ended pair has no track
+          to draw, and then typing is the only way to set it. */}
+      {!slidable && (
       <Flex align="center" gap="xs" style={{ width: '100%' }}>
       <Flex direction="column" gap="0.2vh" style={{ flex: 1 }}>
         <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.1em" c="rgba(255,255,255,0.35)">Min</Text>
@@ -208,6 +221,7 @@ export function RangeControl({
         />
       </Flex>
       </Flex>
+      )}
     </Flex>
   );
 }

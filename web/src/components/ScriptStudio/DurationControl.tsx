@@ -1,4 +1,4 @@
-import { Flex, NumberInput, Select, Text, useMantineTheme } from '@mantine/core';
+import { Flex, NumberInput, Select, useMantineTheme } from '@mantine/core';
 import { useInputStyles } from './Controls';
 import { useChrome } from './studioLocale';
 
@@ -93,7 +93,7 @@ export function DurationControl({
         hideControls
         decimalScale={2}
         styles={styles}
-        style={{ flex: 1 }}
+        style={{ flex: 1, minWidth: '7vh' }}
       />
 
       <Select
@@ -103,18 +103,9 @@ export function DurationControl({
         disabled={disabled}
         allowDeselect={false}
         styles={styles}
-        style={{ width: compact ? '11vh' : '13vh', flexShrink: 0 }}
+        style={{ width: compact ? '9vh' : '11vh', flexShrink: 0 }}
       />
 
-      {/* The stored number, said plainly. Someone reading a schema or a
-          support ticket is looking at THAT, not at what the panel chose to
-          show it as. */}
-      <Text
-        ff="monospace" size="xxs" c="rgba(255,255,255,0.28)"
-        style={{ flexShrink: 0, minWidth: '9vh', textAlign: 'right' }}
-      >
-        {stored} {t(`duration.${base}Short`, base)}
-      </Text>
       <span style={{ display: 'none' }}>{theme.primaryColor}</span>
     </Flex>
   );

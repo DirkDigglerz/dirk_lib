@@ -126,6 +126,20 @@ exports('registerScriptConfigOverrides', function(resourceName, accessBlock)
   end
 
   overridesByResource[resourceName] = { groups = groups, identifiers = identifiers }
+
+  -- Fold this block into the Admins page the first time we see it, so there
+  -- is one list of who has access instead of one per script - and so a grant
+  -- can actually be revoked, which a schema file cannot be from a panel.
+  --
+  -- Deferred: registration happens as the consumer starts, which can be
+  -- before the admin tables exist on a cold boot.
+  if not scriptConfigAdmins.isMigrated(resourceName) then
+    CreateThread(function()
+      Wait(2000)
+      pcall(scriptConfigAdmins.migrateAccessBlock, resourceName, groups, identifiers)
+    end)
+  end
+
   return true
 end)
 
@@ -147,6 +161,11 @@ end)
 -- Does the pushed per-script access block for this resource grant src access?
 -- Read-only against the map — never calls back into the consumer.
 local function pushedOverrideAllows(src, resourceName, ctx)
+  -- Once a script's block has been folded into the rows, the block itself
+  -- stops granting. Both honouring it AND the migrated rows would mean
+  -- deleting a row revokes nothing, because the schema still says yes.
+  if scriptConfigAdmins.isMigrated(resourceName) then return false end
+
   local o = overridesByResource[resourceName]
   if type(o) ~= 'table' then return false end
   local groups = o.groups

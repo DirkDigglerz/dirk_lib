@@ -148,8 +148,82 @@ function admins.remove(id)
   return true
 end
 
+--- Which scripts have had their old per-script `access` block folded in.
+---
+--- Recorded so it happens once. Without this, deleting a migrated row would
+--- see it reappear on the next restart - which is not a revoke, it is a
+--- fifteen-second undo.
+local migrated = {}
+
+local function ensureMigrationTable()
+  MySQL.query.await([[
+    CREATE TABLE IF NOT EXISTS `dirk_admin_migrations` (
+      `resource` VARCHAR(64) NOT NULL,
+      `at` INT UNSIGNED DEFAULT NULL,
+      PRIMARY KEY (`resource`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  ]])
+
+  local ok, rows = pcall(MySQL.query.await, 'SELECT `resource` FROM `dirk_admin_migrations`')
+  if ok and type(rows) == 'table' then
+    for i = 1, #rows do migrated[rows[i].resource] = true end
+  end
+end
+
+--- Has this script's access block already been folded into the rows?
+function admins.isMigrated(resource)
+  return migrated[resource] == true
+end
+
+--- Fold one script's `access` block into rows, once.
+---
+--- The block is NOT written to or cleared - that is the consumer's own config
+--- and dirk_lib has no business editing it. Instead the block stops being
+--- HONOURED for a migrated script (see pushedOverrideAllows), so these rows
+--- become the only thing granting access and deleting one actually revokes.
+--- The original data stays exactly where it was, which is also the way back
+--- if this ever needs undoing.
+---
+--- Everything migrates at `edit`, because that is what the old block granted.
+function admins.migrateAccessBlock(resource, groups, identifiers)
+  if migrated[resource] then return false end
+
+  local rows = 0
+  for i = 1, #(groups or {}) do
+    if admins.put({
+      kind = 'principal', subject = groups[i], level = 'edit',
+      scripts = { resource }, addedBy = 'migrated from ' .. resource,
+    }) then rows = rows + 1 end
+  end
+  for i = 1, #(identifiers or {}) do
+    if admins.put({
+      kind = 'identifier', subject = identifiers[i], level = 'edit',
+      scripts = { resource }, addedBy = 'migrated from ' .. resource,
+    }) then rows = rows + 1 end
+  end
+
+  -- Marked even when there was nothing to move, so an empty block is not
+  -- reconsidered on every boot.
+  local ok, err = pcall(MySQL.query.await,
+    'INSERT IGNORE INTO `dirk_admin_migrations` (`resource`,`at`) VALUES (?,?)',
+    { resource, os.time() })
+  if not ok then
+    lib.print.warn(('[dirk_lib] access migration for %s could not be recorded: %s')
+      :format(resource, tostring(err)))
+    return false
+  end
+
+  migrated[resource] = true
+  if rows > 0 then
+    lib.print.info(('[dirk_lib] moved %d access grant(s) from %s into the Admins page. Manage them there from now on.')
+      :format(rows, resource))
+  end
+  return true
+end
+
 CreateThread(function()
   ensureTable()
+  ensureMigrationTable()
   admins.load()
 end)
 

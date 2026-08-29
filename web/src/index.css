@@ -162,3 +162,30 @@ code {
 .studio-spin {
   animation: studio-spin 0.9s linear infinite;
 }
+
+
+/* ── Screenshot mode ──────────────────────────────────────────────────────
+   Set `data-shot` on <html> and nothing behind the panel paints, so a capture
+   with an alpha channel comes out on genuine transparency.
+
+   The elements are KEPT, only their backgrounds go: cfx-react's DirkProvider
+   backdrop is also the layout parent, and the dim overlay is the flex box that
+   centres the panel - display:none on either collapses the thing being
+   photographed along with it. */
+html[data-shot],
+html[data-shot] body,
+html[data-shot] #root {
+  background: transparent !important;
+}
+
+html[data-shot] [style*="background-image"] {
+  background-image: none !important;
+}
+
+/* the dim behind the panel */
+html[data-shot] [data-studio-panel] {
+  box-shadow: none;
+}
+html[data-shot] div:has(> [data-studio-panel]) {
+  background-color: transparent !important;
+}

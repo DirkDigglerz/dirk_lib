@@ -1,12 +1,8 @@
 import { alpha, Flex, Text, TextInput, Tooltip, useMantineTheme } from '@mantine/core';
-import { ConfirmModal, useSettings } from 'dirk-cfx-react';
+import { ConfirmModal, isEnvBrowser, useSettings } from 'dirk-cfx-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  AlertTriangle, Anchor, Banknote, Box, Braces, Car, Droplets, Fish, Gamepad2, History, Home,
-  Image, LayoutTemplate, Library, Lightbulb, Link as LinkIcon, ListRestart, Lock,
-  Map as MapIcon, MessageCircle, Music, Package, Palette, Plug, Radar,
-  Redo2, RefreshCw, RotateCcw, ScrollText, Search, Shield, Shovel, SlidersHorizontal, Sprout,
-  Store, Target, TrendingUp, Trophy, Undo2, User, Users, Utensils, Waves, Wrench, X, ChevronRight,
+  AlertTriangle, Anchor, ArrowRight, Banknote, Box, Braces, Car, ChevronRight, Droplets, Fish, Gamepad2, History, Home, Image, LayoutTemplate, Library, Lightbulb, Link as LinkIcon, ListRestart, Lock, Map as MapIcon, MessageCircle, Music, Package, Palette, Plug, Radar, Redo2, RefreshCw, RotateCcw, ScrollText, Search, Shield, Shovel, SlidersHorizontal, Sprout, Store, Target, TrendingUp, Trophy, Undo2, User, Users, Utensils, Waves, Wrench, X,
 } from 'lucide-react';
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import { Fragment, memo, startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
@@ -80,7 +76,48 @@ function Highlight({ text, query }: { text: string; query: string }) {
   );
 }
 
+/**
+ * Put the panel into a named state for a screenshot, from the URL.
+ *
+ * Browser-only and costs the real build nothing: without `?shot` it returns
+ * before doing anything. Setting `data-shot` on the root is what lets the
+ * stylesheet silence everything painting behind the panel, so a capture with
+ * an alpha channel comes out on genuine transparency.
+ *
+ * Deep-links through the panel's own navigation rather than setting the
+ * destination directly, so a shot also proves the route works.
+ */
+function useShotMode() {
+  useEffect(() => {
+    if (!isEnvBrowser()) return;
+    const params = new URLSearchParams(window.location.search);
+    const shot = params.get('shot');
+    if (shot === null) return;
+
+    const state: Record<string, unknown> = { open: true, fullScreen: false };
+    const resource = params.get('resource');
+    if (resource) state.activeResource = resource;
+    // `shot=` on its own means "whatever the panel opens on".
+    state.activePage = shot === '' ? null : shot;
+
+    useStudio.setState(state);
+
+    // A section inside a script - Theme, Logger, Bridging. Goes through the
+    // panel's own navigation, so a docs screenshot also proves the route
+    // still exists rather than quietly photographing the landing page.
+    const group = params.get('group');
+    if (group) {
+      useStudio.setState({
+        goToRequest: { resource: resource || 'dirk_lib', group },
+      });
+    }
+
+    document.documentElement.setAttribute('data-shot', '1');
+  }, []);
+}
+
 export default function ScriptStudio() {
+  useShotMode();
   const theme = useMantineTheme();
   const color = theme.colors[theme.primaryColor][5];
 
@@ -285,6 +322,17 @@ export default function ScriptStudio() {
    * stopped there. Selecting is one render; jumping is the next.
    */
   const pendingJump = useRef<{ resource: string; group: string } | null>(null);
+  /**
+   * Bumped whenever `pendingJump` is set from outside the render that
+   * consumes it.
+   *
+   * The consumer is an effect keyed on [script, visibleGroups, query], and
+   * `pendingJump` is a REF - so setting it does not re-run anything. When the
+   * request arrives after those have already settled (switching script from a
+   * link, or from the screenshot hook), the effect had already run against a
+   * null ref and never looked again.
+   */
+  const [jumpNonce, setJumpNonce] = useState(0);
 
   const query = deferredSearch.trim();
 
@@ -699,6 +747,18 @@ export default function ScriptStudio() {
   /** Bounds the wait for a just-selected script's sections to arrive. */
   const missRetry = useRef(0);
 
+  // A field asking to be taken to another script's setting. Same path a
+  // search result takes - switch script, drop the page, queue the scroll.
+  const goToRequest = useStudio((s) => s.goToRequest);
+  useEffect(() => {
+    if (!goToRequest) return;
+    const { resource, group } = goToRequest;
+    useStudio.setState({ activeResource: resource, activePage: null, goToRequest: null });
+    setSearch('');
+    pendingJump.current = { resource, group };
+    setJumpNonce((n) => n + 1);
+  }, [goToRequest]);
+
   const jumpTo = useCallback((groupId: string, subgroupId?: string, keepList?: boolean) => {
     // Picking a section opens its sub-tree. Having to hit the chevron
     // specifically made the tree feel like a separate control rather than part
@@ -865,7 +925,7 @@ export default function ScriptStudio() {
     requestAnimationFrame(() => {
       requestAnimationFrame(() => jumpToRef.current(want.group));
     });
-  }, [script, visibleGroups, query]);
+  }, [script, visibleGroups, query, jumpNonce]);
 
   jumpToRef.current = jumpTo;
 
@@ -943,6 +1003,9 @@ export default function ScriptStudio() {
           }}
         >
           <motion.div
+            // The panel ITSELF, not the dim behind it - so a screenshot keeps
+            // its rounded corners and drops onto any background.
+            data-studio-panel
             initial={{ scale: 0.97, opacity: 0, ...panelBox }}
             animate={{ scale: 1, opacity: 1, ...panelBox }}
             exit={{ scale: 0.97, opacity: 0 }}
@@ -2244,6 +2307,29 @@ const SettingRow = memo(function SettingRow({
           <Text ff="Akrobat SemiBold" size="xs" c="rgba(255,255,255,0.45)" style={{ maxWidth: '82vh' }}>
             <Highlight text={help} query={query} />
           </Text>
+        )}
+
+        {/* "That is set over there." Only while the value it applies to is
+            actually in force - telling someone where the global theme lives
+            is noise once they have stopped following it. */}
+        {entry.goTo && (entry.goTo.when === undefined || value === entry.goTo.when) && (
+          <motion.button
+            type="button"
+            whileTap={{ scale: 0.99 }}
+            onClick={() => useStudio.setState({
+              goToRequest: { resource: entry.goTo!.resource, group: entry.goTo!.group },
+            })}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.4vh',
+              background: 'transparent', border: 'none', padding: 0,
+              cursor: 'pointer', width: 'fit-content',
+            }}
+          >
+            <Text ff="Akrobat Bold" size="xxs" c={color} td="underline">
+              {entry.goTo.label ?? t('main.go_to_setting', 'Change it there')}
+            </Text>
+            <ArrowRight size="1.1vh" color={color} />
+          </motion.button>
         )}
 
         <Flex align="center" gap="xs">

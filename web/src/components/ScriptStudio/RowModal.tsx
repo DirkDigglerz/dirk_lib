@@ -134,7 +134,25 @@ export function RowModal({
    * looking at - a row is saved whole, so a problem hiding on the other tab
    * still stops the save, and the message says which tab to look on.
    */
-  const problems = useMemo(() => validateRow(columns, draft), [columns, draft]);
+  const problems = useMemo(() => validateRow(columns, draft, t), [columns, draft]);
+  const problemFor = (key: string) => problems.find((p) => p.key === key)?.message;
+
+  /**
+   * Has anything actually been typed?
+   *
+   * Compared against the row as it opened, so closing a modal you only looked
+   * at asks nothing - the warning has to be rare to be worth reading.
+   */
+  const dirty = useMemo(
+    () => JSON.stringify(draft) !== JSON.stringify(row),
+    [draft, row],
+  );
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+
+  const askClose = () => {
+    if (dirty) { setConfirmDiscard(true); return; }
+    onClose();
+  };
 
   const tabOf = (key: string) =>
     tabs.find((tab) => tab.columns.some((c) => c.key === key));
@@ -146,7 +164,7 @@ export function RowModal({
         icon={List}
         iconColor={color}
         description={entry.label}
-        onClose={onClose}
+        onClose={askClose}
         width="78vh"
         height="76vh"
         zIndex={10100}
@@ -216,6 +234,7 @@ export function RowModal({
                 disabled={disabled || gatedOff(column)}
                 dimmed={gatedOff(column)}
                 itemName={itemName}
+                error={problemFor(column.key)}
                 onChange={(v) => setField(column.key, v)}
                 onPick={(child, apply) => setPicker({
                   column: child ?? column,
@@ -259,7 +278,7 @@ export function RowModal({
                   </Text>
                 </motion.button>
               )}
-              <StudioButton label={t('rowModal.cancel', 'Cancel')} onClick={onClose} />
+              <StudioButton label={t('rowModal.cancel', 'Cancel')} onClick={askClose} />
               <StudioButton
                 label={t('rowModal.save_entry', 'Save entry')}
                 primary
@@ -281,6 +300,22 @@ export function RowModal({
             disabled={disabled}
             onApply={(v) => picker.apply(v)}
             onClose={() => setPicker(null)}
+          />
+        )}
+
+        {/* Cancel throws the edit away, so it says so once rather than
+            silently. Only when something was actually changed. */}
+        {confirmDiscard && (
+          <ConfirmModal
+            title={t('rowModal.discard_changes', 'Discard changes?')}
+            description={t(
+              'rowModal.discard_body',
+              'You have unsaved changes to this entry. Closing now throws them away.',
+            )}
+            confirmLabel={t('rowModal.discard', 'Discard')}
+            onConfirm={() => { setConfirmDiscard(false); onClose(); }}
+            onClose={() => setConfirmDiscard(false)}
+            zIndex={10300}
           />
         )}
       </AnimatePresence>

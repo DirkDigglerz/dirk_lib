@@ -12,9 +12,17 @@
         "basic.interact",
         "basic.weightUnit",
         "basic.distanceUnit",
-        "basic.keysWhileFishing",
-        "basic.defaultControls",
         "basic.stockResetIntervalSeconds"
+      ]
+    },
+    {
+      "id": "controls",
+      "label": "Controls",
+      "icon": "gamepad-2",
+      "description": "What players press while fishing.",
+      "paths": [
+        "basic.keysWhileFishing",
+        "basic.defaultControls"
       ]
     },
     {
@@ -57,6 +65,7 @@
       "icon": "fish",
       "description": "Every catchable species.",
       "paths": [
+        "basic.guideBookItem",
         "fish"
       ]
     },
@@ -66,8 +75,7 @@
       "icon": "backpack",
       "description": "Rods, reels, line, hooks and bait.",
       "paths": [
-        "equipment",
-        "basic.miscItems"
+        "equipment"
       ]
     },
     {
@@ -186,7 +194,7 @@
       "id": "logging",
       "label": "Logging",
       "icon": "webhook",
-      "description": "Discord webhooks for fishing events.",
+      "description": "Whether fishing logs its events, and the payout that counts as suspicious. Where those lines go is set once in dirk_lib under Logs - kept on this server, and optionally sent on to a Discord channel or webhook.",
       "paths": [
         "logging"
       ]
@@ -318,7 +326,14 @@
             30,
             60
           ],
-          "description": "Number of fish spawned per map cell [min, max]"
+          "description": "Number of fish spawned per map cell [min, max]",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
         },
         "spookPerCatch": {
           "type": "number",
@@ -427,7 +442,7 @@
         },
         "miscItems": {
           "type": "array",
-          "description": "List of admin-configurable tool items shown in the equipment admin's Misc tab. Each entry refs a basic.*Item field; the admin UI resolves the ref to the current value + shows the item's image. Adding a new tool here is the only step needed to surface it in the Misc tab — no frontend code change required.",
+          "description": "Items that have no section of their own. Anything configured elsewhere (the gutting knife, the permit, the anchor) is set there, not here.",
           "x-arrayKey": "ref",
           "items": {
             "type": "object",
@@ -440,29 +455,12 @@
                 "type": "string",
                 "description": "Display label shown in the Misc tab, e.g. 'Fish Knife'. Independent of the configured item name so admins who rename an item to 'my_knife' still see 'Fish Knife' in the panel."
               }
-            }
+            },
+            "required": [
+              "ref"
+            ]
           },
           "default": [
-            {
-              "ref": "basic.fishGuttingItem",
-              "label": "Fish Knife"
-            },
-            {
-              "ref": "basic.crushingItem",
-              "label": "Meat Mallet"
-            },
-            {
-              "ref": "basic.permitItem",
-              "label": "Fishing Permit"
-            },
-            {
-              "ref": "basic.anchorItem",
-              "label": "Boat Anchor"
-            },
-            {
-              "ref": "basic.fishFinderItem",
-              "label": "Fish Finder"
-            },
             {
               "ref": "basic.guideBookItem",
               "label": "Guidebook"
@@ -557,7 +555,11 @@
               "minimum": 0,
               "maximum": 1,
               "description": "How strongly species rarity makes the minigame harder (faster pulse, longer cut path). 0 = same difficulty for every fish; 1 = rare fish are significantly harder to cut cleanly.",
-              "x-control": "difficulty"
+              "x-control": "difficulty",
+              "x-enabledWhen": {
+                "path": "basic.gutting.useMinigame",
+                "equals": true
+              }
             },
             "cutBuffer": {
               "type": "number",
@@ -565,7 +567,11 @@
               "minimum": 0,
               "maximum": 0.95,
               "description": "How forgiving the cut line is on the gutting minigame. Anywhere within this fraction of the line's tolerance band counts as a PERFECT on-line cut (no accuracy penalty) — only drift past it starts costing. 0 = must trace dead-centre; 0.9 = very forgiving. Default 0.55.",
-              "x-control": "forgiveness"
+              "x-control": "forgiveness",
+              "x-enabledWhen": {
+                "path": "basic.gutting.useMinigame",
+                "equals": true
+              }
             },
             "randomRewards": {
               "type": "array",
@@ -657,7 +663,10 @@
                   "chance": {
                     "type": "number"
                   }
-                }
+                },
+                "required": [
+                  "name"
+                ]
               }
             }
           }
@@ -801,7 +810,10 @@
           "type": "number",
           "default": 48,
           "minimum": 1,
-          "description": "Hours before an unchecked trap is automatically removed (stale). 48 = 2 days."
+          "description": "Hours before an unchecked trap is automatically removed (stale). 48 = 2 days.",
+          "title": "Trap Stale Time",
+          "x-control": "duration",
+          "x-durationBase": "hours"
         },
         "showTrapBlips": {
           "type": "boolean",
@@ -862,7 +874,10 @@
           "type": "number",
           "default": 86400,
           "minimum": 60,
-          "description": "Seconds between equipment store stock resets. Only applies to items with maxStock set; unlimited items are unaffected. Default 86400 = 24 hours."
+          "description": "How often equipment store stock is restocked. Only applies to items with maxStock set; unlimited items are unaffected.",
+          "title": "Stock Reset Interval",
+          "x-control": "duration",
+          "x-durationBase": "seconds"
         },
         "keysWhileFishing": {
           "type": "array",
@@ -886,7 +901,7 @@
         },
         "defaultControls": {
           "type": "object",
-          "description": "Default key bindings for fishing actions",
+          "description": "The keys fishing actions start on. These are only DEFAULTS the server hands out — each player can rebind any of them for themselves in the pause menu under Settings > Key Bindings > FiveM, and their choice overrides what is set here.",
           "default": {
             "reelIn": {
               "main": {
@@ -982,7 +997,13 @@
         "useOverride": {
           "type": "boolean",
           "default": false,
-          "description": "Master switch — when off this resource follows the global dirk_lib theme."
+          "description": "Off means this script follows the global dirk_lib theme, so every dirk NUI matches. Turn it on only if you want fishing to look different from the rest.",
+          "x-goTo": {
+            "resource": "dirk_lib",
+            "group": "appearance",
+            "label": "Change the global theme",
+            "when": false
+          }
         },
         "primaryColor": {
           "x-control": "mantineColor",
@@ -1065,7 +1086,14 @@
             5,
             10
           ],
-          "description": "Number of the 25 dig tiles that contain a reward [min, max] — the rest are empty digs. Tiles are randomly placed each dig."
+          "description": "How many bait spots a dig grid holds, as a min and max. A number is rolled between the two.",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 25
+          }
         },
         "randomItemChance": {
           "type": "number",
@@ -1180,7 +1208,10 @@
               "chance": {
                 "type": "number"
               }
-            }
+            },
+            "required": [
+              "name"
+            ]
           }
         },
         "tools": {
@@ -1224,14 +1255,25 @@
                 "type": "number"
               },
               "useScenario": {
-                "type": "boolean"
+                "type": "boolean",
+                "title": "Dig Style",
+                "x-control": "boolChoice",
+                "x-boolLabels": {
+                  "true": "Trowel (kneel)",
+                  "false": "Spade (stand)"
+                },
+                "description": "Which animation this tool digs with. Trowel kneels and scoops; spade stands and digs with a shovel prop."
               },
               "lvlRequired": {
                 "type": "number",
                 "default": 0,
                 "minimum": 0
               }
-            }
+            },
+            "required": [
+              "label",
+              "name"
+            ]
           },
           "description": "Digging tools available to players",
           "default": [
@@ -1532,10 +1574,17 @@
                 "y": {
                   "type": "number"
                 }
-              }
+              },
+              "required": [
+                "x",
+                "y"
+              ]
             }
           }
-        }
+        },
+        "required": [
+          "id"
+        ]
       }
     },
     "equipment": {
@@ -1587,7 +1636,11 @@
               "lvlRequired": {
                 "type": "number"
               }
-            }
+            },
+            "required": [
+              "label",
+              "name"
+            ]
           },
           "default": [
             {
@@ -1782,7 +1835,11 @@
               "lvlRequired": {
                 "type": "number"
               }
-            }
+            },
+            "required": [
+              "label",
+              "name"
+            ]
           },
           "default": [
             {
@@ -1929,7 +1986,11 @@
               "lvlRequired": {
                 "type": "number"
               }
-            }
+            },
+            "required": [
+              "label",
+              "name"
+            ]
           },
           "default": [
             {
@@ -2060,7 +2121,11 @@
               "lvlRequired": {
                 "type": "number"
               }
-            }
+            },
+            "required": [
+              "label",
+              "name"
+            ]
           },
           "default": [
             {
@@ -2332,7 +2397,11 @@
                 "digQuantity",
                 "digMaterials"
               ]
-            }
+            },
+            "required": [
+              "label",
+              "name"
+            ]
           },
           "default": [
             {
@@ -2632,7 +2701,11 @@
               "lvlRequired": {
                 "type": "number"
               }
-            }
+            },
+            "required": [
+              "label",
+              "name"
+            ]
           },
           "default": [
             {
@@ -2761,7 +2834,11 @@
                 "default": 0.5,
                 "description": "Trap durability 0-1. Higher strength = lower chance of breaking when chanceOfBreak triggers."
               }
-            }
+            },
+            "required": [
+              "label",
+              "name"
+            ]
           },
           "default": [
             {
@@ -3119,10 +3196,17 @@
                   "minimum": 0,
                   "maximum": 1
                 }
-              }
+              },
+              "required": [
+                "name"
+              ]
             }
           }
-        }
+        },
+        "required": [
+          "label",
+          "name"
+        ]
       },
       "default": [
         {
@@ -5973,17 +6057,27 @@
           },
           "perFishModifiers": {
             "type": "object",
-            "description": "Per-species overrides for this zone, keyed by fish name.",
+            "description": "Override the zone-wide modifiers for particular species. Anything not listed uses the values on the Modifiers tab.",
             "additionalProperties": {
               "type": "object",
               "properties": {
                 "abundanceModifier": {
-                  "type": "number"
+                  "type": "number",
+                  "x-control": "multiplier",
+                  "minimum": 0,
+                  "maximum": 5
                 },
                 "weightModifier": {
-                  "type": "number"
+                  "type": "number",
+                  "x-control": "multiplier",
+                  "minimum": 0,
+                  "maximum": 5
                 }
               }
+            },
+            "x-optionsFrom": {
+              "path": "fish",
+              "key": "name"
             }
           },
           "permitRequired": {
@@ -6006,11 +6100,64 @@
                 "y": {
                   "type": "number"
                 }
-              }
+              },
+              "required": [
+                "x",
+                "y"
+              ]
             }
           }
+        },
+        "required": [
+          "label",
+          "name"
+        ]
+      },
+      "x-rowTabs": [
+        {
+          "id": "general",
+          "label": "General",
+          "icon": "info",
+          "keys": [
+            "name",
+            "label",
+            "lvlRequired",
+            "description",
+            "zone"
+          ]
+        },
+        {
+          "id": "modifiers",
+          "label": "Modifiers",
+          "icon": "sliders",
+          "keys": [
+            "densityModifier",
+            "abundanceModifier",
+            "weightModifier",
+            "biteChanceModifier",
+            "xpModifier",
+            "moneyModifier"
+          ]
+        },
+        {
+          "id": "perfish",
+          "label": "Per Fish",
+          "icon": "fish",
+          "keys": [
+            "perFishModifiers"
+          ]
+        },
+        {
+          "id": "permits",
+          "label": "Permits",
+          "icon": "ticket",
+          "keys": [
+            "permitRequired",
+            "permitPrice",
+            "permitInterval"
+          ]
         }
-      }
+      ]
     },
     "stores": {
       "x-rowOrder": [
@@ -7927,7 +8074,12 @@
                 "w": {
                   "type": "number"
                 }
-              }
+              },
+              "required": [
+                "x",
+                "y",
+                "z"
+              ]
             }
           },
           "blip": {
@@ -7976,7 +8128,10 @@
                 "icon": {
                   "type": "string"
                 }
-              }
+              },
+              "required": [
+                "name"
+              ]
             }
           },
           "stock": {
@@ -8002,13 +8157,21 @@
                     "type": "integer"
                   }
                 }
-              }
+              },
+              "required": [
+                "category"
+              ]
             }
           },
           "lvlRequired": {
             "type": "integer"
           }
-        }
+        },
+        "required": [
+          "id",
+          "name",
+          "type"
+        ]
       }
     },
     "seaBoundary": {
@@ -8309,7 +8472,11 @@
           "y": {
             "type": "number"
           }
-        }
+        },
+        "required": [
+          "x",
+          "y"
+        ]
       }
     },
     "tournaments": {
@@ -8824,7 +8991,10 @@
               "durationMinutes": {
                 "type": "number",
                 "minimum": 1,
-                "default": 60
+                "default": 60,
+                "title": "Duration",
+                "x-control": "duration",
+                "x-durationBase": "minutes"
               }
             }
           }
@@ -8849,13 +9019,17 @@
           "default": 0,
           "minimum": 0,
           "maximum": 23,
-          "description": "Server-local hour at which daily challenges reset (0 = midnight)."
+          "description": "Server-local hour at which daily challenges reset (0 = midnight).",
+          "title": "Reset At",
+          "x-control": "hourOfDay"
         },
         "rewardMultiplier": {
           "type": "number",
           "default": 1,
           "minimum": 0,
-          "description": "Global multiplier applied to all challenge rewards (xp and money)."
+          "description": "Global multiplier applied to all challenge rewards (xp and money).",
+          "x-control": "multiplier",
+          "maximum": 5
         },
         "templates": {
           "type": "array",
@@ -9082,7 +9256,8 @@
     }
   },
   "x-managedElsewhere": [
-    "basic.guideBookItem"
+    "access",
+    "basic.miscItems"
   ],
   "x-pages": [
     {

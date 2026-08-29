@@ -9,7 +9,8 @@ import { Eye, EyeOff, MapPin, Pencil, PenTool, Trash2, X } from 'lucide-react';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Polygon, useMap } from 'react-leaflet';
 import { PANE_HEIGHT, PANE_MIN_HEIGHT } from './Controls';
-import { FieldRow } from './FieldRow';
+import { FieldRow, isWideColumn } from './FieldRow';
+import { validateRow } from './rowValidation';
 import { Icon } from './Icon';
 import { PickerDrawer } from './PickerDrawer';
 import { fieldGatedOff, StudioButton } from './ui';
@@ -661,8 +662,54 @@ function ShapeModal({
   const [draft, setDraft] = useState<Row>(() => JSON.parse(JSON.stringify(row)));
   const [picker, setPicker] = useState<SettingColumn | null>(null);
 
-  const columns = (entry.columns ?? []).filter((c) => c.key !== polyKey);
+  const allColumns = (entry.columns ?? []).filter((c) => c.key !== polyKey);
   const points = Array.isArray(draft[polyKey]) ? (draft[polyKey] as Point[]).length : 0;
+
+  /**
+   * The same `x-rowTabs` the list row editor honours.
+   *
+   * A zone is edited HERE rather than in RowModal - it belongs to the map -
+   * so a schema declaring tabs had them silently ignored and every field came
+   * out in one long scroll. The boundary column is excluded because the map
+   * behind this modal IS that field.
+   */
+  const tabs = useMemo(() => {
+    const declared = entry.rowTabs ?? [];
+    const built = declared
+      .map((tab) => ({
+        ...tab,
+        columns: tab.keys
+          .map((key) => allColumns.find((c) => c.key === key))
+          .filter(Boolean) as SettingColumn[],
+      }))
+      .filter((tab) => tab.columns.length > 0);
+    if (!built.length) return [];
+
+    // Anything the schema forgot to list still has to be reachable, so it
+    // joins the first tab rather than vanishing.
+    const claimed = new Set(built.flatMap((tab) => tab.columns.map((c) => c.key)));
+    const orphans = allColumns.filter((c) => !claimed.has(c.key));
+    if (orphans.length) built[0].columns = [...built[0].columns, ...orphans];
+    return built;
+  }, [entry.rowTabs, allColumns]);
+
+  const [activeTab, setActiveTab] = useState(() => tabs[0]?.id ?? '');
+
+  // Same rules the list row editor enforces - a zone is a row like any other,
+  // it just happens to be edited on a map.
+  const problems = useMemo(() => validateRow(allColumns, draft, t), [allColumns, draft]);
+  const problemFor = (key: string) => problems.find((p) => p.key === key)?.message;
+  const tabOf = (key: string) => tabs.find((tab) => tab.columns.some((c) => c.key === key));
+
+  const dirty = useMemo(() => JSON.stringify(draft) !== JSON.stringify(row), [draft, row]);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const askClose = () => {
+    if (dirty) { setConfirmDiscard(true); return; }
+    onClose();
+  };
+  const columns = tabs.length
+    ? (tabs.find((tab) => tab.id === activeTab) ?? tabs[0]).columns
+    : allColumns;
 
   return (
     <>
@@ -672,20 +719,51 @@ function ShapeModal({
         iconColor={color}
         description={entry.label}
         badge={{ label: `${points} BOUNDARY POINTS`, color }}
-        onClose={onClose}
+        onClose={askClose}
         width="70vh"
         height="66vh"
         zIndex={10100}
       >
         <Flex direction="column" flex={1} style={{ minHeight: 0 }}>
+          {tabs.length > 1 && (
+            <Flex gap="xs" px="sm" pt="xs" style={{ flexShrink: 0 }}>
+              {tabs.map((tab) => (
+                <motion.button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  whileTap={{ scale: 0.99 }}
+                  style={{
+                    padding: '0.5vh 1vh',
+                    background: tab.id === activeTab ? alpha(color, 0.12) : 'transparent',
+                    border: `0.1vh solid ${tab.id === activeTab ? alpha(color, 0.4) : 'transparent'}`,
+                    borderRadius: theme.radius.xs,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <Text
+                    ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.05em"
+                    c={tab.id === activeTab ? color : 'rgba(255,255,255,0.5)'}
+                  >
+                    {tab.label}
+                  </Text>
+                </motion.button>
+              ))}
+            </Flex>
+          )}
+
           <Flex direction="column" gap="xs" p="sm" style={{ overflowY: 'auto', flex: 1, minHeight: 0 }}>
             {columns.map((column) => (
               <FieldRow
                 key={column.key}
+                // A tab that holds exactly one wide control does not need a
+                // titled box inside a titled tab saying the same thing twice.
+                bare={columns.length === 1 && isWideColumn(column.type)}
                 column={column}
                 resource={resource}
                 row={draft}
                 value={draft[column.key]}
+                error={problemFor(column.key)}
                 disabled={disabled || fieldGatedOff(column, draft)}
                 dimmed={fieldGatedOff(column, draft)}
                 onChange={(v) => setDraft((prev) => ({ ...prev, [column.key]: v }))}
@@ -700,8 +778,34 @@ function ShapeModal({
           >
             <StudioButton label={t('zoneMap.delete', 'Delete')} danger icon={Trash2} onClick={onDelete} disabled={disabled} />
             <Flex gap="xs">
-              <StudioButton label={t('zoneMap.cancel', 'Cancel')} onClick={onClose} />
-              <StudioButton label={t('zoneMap.save_area', 'Save area')} primary onClick={() => onSave(draft)} disabled={disabled} />
+              {problems.length > 0 && (
+                <motion.button
+                  type="button"
+                  onClick={() => {
+                    const tab = tabOf(problems[0].key);
+                    if (tab) setActiveTab(tab.id);
+                  }}
+                  whileTap={{ scale: 0.99 }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.5vh',
+                    background: 'transparent', border: 'none',
+                    cursor: 'pointer', padding: 0, maxWidth: '30vh',
+                  }}
+                >
+                  <Text ff="Akrobat SemiBold" size="xxs" c="#E0B15F" truncate>
+                    {problems.length === 1
+                      ? problems[0].message
+                      : t('zoneMap.n_problems', '{} things need fixing').replace('{}', String(problems.length))}
+                  </Text>
+                </motion.button>
+              )}
+              <StudioButton label={t('zoneMap.cancel', 'Cancel')} onClick={askClose} />
+              <StudioButton
+                label={t('zoneMap.save_area', 'Save area')}
+                primary
+                onClick={() => onSave(draft)}
+                disabled={disabled || problems.length > 0}
+              />
             </Flex>
           </Flex>
         </Flex>
@@ -717,6 +821,17 @@ function ShapeModal({
             disabled={disabled}
             onApply={(v) => setDraft((prev) => ({ ...prev, [picker.key]: v }))}
             onClose={() => setPicker(null)}
+          />
+        )}
+
+        {confirmDiscard && (
+          <ConfirmModal
+            title={t('zoneMap.discard_changes', 'Discard changes?')}
+            description={t('zoneMap.discard_body', 'You have unsaved changes to this area. Closing now throws them away.')}
+            confirmLabel={t('zoneMap.discard', 'Discard')}
+            onConfirm={() => { setConfirmDiscard(false); onClose(); }}
+            onClose={() => setConfirmDiscard(false)}
+            zIndex={10300}
           />
         )}
       </AnimatePresence>

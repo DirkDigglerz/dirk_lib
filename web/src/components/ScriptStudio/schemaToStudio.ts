@@ -114,7 +114,7 @@ const CONTROL_TYPES = new Set<string>([
   'icon',
   'custom',
   'keybindMap', 'groupGrades', 'weightMap',
-  'discordChannel', 'redirectKind',
+  'discordChannel', 'redirectKind', 'duration', 'hourOfDay', 'boolChoice', 'objectMap',
 ]);
 
 /**
@@ -549,7 +549,8 @@ function buildColumnInner(
   // in one fishing zone, or anywhere. x-optionsFrom was only honoured on
   // arrays, so the scalar case had nowhere to go and fell through to free
   // text, where a typo silently means "nowhere".
-  if (child.type !== 'array') {
+  const mapsObjects = (child.additionalProperties as JsonSchema | undefined)?.type === 'object';
+  if (child.type !== 'array' && !mapsObjects) {
     const one = child['x-optionsFrom'] as
       { path?: string; key?: string; labelKey?: string } | string | undefined;
     if (one) {
@@ -609,6 +610,14 @@ function buildColumnInner(
             && (r as Record<string, unknown>)[nestedKey] !== undefined) as
               Record<string, unknown> | undefined)?.[nestedKey];
         const built = buildColumn(nestedKey, nestedChild, nestedValue, /name$|^item$/.test(nestedKey));
+        // A nested table declares what it requires the same way a top-level
+        // one does. Without this a store's stock rows could be saved blank -
+        // the outer row validated, the table inside it was merely non-empty,
+        // and nothing looked at the rows themselves.
+        if (Array.isArray(child.items?.required)
+          && (child.items.required as string[]).includes(nestedKey)) {
+          built.required = true;
+        }
         nested.push(built);
         nestedTemplate[nestedKey] = nestedChild.default ?? defaultForControl(built.type);
       }
@@ -680,7 +689,10 @@ function buildColumnInner(
     const pairMin = min ?? child.items?.minimum;
     const pairMax = max ?? child.items?.maximum;
     if (child.minItems === 2 && child.maxItems === 2 && numericItems) {
-      return { key, label, type: 'range', min: pairMin, max: pairMax };
+      return {
+        key, label, type: 'range', min: pairMin, max: pairMax,
+        step: child.items?.multipleOf ?? (child.items?.type === 'integer' ? 1 : undefined),
+      };
     }
 
     const allNumbers = rows.length > 0 && rows.every((r) => typeof r === 'number');
@@ -707,6 +719,29 @@ function buildColumnInner(
       min: openValues.minimum ?? 0,
       max: openValues.maximum ?? 1,
       optionsFrom: weightMapSource(key),
+    };
+  }
+
+  // An OPEN map whose values are OBJECTS - `{ [anything]: { a, b } }`.
+  //
+  // The numeric case above is rescued; this one was not, so it fell into the
+  // plain-object branch and froze the keys to whichever entries the shipped
+  // default happened to carry. zones[].perFishModifiers came out as three
+  // fixed species, each a nested box, with no way to add a fourth.
+  //
+  // Where the keys come from is DECLARED (`x-optionsFrom`), never guessed from
+  // the field name - the panel has no business knowing what a fish is.
+  const openObjects = child.additionalProperties as JsonSchema | undefined;
+  if (openObjects?.type === 'object' && openObjects.properties
+    && Object.keys(openObjects.properties).length > 0) {
+    const shape = openObjects.properties as JsonSchema;
+    return {
+      key,
+      label,
+      type: 'objectMap',
+      columns: Object.keys(shape).map((childKey) =>
+        buildColumn(childKey, shape[childKey] as JsonSchema, undefined, false)),
+      optionsFrom: child['x-optionsFrom'] as { path: string; key: string } | undefined,
     };
   }
 
@@ -1236,7 +1271,7 @@ function walkObject(
       && !looksLikeCoords(fallback, child)) {
       walkObject(child, childPath, group, childServerOnly, out, overrides, mapPaths, {
         id: childPath,
-        label: labelFor(key, node),
+        label: labelFor(key, child),
       }, rowTabs);
       continue;
     }
@@ -1246,16 +1281,30 @@ function walkObject(
 
     out.push({
       path: childPath,
-      label: labelFor(key, node),
+      label: labelFor(key, child),
       help: child?.description,
       type: control,
       group,
       subgroup,
       default: fallback,
       value,
-      min: child?.minimum,
-      max: child?.maximum,
+      // Bounds on a PAIR live on the items, not on the array - `minimum`
+      // beside `type: array` means "at least this many entries", not "no
+      // lower than this". Without the fallback a two-point slider came
+      // through with nothing to slide between.
+      min: child?.minimum ?? child?.items?.minimum,
+      max: child?.maximum ?? child?.items?.maximum,
       options: enumOptions(child),
+      // What unit a `duration` value is stored in. Declared, because the
+      // control has to convert from it and guessing from the field name is
+      // how "86400 seconds" became a thing you had to work out.
+      durationBase: child?.['x-durationBase'],
+      // What the two sides of a `boolChoice` are called. The panel cannot
+      // know that `useScenario: false` means a shovel.
+      boolLabels: child?.['x-boolLabels'],
+      // "That is set over there." A setting can point at another script's
+      // setting rather than describing where to find it in prose.
+      goTo: child?.['x-goTo'],
       serverOnly: childServerOnly || undefined,
       // Declared, not inferred - the missing-items audit reads this.
       installItem: child?.['x-installItem'] ? true : undefined,
@@ -1369,6 +1418,15 @@ function buildListEntry(
       subgroup,
       default: fallback,
       value,
+      // Bounds live on the ITEMS - `minimum` beside `type: array` means "at
+      // least this many entries", not "no lower than this". Without this the
+      // slider had nothing to slide between and came out unusable.
+      min: node?.minimum ?? node?.items?.minimum,
+      max: node?.maximum ?? node?.items?.maximum,
+      // Whole numbers when the schema says so - `multipleOf`, or an integer
+      // item type, which means the same thing and is the commoner spelling.
+      step: node?.items?.multipleOf ?? node?.multipleOf
+        ?? (node?.items?.type === 'integer' ? 1 : undefined),
       serverOnly: serverOnly || undefined,
     };
   }

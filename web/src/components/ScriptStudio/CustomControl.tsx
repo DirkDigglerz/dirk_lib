@@ -8,7 +8,7 @@ import { useStudio } from './store';
 import { notify } from './Toasts';
 import type { SettingEntry } from './types';
 import { translate, useActiveLanguage, useBundles } from './studioLocale';
-import { fetchNui, copyToClipboard } from 'dirk-cfx-react';
+import { copyToClipboard, fetchNui, isEnvBrowser } from 'dirk-cfx-react';
 import * as motion from 'framer-motion';
 import { motion as m } from 'framer-motion';
 import * as leaflet from 'leaflet';
@@ -176,7 +176,13 @@ export function load(resource: string, path: string): Promise<React.ComponentTyp
     // assets out of other resources this way (item images come from
     // nui://ox_inventory/web/images/), and a probe component served from
     // dirk_fishing loads through exactly this path.
-    const url = `nui://${resource}/${path}`;
+    // In game this is a real nui:// fetch out of the owning resource. A
+    // browser has no such scheme, so dev serves the same file from the
+    // resource folder next door (see the middleware in vite.config.ts) -
+    // otherwise a script's own pages cannot be opened in dev at all.
+    const url = isEnvBrowser()
+      ? `/__nui/${resource}/${path}`
+      : `nui://${resource}/${path}`;
 
     let module_: { default?: React.ComponentType<CustomProps> };
     try {

@@ -215,13 +215,41 @@ export async function fetchLogFacets(since: number | null): Promise<{ resources:
   return { resources: sort(resources), events: sort(events), total };
 }
 
-/** Where log lines are currently going. Mirrors dirk_lib's `logger` config. */
+/**
+ * Delivery health, as the server reports it. Mirrors `LogHealth` in
+ * `logsData.ts` - `routes` is positional, matched back to the redirect rows
+ * in the config by index, so entry 0 here describes redirect row 0.
+ */
 export const MOCK_DELIVERY = {
-  service: { name: 'fivemanage', ok: true, note: 'Batched every 500ms', lastAt: MOCK_NOW - 60 },
-  local: { enabled: true, retentionDays: 7, rows: TABLE.length, approxSize: '3.1 MB', lastPruneAt: MOCK_NOW - 38400 },
-  webhooks: [
-    { scope: 'dirk_fishing', channel: '#fishing-logs', username: 'Dirk Fishing', ok: true, lastAt: MOCK_NOW - 120, sent24h: 1284 },
-    { scope: 'dirk_fishing · suspiciousSale', channel: '#anticheat', username: 'Dirk Alerts', ok: true, lastAt: MOCK_NOW - 15780, sent24h: 3 },
-    { scope: 'default', channel: '#server-logs', username: 'Dirk', ok: false, lastAt: MOCK_NOW - 87300, sent24h: 0, error: 'HTTP 401 - webhook deleted or revoked' },
+  local: { enabled: true, retentionDays: 14, rows: TABLE.length, bytes: 3_250_000 },
+  routes: [
+    {
+      id: 'r1',
+      label: 'Fishing to #fishing-logs',
+      enabled: true,
+      resources: ['dirk_fishing'],
+      sent: 1284,
+      dropped: 0,
+      queued: 0,
+      lastAt: MOCK_NOW - 120,
+    },
+    {
+      id: 'r2',
+      label: 'Warnings to #anticheat',
+      enabled: true,
+      levels: ['warn', 'error'],
+      sent: 3,
+      dropped: 0,
+      queued: 0,
+      lastAt: MOCK_NOW - 15780,
+    },
+    {
+      id: 'r3',
+      label: 'Everything to #server-logs',
+      enabled: false,
+      sent: 0,
+      dropped: 41,
+      queued: 0,
+    },
   ],
 };

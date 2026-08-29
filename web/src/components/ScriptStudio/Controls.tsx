@@ -18,6 +18,8 @@ import { ModelControl } from './ModelControl';
 import { PedsField } from './PedControl';
 import type { ControlType, SettingColumn, SettingEntry } from './types';
 import { DiscordChannelControl } from './DiscordChannelControl';
+import { DurationControl } from './DurationControl';
+import { BoolChoiceControl } from './BoolChoiceControl';
 import { useChrome } from './studioLocale';
 
 // One dispatch, keyed by the schema's control type. Adding a control here is
@@ -212,6 +214,19 @@ function textareaInput(input: Record<string, unknown>) {
   const { height: _h, minHeight: _mh, maxHeight: _xh, ...rest } = input;
   return { ...rest, paddingBlock: '0.6vh' };
 }
+
+/**
+ * The 24 hours, named rather than numbered.
+ *
+ * Midnight and midday are called out because "0" and "12" are the two people
+ * second-guess.
+ */
+const HOURS = Array.from({ length: 24 }, (_, h) => ({
+  value: String(h),
+  label: h === 0 ? '00:00 — midnight'
+    : h === 12 ? '12:00 — midday'
+      : `${String(h).padStart(2, '0')}:00`,
+}));
 
 export function SettingControl({ type, value, onChange, entry, column, disabled, onDrill, compact, resource }: ControlProps) {
   const t = useChrome();
@@ -479,6 +494,53 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
     // One framework job or gang, declared with `x-groupPicker`. A plain text
     // box here is a silent failure waiting to happen: a typo makes, say, a
     // business nobody can ever staff, and nothing ever says so.
+    // A length of time, read in whatever unit divides cleanly. 86400 in a
+    // number box says nothing; "1 day" says everything.
+    case 'boolChoice':
+      return (
+        <ControlShell width="26vh">
+          <BoolChoiceControl
+            value={value}
+            labels={entry?.boolLabels ?? column?.boolLabels}
+            disabled={disabled}
+            onChange={onChange}
+          />
+        </ControlShell>
+      );
+
+    case 'duration':
+      return (
+        <ControlShell width="21vh">
+          <DurationControl
+            value={value}
+            base={entry?.durationBase ?? column?.durationBase ?? 'seconds'}
+            min={min}
+            max={max}
+            disabled={disabled}
+            compact={compact}
+            onChange={onChange}
+          />
+        </ControlShell>
+      );
+
+    // An hour of the day. A 0-23 number box asks you to think in 24-hour time
+    // AND remember that 0 is midnight; this just lists the hours.
+    case 'hourOfDay':
+      return (
+        <ControlShell width="20vh">
+          <Select
+            value={typeof value === 'number' ? String(value) : null}
+            onChange={(next) => onChange(next === null ? 0 : Number(next))}
+            disabled={disabled}
+            data={HOURS}
+            allowDeselect={false}
+            comboboxProps={{ withinPortal: true, zIndex: 10400 }}
+            styles={styles}
+            style={{ flex: 1 }}
+          />
+        </ControlShell>
+      );
+
     case 'discordChannel':
       return (
         <ControlShell width="30vh" className="studio-native">
@@ -834,6 +896,7 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
             value={value}
             min={entry?.min ?? column?.min}
             max={entry?.max ?? column?.max}
+            step={entry?.step ?? column?.step}
             suffix={suffix}
             disabled={disabled}
             onChange={onChange}

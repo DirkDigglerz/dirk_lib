@@ -1670,6 +1670,18 @@ lib.callback.register(('%s:giveScriptConfigItem'):format(scriptName), function(s
     return false, 'AddItemFailed'
   end
 
+  -- An admin handing themselves items is exactly the sort of thing the logs
+  -- exist for. `warn`, not `info`: it is not wrong, but it is worth seeing
+  -- in a channel rather than only on request.
+  pcall(function()
+    -- lib.logger is a CALLABLE - (source, event, message, ...tags) - and the
+    -- level rides the varargs as a `level:` tag rather than an options table.
+    -- The resource is filled in from the calling VM, so it is not passed.
+    lib.logger(src, 'admin:giveItem',
+      ('%s gave themselves %dx %s'):format(GetPlayerName(src) or '?', itemAmount, itemName),
+      'level:warn', ('item:%s'):format(itemName), ('amount:%d'):format(itemAmount))
+  end)
+
   return true
 end)
 

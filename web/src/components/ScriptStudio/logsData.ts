@@ -131,9 +131,9 @@ export function useLogHealth() {
         return {
           enabled: MOCK_DELIVERY.local.enabled,
           rows: MOCK_DELIVERY.local.rows,
-          bytes: 0,
+          bytes: MOCK_DELIVERY.local.bytes,
           retentionDays: MOCK_DELIVERY.local.retentionDays,
-          routes: [],
+          routes: MOCK_DELIVERY.routes,
         } as LogHealth;
       }
       return ask<LogHealth>('GET_LOG_HEALTH');

@@ -2,6 +2,7 @@ import { alpha, Flex, Text, Tooltip, useMantineTheme } from '@mantine/core';
 import { resolveItemDescription, resolveItemLabel, useItems } from 'dirk-cfx-react';
 import { Info } from 'lucide-react';
 import { RedirectKindControl } from './RedirectKindControl';
+import { ObjectMapControl } from './ObjectMapControl';
 import { SettingControl } from './Controls';
 import { opensPicker } from './PickerDrawer';
 import { RangeControl, SliderControl, TagsControl } from './RichControls';
@@ -35,7 +36,7 @@ export function isWideColumn(type: SettingColumn['type']): boolean {
     || type === 'keybindMap' || type === 'mantineColor' || type === 'shade'
     || type === 'groupGrades' || type === 'weekdays' || type === 'positions'
     || type === 'pickList' || type === 'weightMap'
-    || type === 'redirectKind';
+    || type === 'redirectKind' || type === 'objectMap';
 }
 
 /**
@@ -51,9 +52,25 @@ export function isWideColumn(type: SettingColumn['type']): boolean {
  * nobody sees.
  */
 export function FieldRow({
-  column, value, onChange, onPick, disabled, itemName, resource, path, dimmed, row, parentRow,
+  column, value, onChange, onPick, disabled, itemName, resource, path, dimmed, row, parentRow, bare, error,
 }: {
   column: SettingColumn;
+  /**
+   * Draw the control alone - no label, no container.
+   *
+   * For when the surrounding chrome already says what this is: a tab holding
+   * one wide control was a titled box inside a titled tab, which reads as two
+   * things when there is only one.
+   */
+  bare?: boolean;
+  /**
+   * What is wrong with this field.
+   *
+   * On the field rather than only in a summary: being told "2 things need
+   * fixing" and having to hunt for them is worse than the field saying so
+   * where you are already looking.
+   */
+  error?: string;
   /**
    * Path of the setting this row belongs to, so the field's label and help can
    * be looked up in the owning script's locale files - `settings.<path>.<key>`.
@@ -143,10 +160,12 @@ export function FieldRow({
       align={wide ? 'stretch' : 'center'}
       justify="space-between"
       gap={wide ? 'xs' : 'sm'}
-      px="sm" py="xs"
+      px={bare ? 0 : 'sm'} py={bare ? 0 : 'xs'}
       style={{
-        background: alpha(theme.colors.dark[8], 0.5),
-        border: `0.1vh solid ${alpha(theme.colors.dark[5], 0.35)}`,
+        background: bare ? 'transparent' : alpha(theme.colors.dark[8], 0.5),
+        border: bare
+          ? 'none'
+          : `0.1vh solid ${error ? alpha('#E0776B', 0.6) : alpha(theme.colors.dark[5], 0.35)}`,
         borderRadius: theme.radius.xs,
         // Dimmed rather than hidden: knowing the field exists, and that
         // something else is switching it off, beats it vanishing.
@@ -154,6 +173,7 @@ export function FieldRow({
         transition: 'opacity 0.15s',
       }}
     >
+      {!bare && (
       <Flex direction="column" style={{ minWidth: 0, lineHeight: 1.2 }}>
         <Flex align="center" gap="0.5vh">
           <Text ff="Akrobat Bold" size="xs" c="rgba(255,255,255,0.85)">{fieldLabel}</Text>
@@ -214,7 +234,13 @@ export function FieldRow({
         <Text ff="monospace" size="xxs" c="rgba(255,255,255,0.28)">
           {mirrors ? 'from inventory' : column.key}
         </Text>
+        {error && (
+          <Text ff="Akrobat SemiBold" size="xxs" c="#E0776B" pt="0.2vh">
+            {error}
+          </Text>
+        )}
       </Flex>
+      )}
 
       {column.type === 'slider' && (
         <SliderControl value={value} min={column.min} max={column.max ?? 1}
@@ -226,6 +252,7 @@ export function FieldRow({
           value={value}
           min={bounds?.[0] ?? column.min}
           max={bounds?.[1] ?? column.max}
+          step={column.step}
           disabled={disabled}
           suffix={column.suffix}
           onChange={onChange}
@@ -251,6 +278,17 @@ export function FieldRow({
           value={value}
           disabled={disabled}
           label={column.label}
+          onChange={onChange}
+        />
+      )}
+
+      {column.type === 'objectMap' && (
+        <ObjectMapControl
+          value={value}
+          columns={column.columns ?? []}
+          optionsFrom={column.optionsFrom}
+          resource={resource}
+          disabled={disabled}
           onChange={onChange}
         />
       )}

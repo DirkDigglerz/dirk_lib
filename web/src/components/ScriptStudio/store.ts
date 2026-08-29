@@ -73,6 +73,15 @@ type StudioState = {
    */
   openRowRequest: { path: string; index: number } | null;
   /**
+   * "Take me to that setting, in that script."
+   *
+   * Raised from anywhere - a field that points at another script's setting -
+   * and performed by the shell, which is the only thing that knows how to
+   * change script, close a page and scroll a group into view. Search already
+   * did exactly this; it just had the jump wired straight to it as a prop.
+   */
+  goToRequest: { resource: string; group: string } | null;
+  /**
    * Announcements for the Overview page.
    *
    * Empty until dirk_lib fetches them, and the page falls back to its mock
@@ -123,6 +132,7 @@ export const useStudio = create<StudioState>(() => ({
   activeList: null,
   shownList: null,
   openRowRequest: null,
+  goToRequest: null,
   dispatch: [],
   changelogs: [],
   tests: [],

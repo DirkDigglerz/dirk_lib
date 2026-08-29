@@ -61,6 +61,14 @@ export type ControlType =
   | 'discordChannel'
   /** webhook URL or Discord bot - which way a redirect reaches Discord */
   | 'redirectKind'
+  /** a length of time, read in whatever unit divides cleanly */
+  | 'duration'
+  /** an hour of the day, 0-23, picked by name rather than typed */
+  | 'hourOfDay'
+  /** a boolean shown as the two things it picks between */
+  | 'boolChoice'
+  /** an open map whose values are objects - rows of key + its fields */
+  | 'objectMap'
   | 'keybindMap'
   | 'groupGrades'
   | 'refs'
@@ -106,6 +114,18 @@ export type SettingColumn = {
   label: string;
   type: ControlType;
   suffix?: string;
+  /** the smallest change allowed - 1 for whole numbers. From `multipleOf`. */
+  step?: number;
+  /**
+   * What unit a `duration` value is STORED in - declared, never guessed.
+   *
+   * The control shows whichever unit reads best, but it has to know what the
+   * number already means to convert it. Inferring that from a field name
+   * would put the whole thing back to guessing.
+   */
+  durationBase?: 'seconds' | 'minutes' | 'hours' | 'days';
+  /** boolChoice: what the two sides are called */
+  boolLabels?: { true?: string; false?: string };
   options?: SettingOption[];
   /** pickList: the setting whose rows supply the options, e.g. 'fish' */
   /** the schema's description, shown on hover inside a row editor */
@@ -214,6 +234,17 @@ export type SettingEntry = {
   max?: number;
   step?: number;
   suffix?: string;
+  /** what unit a `duration` value is stored in - declared, never guessed */
+  durationBase?: 'seconds' | 'minutes' | 'hours' | 'days';
+  /** boolChoice: what the two sides are called */
+  boolLabels?: { true?: string; false?: string };
+  /**
+   * A link to the setting that governs this one when it is switched off.
+   *
+   * `when` names the value it applies to, so "the global theme is over here"
+   * only appears while this resource is actually following the global theme.
+   */
+  goTo?: { resource: string; group: string; label?: string; when?: unknown };
   options?: SettingOption[];
   /** pickList: the setting whose rows supply the options, e.g. 'fish' */
   optionsFrom?: { path: string; key: string };

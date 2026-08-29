@@ -9,23 +9,60 @@ import type { SettingColumn } from './types';
  * column, and `x-validate` / `x-validateRows` rules in the same grammar
  * `x-enabledWhen` uses. Nothing read any of it at save time, so a row could be
  * saved blank and the failure turned up later, somewhere else, as a redirect
- * that never fired or a store with no name.
+ * that never fired or a store selling an item with no name.
  *
- * A field switched OFF by another field is never checked. A webhook URL is
- * required for a webhook redirect and meaningless for a bot one, and demanding
- * it in both is how a form becomes impossible to satisfy.
+ * RECURSIVE, because a row is not flat. A store holds categories and stock; a
+ * fish holds reward items. Checking only the top level meant a store with six
+ * nameless stock rows was "valid" - the nested table was non-empty, so nothing
+ * looked inside it.
  */
 
-export type RowProblem = { key: string; label: string; message: string };
+export type RowProblem = {
+  /** the TOP-LEVEL column, so the editor can jump to the right tab */
+  key: string;
+  label: string;
+  message: string;
+};
+
+type Translate = (key: string, fallback: string) => string;
 
 export function validateRow(
   columns: SettingColumn[],
   row: Record<string, unknown>,
+  /**
+   * The panel's translator.
+   *
+   * Only the generated messages are built here - "X is needed", and the
+   * "Stock #2" prefix on a nested one. Everything else is a sentence the
+   * schema wrote, and translating those belongs to the script that owns them.
+   */
+  t?: Translate,
+): RowProblem[] {
+  return walk(columns, row, t, null);
+}
+
+function walk(
+  columns: SettingColumn[],
+  row: Record<string, unknown>,
+  t: Translate | undefined,
+  /** the top-level column these problems belong to, when nested */
+  owner: { key: string; label: string } | null,
+  /** how to say where a nested problem is, e.g. "Stock #2" */
+  where = '',
 ): RowProblem[] {
   const problems: RowProblem[] = [];
+  const say = (key: string, fallback: string) => (t ? t(key, fallback) : fallback);
 
-  // `self` for the field being tested, any other key for a sibling in the same
-  // row - the same lookup shape the settings list uses, so a rule reads the
+  const report = (column: SettingColumn, message: string) => {
+    problems.push({
+      key: owner?.key ?? column.key,
+      label: owner?.label ?? column.label,
+      message: where ? `${where}: ${message}` : message,
+    });
+  };
+
+  // `self` for the field being tested, any other key for a sibling in the
+  // same row - the same lookup the settings list uses, so a rule reads the
   // same wherever it is written.
   const lookupFor = (value: unknown) => (path: string) =>
     (path === 'self' ? value : row[path]);
@@ -34,36 +71,67 @@ export function validateRow(
     if (fieldGatedOff(column, row)) continue;
 
     const value = row[column.key];
+    const empty = isEmpty(value);
 
-    if (column.required && isEmpty(value)) {
-      problems.push({
-        key: column.key,
-        label: column.label,
-        message: `${column.label} is needed`,
-      });
+    if (column.required && empty) {
+      report(column, say('validation.required', '{} is needed').replace('{}', column.label));
       continue;
     }
-
-    const empty = isEmpty(value);
 
     for (const rule of (column.validate ?? []) as ValidationRule[]) {
       if (rule.when && !test(rule.when, value, lookupFor(value))) continue;
 
-      // An empty optional field only answers to rules ABOUT emptiness.
-      //
-      // A rule saying "this must be set" is exactly the case that has to run
-      // on a blank - that is what makes a field required. A rule saying "at
-      // least 1" must not, or every optional number a schema constrains
-      // reports a problem on a field nobody filled in.
+      // An empty optional field only answers rules ABOUT emptiness. A rule
+      // saying "this must be set" is what makes a field required and has to
+      // run on a blank; a rule saying "at least 1" must not, or every
+      // optional number a schema constrains complains about a field nobody
+      // filled in.
       if (empty && !isPresenceRule(rule)) continue;
 
-      if (!test(rule.must, value, lookupFor(value))) {
-        problems.push({ key: column.key, label: column.label, message: rule.message });
+      if (!test(rule.must, value, lookupFor(value))) report(column, rule.message);
+    }
+
+    if (empty) continue;
+
+    // ── into the nested shapes ──────────────────────────────────────────
+    const mine = owner ?? { key: column.key, label: column.label };
+    const child = column.columns ?? [];
+    if (!child.length) continue;
+
+    // A table inside a row:every row checked, numbered so the message says which.
+    if (column.type === 'rows' && Array.isArray(value)) {
+      value.forEach((entry, index) => {
+        if (!entry || typeof entry !== 'object') return;
+        const name = String((entry as Record<string, unknown>)[column.rowLabelKey ?? 'name'] ?? '');
+        const at = name || `#${index + 1}`;
+        problems.push(...walk(child, entry as Record<string, unknown>, t, mine,
+          join(where, `${column.label} ${at}`)));
+      });
+      continue;
+    }
+
+    // An open map of objects: keyed by name rather than numbered.
+    if (column.type === 'objectMap' && value && typeof value === 'object') {
+      for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+        if (!entry || typeof entry !== 'object') continue;
+        problems.push(...walk(child, entry as Record<string, unknown>, t, mine,
+          join(where, `${column.label} ${key}`)));
       }
+      continue;
+    }
+
+    // A plain nested object is just more fields.
+    if (column.type === 'object' && value && typeof value === 'object') {
+      problems.push(...walk(child, value as Record<string, unknown>, t, mine,
+        join(where, column.label)));
     }
   }
 
   return problems;
+}
+
+function join(a: string, b: string) {
+  return a ? `${a} › ${b}` : b;
 }
 
 /**

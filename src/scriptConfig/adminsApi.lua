@@ -104,10 +104,14 @@ lib.callback.register('dirk_lib:putAdmin', function(source, payload)
   })
   if not ok then return false, err end
 
-  lib.logger.log('dirk_lib', 'admin:granted',
-    ('%s granted %s access to %s'):format(
-      GetPlayerName(source), payload.level or '?', payload.subject or '?'),
-    { level = 'warn' })
+  -- Straight at the export: this runs in dirk_lib's own VM, where the
+  -- consumer-facing `lib.logger` proxy is not loaded.
+  pcall(function()
+    exports.dirk_lib:logger_emit(source, 'admin:granted',
+      ('%s granted %s access to %s'):format(
+        GetPlayerName(source), payload.level or '?', payload.subject or '?'),
+      'level:warn')
+  end)
   return true
 end)
 
@@ -117,7 +121,9 @@ lib.callback.register('dirk_lib:removeAdmin', function(source, payload)
   local ok, err = admins.remove(id)
   if not ok then return false, err end
 
-  lib.logger.log('dirk_lib', 'admin:revoked',
-    ('%s removed an access entry'):format(GetPlayerName(source)), { level = 'warn' })
+  pcall(function()
+    exports.dirk_lib:logger_emit(source, 'admin:revoked',
+      ('%s removed an access entry'):format(GetPlayerName(source)), 'level:warn')
+  end)
   return true
 end)
