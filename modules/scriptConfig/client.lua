@@ -213,13 +213,14 @@ local sendSettingsToNui = function()
   }))
 end
 
--- How the config fetch behaves when the server does not answer.
+-- What happens when the server has no config to give yet.
 --
--- The server legitimately replies nil while it is still building the config on
--- a cold boot ('NotReady'), and a callback can time out under load. Both are
--- transient, and both used to be permanent: the fetch result was ignored and
--- `settingsLoaded` was set regardless, so that client served DEFAULTS for the
--- rest of its session and never asked again.
+-- On a cold boot the server answers 'NotReady' until it has finished merging
+-- the stored config over the schema. That is transient - but it used to be
+-- permanent, because the fetch result was ignored and `settingsLoaded` was set
+-- regardless. The guard at the top of ensureSettingsLoaded then answered every
+-- later call from cache, so that client served DEFAULTS for the rest of its
+-- session and never asked again.
 --
 -- That is the whole bug behind "my shop times are wrong", "the zone I drew is
 -- invisible to players" and "players see English while I see Lithuanian" - the
@@ -230,18 +231,37 @@ local retrying = false
 local lastAttemptAt, attempts = 0, 0
 local reportedFailure = false
 
---- One attempt. True when the server actually answered with a config.
+--- One attempt.
+---
+--- Three answers, and only one of them is a failure - which is the trap the
+--- first version of this fix fell into:
+---
+---   table         a fresh config
+---   nil, nil      "you are already up to date" - the NORMAL answer for any
+---                 client whose KVP cache matches the server's hash
+---   nil, reason   the server has no config yet ('NotReady'), still booting
+---
+--- Treating a bare nil as a failure would put every healthy cached client into
+--- a permanent retry loop and warn about a server that is working fine.
 local function fetchFromServer()
   attempts += 1
   lastAttemptAt = GetGameTimer()
-  local reply = lib.callback.await(('%s:getScriptConfig'):format(scriptName), clientVersion or -1)
-  debugLog(('fetchFromServer returned (type=%s, attempt=%d)'):format(type(reply), attempts))
-  if type(reply) ~= 'table' then return false end
+  local reply, reason = lib.callback.await(('%s:getScriptConfig'):format(scriptName), clientVersion or -1)
+  debugLog(('fetchFromServer returned (type=%s, reason=%s, attempt=%d)')
+    :format(type(reply), tostring(reason), attempts))
 
-  scriptConfig = reply.data or scriptConfig
-  clientVersion = reply.client_version or clientVersion
-  updateKVP(clientVersion, scriptConfig)
-  return true
+  if type(reply) == 'table' then
+    scriptConfig = reply.data or scriptConfig
+    clientVersion = reply.client_version or clientVersion
+    updateKVP(clientVersion, scriptConfig)
+    return true
+  end
+
+  -- Up to date. Whatever KVP hydrated is current by definition - the server
+  -- only says this when its hash matches the one we sent.
+  if reason == nil then return true end
+
+  return false
 end
 
 local function startRetrying()
@@ -268,9 +288,9 @@ local function startRetrying()
       -- Said once, not every retry, so a struggling server does not flood F8.
       if not reportedFailure then
         reportedFailure = true
-        lib.print.warn(('scriptConfig [%s]: the server has not sent this client its config yet '
-          .. '(%d attempts). Running on DEFAULTS until it does - shop hours, zones and language '
-          .. 'will not match the panel. Still retrying.'):format(scriptName, attempts))
+        lib.print.warn(('scriptConfig [%s]: the server has not finished building its config yet '
+          .. '(%d attempts, usually a cold boot). Running on DEFAULTS until it does - shop hours, '
+          .. 'zones and language will not match the panel. Still retrying.'):format(scriptName, attempts))
         TriggerServerEvent('dirk_lib:scriptConfigFetch', scriptName, 'failed', attempts)
       end
     end
