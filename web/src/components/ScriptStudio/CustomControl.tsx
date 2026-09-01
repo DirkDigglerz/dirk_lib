@@ -8,6 +8,7 @@ import { useStudio } from './store';
 import { notify } from './Toasts';
 import type { SettingEntry } from './types';
 import { translate, useActiveLanguage, useBundles } from './studioLocale';
+import { newRow } from './newRow';
 import { copyToClipboard, fetchNui, isEnvBrowser } from 'dirk-cfx-react';
 import * as motion from 'framer-motion';
 import { motion as m } from 'framer-motion';
@@ -295,7 +296,7 @@ export function CustomControl({
       // Composed first, appended on save - the same rule the built-in list
       // follows. Backing out of a new entry should leave nothing behind.
       addRow: () => {
-        setCreatingRow(JSON.parse(JSON.stringify(entry?.rowTemplate ?? {})));
+        setCreatingRow(newRow(entry?.rowTemplate, entry?.columns));
       },
       deleteRow: (index: number) => onChange(rows.filter((_, i) => i !== index)),
     }

@@ -1558,7 +1558,8 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "x-generateId": "depth"
           },
           "depth": {
             "type": "integer"
@@ -8040,7 +8041,8 @@
             "type": "string"
           },
           "id": {
-            "type": "string"
+            "type": "string",
+            "x-generateId": "store"
           },
           "name": {
             "type": "string"
@@ -9150,7 +9152,8 @@
             "properties": {
               "id": {
                 "type": "string",
-                "description": "Unique template id"
+                "description": "Unique template id",
+                "x-generateId": "c"
               },
               "label": {
                 "type": "string",

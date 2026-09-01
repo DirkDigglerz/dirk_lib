@@ -139,6 +139,18 @@ export type SettingColumn = {
    * though they applied.
    */
   enabledWhen?: { path: string; equals?: unknown };
+  /**
+   * This column's value is machine-generated on a new row, not typed.
+   *
+   * Set by `x-generateId` on a field that is the array's `x-arrayKey`. The key
+   * is the row's identity for smartMerge, so it must exist and must not drift
+   * once rows reference it - hence `readOnly` alongside it.
+   */
+  generated?: boolean;
+  /** optional prefix for a generated id, e.g. `c` -> `c_m1x8k2_a4f9` */
+  idPrefix?: string;
+  /** shown, but not editable */
+  readOnly?: boolean;
   /** what the blank option means for a `pickOne`, e.g. "Anywhere" */
   anyLabel?: string;
   optionsFrom?: { path: string; key: string ; labelKey?: string };

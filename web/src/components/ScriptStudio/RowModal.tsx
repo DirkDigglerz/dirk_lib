@@ -231,7 +231,7 @@ export function RowModal({
                 // `?? column.default`: a row that predates a field has no key
                 // for it, and blank is not what the server will use
                 value={draft[column.key] ?? column.default}
-                disabled={disabled || gatedOff(column)}
+                disabled={disabled || gatedOff(column) || !!column.readOnly}
                 dimmed={gatedOff(column)}
                 itemName={itemName}
                 error={problemFor(column.key)}

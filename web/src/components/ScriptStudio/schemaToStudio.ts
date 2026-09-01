@@ -436,6 +436,16 @@ function columnsFor(node: JsonSchema, rows: unknown[]): { columns: SettingColumn
         (row) => (row && typeof row === 'object' ? (row as Record<string, unknown>)[key] : undefined),
       ),
     );
+    // An opaque identity the panel fills in, not something to type. Read-only
+    // because the key is what smartMerge matches rows on - editing it after
+    // other rows or saved data reference it silently orphans them.
+    const genId = child?.['x-generateId'];
+    if (genId) {
+      column.generated = true;
+      column.readOnly = true;
+      if (typeof genId === 'string') column.idPrefix = genId;
+    }
+
     const iconSet = child?.['x-iconSet'];
     if (iconSet === 'fontawesome' || iconSet === 'lucide') column.iconSet = iconSet;
 

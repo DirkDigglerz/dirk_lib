@@ -16,6 +16,7 @@ import { PickerDrawer } from './PickerDrawer';
 import { fieldGatedOff, StudioButton } from './ui';
 import type { SettingColumn, SettingEntry } from './types';
 import { useChrome } from './studioLocale';
+import { newRow } from './newRow';
 
 type Row = Record<string, unknown>;
 type Point = { x: number; y: number };
@@ -124,7 +125,7 @@ export function ZoneMap({
     }
 
     const rows = Array.isArray(layer.value) ? [...(layer.value as Row[])] : [];
-    const template = JSON.parse(JSON.stringify(layer.entry.rowTemplate ?? {}));
+    const template = newRow(layer.entry.rowTemplate, layer.entry.columns);
     template[layer.labelKey] = `${layer.entry.label} ${rows.length + 1}`;
     template[layer.polyKey] = points;
     layer.onChange([...rows, template]);

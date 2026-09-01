@@ -9,6 +9,7 @@ import { ItemArt, rowIdentity, singular, StudioButton } from './ui';
 import { AnyIcon } from './Icon';
 import type { SettingColumn } from './types';
 import { useChrome } from './studioLocale';
+import { newRow } from './newRow';
 
 type Row = Record<string, unknown>;
 
@@ -173,7 +174,7 @@ export function NestedRows({
         disabled={disabled}
         // Composed, then appended on save - the same rule the outer lists
         // follow. A reward you started and abandoned should not be in the list.
-        onClick={() => setCreating(JSON.parse(JSON.stringify(column.rowTemplate ?? {})))}
+        onClick={() => setCreating(newRow(column.rowTemplate, column.columns))}
         grow
       />
 

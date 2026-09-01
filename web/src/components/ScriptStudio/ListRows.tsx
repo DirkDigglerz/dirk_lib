@@ -9,6 +9,7 @@ import { useItems } from 'dirk-cfx-react';
 import { ItemArt, singular, StudioButton } from './ui';
 import type { SettingColumn, SettingEntry } from './types';
 import { useChrome } from './studioLocale';
+import { newRow } from './newRow';
 
 type Row = Record<string, unknown>;
 
@@ -98,7 +99,7 @@ export function ListRows({
    * changes - that nobody asked for. It is held here until Save.
    */
   const addRow = () => {
-    setCreating(JSON.parse(JSON.stringify(entry.rowTemplate ?? {})));
+    setCreating(newRow(entry.rowTemplate, entry.columns));
   };
 
   const deleteRow = (index: number) => {

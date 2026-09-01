@@ -696,7 +696,8 @@
             "type": "object",
             "properties": {
               "id": {
-                "type": "string"
+                "type": "string",
+                "x-generateId": "r"
               },
               "label": {
                 "type": "string",
