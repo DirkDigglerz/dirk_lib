@@ -187,14 +187,50 @@ local function onScriptConfig(path, cb, options)
   end
 end
 
+-- Where this server's cached config lives on the player's machine.
+--
+-- KVP is keyed per RESOURCE, not per server, so `dirk_fishing_scriptConfig`
+-- was one slot shared by every server the player visits that runs a resource
+-- of that name. Someone who plays on two servers running fishing arrived at
+-- the second carrying the first one's settings - and while that normally
+-- self-corrects on the next fetch (the hashes differ, so the server sends the
+-- real config), a cold boot answers 'NotReady' and left them running on
+-- another server's shop hours, zones and language.
+--
+-- Scoping the key to the endpoint makes that impossible rather than merely
+-- self-correcting. Cost is one extra fetch the first time a player joins a
+-- given server, which is the same work a hash mismatch would have caused.
+-- Resolved on first use, not at load: the endpoint is not guaranteed to be
+-- readable the instant a resource's client scripts run.
+local resolvedKvpKey
+local function kvpKeyFor()
+  if resolvedKvpKey then return resolvedKvpKey end
+
+  local endpoint = GetCurrentServerEndpoint()
+  if type(endpoint) ~= 'string' or endpoint == '' then
+    -- No endpoint yet: use the old shared key rather than losing caching, and
+    -- do NOT memoise, so the next call can still upgrade to a scoped one.
+    return ('%s_scriptConfig'):format(scriptName)
+  end
+
+  resolvedKvpKey = ('%s_scriptConfig_%s'):format(scriptName, endpoint)
+
+  -- One-time tidy of the shared key this replaces. Left behind it would sit on
+  -- every player's machine forever, unread.
+  local legacy = ('%s_scriptConfig'):format(scriptName)
+  if GetResourceKvpString(legacy) then DeleteResourceKvp(legacy) end
+
+  return resolvedKvpKey
+end
+
 local fetchFromKVP = function()
-  local raw = GetResourceKvpString(('%s_scriptConfig'):format(scriptName))
+  local raw = GetResourceKvpString(kvpKeyFor())
   if not raw or raw == '' then return nil end
   return json.decode(raw)
 end
 
 local updateKVP = function(ver, data)
-  SetResourceKvp(('%s_scriptConfig'):format(scriptName), json.encode({
+  SetResourceKvp(kvpKeyFor(), json.encode({
     client_version = ver,
     data = data,
   }))
@@ -586,7 +622,7 @@ RegisterNetEvent(('%s:updateScriptConfig'):format(scriptName), function(data, ne
   clientVersion = new_version or clientVersion
   settingsLoaded = true
   local changedLeaves = collectChangedLeaves(data, previousSettings, nil, {})
-  SetResourceKvp(('%s_scriptConfig'):format(scriptName), json.encode({
+  SetResourceKvp(kvpKeyFor(), json.encode({
     client_version = clientVersion,
     data = scriptConfig,
   }))
