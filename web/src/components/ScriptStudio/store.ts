@@ -80,7 +80,7 @@ type StudioState = {
    * change script, close a page and scroll a group into view. Search already
    * did exactly this; it just had the jump wired straight to it as a prop.
    */
-  goToRequest: { resource: string; group: string } | null;
+  goToRequest: { resource: string; group?: string; page?: string } | null;
   /**
    * Announcements for the Overview page.
    *

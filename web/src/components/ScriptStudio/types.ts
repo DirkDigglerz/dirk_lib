@@ -244,7 +244,15 @@ export type SettingEntry = {
    * `when` names the value it applies to, so "the global theme is over here"
    * only appears while this resource is actually following the global theme.
    */
-  goTo?: { resource: string; group: string; label?: string; when?: unknown };
+  goTo?: {
+    resource: string;
+    /** a settings section to scroll to */
+    group?: string;
+    /** a whole page (Logs, Admins, Bridges) - takes precedence over `group` */
+    page?: string;
+    label?: string;
+    when?: unknown;
+  };
   options?: SettingOption[];
   /** pickList: the setting whose rows supply the options, e.g. 'fish' */
   optionsFrom?: { path: string; key: string };

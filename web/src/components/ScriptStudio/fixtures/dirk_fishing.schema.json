@@ -9244,7 +9244,12 @@
         "enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Report fishing events to dirk_lib's logging. Where they GO - the Logs page, Discord webhooks, an external service - is set once in /dirk_config > Logs and applies to every dirk script."
+          "description": "Report fishing events to dirk_lib's logging. Where they GO - the Logs page, Discord webhooks, an external service - is set once in /dirk_config > Logs and applies to every dirk script.",
+          "x-goTo": {
+            "resource": "dirk_lib",
+            "page": "logs",
+            "label": "Open Logs and Delivery"
+          }
         },
         "suspiciousSaleThreshold": {
           "type": "number",

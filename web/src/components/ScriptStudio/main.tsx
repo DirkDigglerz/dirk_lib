@@ -752,11 +752,15 @@ export default function ScriptStudio() {
   const goToRequest = useStudio((s) => s.goToRequest);
   useEffect(() => {
     if (!goToRequest) return;
-    const { resource, group } = goToRequest;
-    useStudio.setState({ activeResource: resource, activePage: null, goToRequest: null });
+    const { resource, group, page } = goToRequest;
+    // A page target (Logs, Admins, Bridges) is not a settings section, so there
+    // is nothing to scroll to - opening it IS the destination.
+    useStudio.setState({ activeResource: resource, activePage: page ?? null, goToRequest: null });
     setSearch('');
-    pendingJump.current = { resource, group };
-    setJumpNonce((n) => n + 1);
+    if (!page && group) {
+      pendingJump.current = { resource, group };
+      setJumpNonce((n) => n + 1);
+    }
   }, [goToRequest]);
 
   const jumpTo = useCallback((groupId: string, subgroupId?: string, keepList?: boolean) => {
@@ -2317,7 +2321,11 @@ const SettingRow = memo(function SettingRow({
             type="button"
             whileTap={{ scale: 0.99 }}
             onClick={() => useStudio.setState({
-              goToRequest: { resource: entry.goTo!.resource, group: entry.goTo!.group },
+              goToRequest: {
+                resource: entry.goTo!.resource,
+                group: entry.goTo!.group,
+                page: entry.goTo!.page,
+              },
             })}
             style={{
               display: 'flex', alignItems: 'center', gap: '0.4vh',
