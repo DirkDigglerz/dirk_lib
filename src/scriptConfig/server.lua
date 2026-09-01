@@ -504,6 +504,50 @@ RegisterNetEvent('dirk_lib:reopenScriptConfigChooser', function()
   TriggerClientEvent('dirk_lib:openScriptConfigChooser', src, collectRegisteredConfigs(src))
 end)
 
+-- ── Config delivery health ───────────────────────────────────────────────
+-- A client tells us when it could not get its config, and again when it
+-- finally did. This exists because the failure was previously invisible from
+-- the server: the player just silently ran on defaults, and the only symptom
+-- an owner ever saw was "shop times are wrong for players but right for me".
+--
+-- Untrusted input, so nothing here is taken at face value: the resource must
+-- be one that actually registered a config, the state is one of two known
+-- words, and a client gets one line per resource per session however many
+-- times it shouts.
+local fetchReportSeen = {}
+
+AddEventHandler('playerDropped', function()
+  fetchReportSeen[source] = nil
+end)
+
+RegisterNetEvent('dirk_lib:scriptConfigFetch', function(resourceName, state, attempts)
+  local src = source
+  if type(resourceName) ~= 'string' or #resourceName > 64 then return end
+  if state ~= 'failed' and state ~= 'recovered' then return end
+  -- Must be a real, started resource that opted into scriptConfig - not any
+  -- string a client cares to send.
+  if GetResourceState(resourceName) ~= 'started' then return end
+  if not hasScriptConfigTag(resourceName) then return end
+
+  local seen = fetchReportSeen[src]
+  if not seen then seen = {}; fetchReportSeen[src] = seen end
+  local slot = resourceName .. ':' .. state
+  if seen[slot] then return end
+  seen[slot] = true
+
+  local tries = math.min(math.max(tonumber(attempts) or 1, 1), 999)
+
+  if state == 'failed' then
+    lib.logger(src, 'configFetchFailed',
+      ('did not receive %s config after %d attempts - running on defaults'):format(resourceName, tries),
+      'level:warn', ('resource:%s'):format(resourceName))
+  else
+    lib.logger(src, 'configFetchRecovered',
+      ('received %s config after %d attempts'):format(resourceName, tries),
+      ('resource:%s'):format(resourceName))
+  end
+end)
+
 -- ── Online players list (for the access overrides UI) ────────────────────
 -- Used by the dirk_lib admin Script Config tab to populate the identifier
 -- dropdown. Master-only — the UI that consumes it is master-only too.

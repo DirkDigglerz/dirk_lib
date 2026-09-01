@@ -213,6 +213,71 @@ local sendSettingsToNui = function()
   }))
 end
 
+-- How the config fetch behaves when the server does not answer.
+--
+-- The server legitimately replies nil while it is still building the config on
+-- a cold boot ('NotReady'), and a callback can time out under load. Both are
+-- transient, and both used to be permanent: the fetch result was ignored and
+-- `settingsLoaded` was set regardless, so that client served DEFAULTS for the
+-- rest of its session and never asked again.
+--
+-- That is the whole bug behind "my shop times are wrong", "the zone I drew is
+-- invisible to players" and "players see English while I see Lithuanian" - the
+-- language, the zones and the shop hours are all config, and an admin looked
+-- fine only because opening the panel forces a fresh fetch.
+local RETRY_FIRST_MS, RETRY_MAX_MS = 1000, 30000
+local retrying = false
+local lastAttemptAt, attempts = 0, 0
+local reportedFailure = false
+
+--- One attempt. True when the server actually answered with a config.
+local function fetchFromServer()
+  attempts += 1
+  lastAttemptAt = GetGameTimer()
+  local reply = lib.callback.await(('%s:getScriptConfig'):format(scriptName), clientVersion or -1)
+  debugLog(('fetchFromServer returned (type=%s, attempt=%d)'):format(type(reply), attempts))
+  if type(reply) ~= 'table' then return false end
+
+  scriptConfig = reply.data or scriptConfig
+  clientVersion = reply.client_version or clientVersion
+  updateKVP(clientVersion, scriptConfig)
+  return true
+end
+
+local function startRetrying()
+  if retrying then return end
+  retrying = true
+
+  CreateThread(function()
+    local wait = RETRY_FIRST_MS
+    while not settingsLoaded do
+      Wait(wait)
+      wait = math.min(wait * 2, RETRY_MAX_MS)
+
+      if fetchFromServer() then
+        settingsLoaded = true
+        lib.print.info(('scriptConfig [%s]: config arrived after %d attempt(s); settings are live.')
+          :format(scriptName, attempts))
+        -- Everything that read a default in the meantime gets told the truth.
+        dispatchScriptConfigWatchers(scriptConfig, nil, nil, 'load', true)
+        if hasUI then sendSettingsToNui() end
+        TriggerServerEvent('dirk_lib:scriptConfigFetch', scriptName, 'recovered', attempts)
+        break
+      end
+
+      -- Said once, not every retry, so a struggling server does not flood F8.
+      if not reportedFailure then
+        reportedFailure = true
+        lib.print.warn(('scriptConfig [%s]: the server has not sent this client its config yet '
+          .. '(%d attempts). Running on DEFAULTS until it does - shop hours, zones and language '
+          .. 'will not match the panel. Still retrying.'):format(scriptName, attempts))
+        TriggerServerEvent('dirk_lib:scriptConfigFetch', scriptName, 'failed', attempts)
+      end
+    end
+    retrying = false
+  end)
+end
+
 local function ensureSettingsLoaded(forceRefresh)
   local previousSettings = settingsLoaded and cloneValue(scriptConfig) or nil
 
@@ -231,19 +296,23 @@ local function ensureSettingsLoaded(forceRefresh)
     debugLog(('ensureSettingsLoaded kvp hydrate done (hasKvp=%s, version=%s)'):format(tostring(kvp ~= nil), tostring(clientVersion)))
   end
 
-  debugLog('ensureSettingsLoaded fetching from server')
-  local newSettings = lib.callback.await(('%s:getScriptConfig'):format(scriptName), clientVersion or -1)
-  debugLog(('ensureSettingsLoaded server returned (type=%s)'):format(type(newSettings)))
+  -- Callers reach this on demand (lib.scriptConfig.get). While a retry thread
+  -- is already running, do not add another blocking await on top of it - hand
+  -- back what we have and let the retry finish.
+  local canAttempt = not retrying or forceRefresh
+    or (GetGameTimer() - lastAttemptAt) > RETRY_FIRST_MS
 
-  if type(newSettings) == 'table' then
-    scriptConfig = newSettings.data or scriptConfig
-    clientVersion = newSettings.client_version or clientVersion
-    updateKVP(clientVersion, scriptConfig)
+  if canAttempt and fetchFromServer() then
+    settingsLoaded = true
+  elseif not settingsLoaded then
+    -- NOT marked loaded. That single line was the bug: it made a failed fetch
+    -- permanent, because the early return above then answered every later call.
+    startRetrying()
   end
 
-  settingsLoaded = true
   dispatchScriptConfigWatchers(scriptConfig, previousSettings, nil, forceRefresh and 'refresh' or 'load', true)
-  debugLog(('ensureSettingsLoaded complete (version=%s)'):format(tostring(clientVersion)))
+  debugLog(('ensureSettingsLoaded complete (loaded=%s, version=%s)')
+    :format(tostring(settingsLoaded), tostring(clientVersion)))
   return scriptConfig
 end
 

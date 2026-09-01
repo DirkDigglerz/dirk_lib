@@ -27,6 +27,11 @@ local function send(action, data)
   }))
 end
 
+-- Resource that opened the currently-showing card (nil when nothing is up).
+-- Tracked so a mid-flow restart/stop of that resource can't leave the card
+-- stranded on screen forever (it never gets to call hideInstructions).
+local owner = nil
+
 ---@class InstructionKey
 ---@field key    string  -- short label inside the key cap, e.g. 'E', '⌫', 'LMB'
 ---@field action string  -- what the key does, e.g. 'Confirm', 'Cancel'
@@ -44,6 +49,7 @@ function lib.showInstructions(spec)
     lib.print.warn('[lib.showInstructions] spec.title (string) is required')
     return
   end
+  owner = GetInvokingResource() or GetCurrentResourceName()
   send('DIRK_LIB_SHOW_INSTRUCTIONS', {
     title = spec.title,
     hint  = spec.hint,
@@ -53,5 +59,16 @@ end
 
 ---Hide the bottom-right instruction card. No-op if nothing is showing.
 function lib.hideInstructions()
+  owner = nil
   send('DIRK_LIB_HIDE_INSTRUCTIONS', {})
 end
+
+-- If the resource that opened the card stops (a mid-flow restart, say), it never
+-- gets to call hideInstructions — so hide it here or the card stays on screen
+-- forever, which also visually strands the player.
+AddEventHandler('onClientResourceStop', function(res)
+  if owner and res == owner then
+    owner = nil
+    send('DIRK_LIB_HIDE_INSTRUCTIONS', {})
+  end
+end)
