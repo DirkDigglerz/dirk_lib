@@ -2962,7 +2962,7 @@
           "infoUnlockLvl": {
             "type": "integer",
             "minimum": 0,
-            "description": "Level a player reaches before this fish's details appear in their guidebook. It also sets the fish's difficulty band - 1-15 beginner, 16-40 intermediate, 41+ advanced - which daily challenges draw from, which decides its nibble marker colour, and whether it is exempt from zone spook."
+            "description": "Level a player reaches before this fish's details appear in their guidebook. It also decides the fish's difficulty band - your fish are sorted by this and split into easiest, middle and hardest thirds - which daily challenges draw from, which sets its nibble marker colour, and whether it is exempt from zone spook."
           },
           "biteChance": {
             "type": "number",
@@ -9223,12 +9223,12 @@
                   "tier3"
                 ],
                 "default": "any",
-                "description": "Which fish a catch_species challenge picks its species from. The bands come from each fish's Info Unlock Level on the Fish page. Ignored by catch_count and catch_weight, which do not care which fish.",
+                "description": "Which fish a catch_species challenge picks from. Your fish are sorted by Info Unlock Level and split into three equal groups, so a band is never empty and stays balanced as you add fish. Ignored by catch_count and catch_weight.",
                 "x-enumLabels": {
                   "any": "Any fish",
-                  "tier1": "Beginner - unlocks at level 1-15",
-                  "tier2": "Intermediate - level 16-40",
-                  "tier3": "Advanced - level 41+"
+                  "tier1": "Beginner",
+                  "tier2": "Intermediate",
+                  "tier3": "Advanced"
                 }
               },
               "xp": {
