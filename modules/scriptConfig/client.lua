@@ -187,50 +187,27 @@ local function onScriptConfig(path, cb, options)
   end
 end
 
--- Where this server's cached config lives on the player's machine.
+-- The cached config is NOT applied until the server has vouched for it.
 --
--- KVP is keyed per RESOURCE, not per server, so `dirk_fishing_scriptConfig`
--- was one slot shared by every server the player visits that runs a resource
--- of that name. Someone who plays on two servers running fishing arrived at
--- the second carrying the first one's settings - and while that normally
--- self-corrects on the next fetch (the hashes differ, so the server sends the
--- real config), a cold boot answers 'NotReady' and left them running on
--- another server's shop hours, zones and language.
+-- KVP is keyed per resource, not per server, so `dirk_fishing_scriptConfig` is
+-- one slot shared by every server the player visits that runs a resource of
+-- that name. The old code assigned that blob to `scriptConfig` immediately and
+-- only then asked the server, so between those two points a player who also
+-- plays elsewhere was live on ANOTHER server's shop hours, zones and language.
 --
--- Scoping the key to the endpoint makes that impossible rather than merely
--- self-correcting. Cost is one extra fetch the first time a player joins a
--- given server, which is the same work a hash mismatch would have caused.
--- Resolved on first use, not at load: the endpoint is not guaranteed to be
--- readable the instant a resource's client scripts run.
-local resolvedKvpKey
-local function kvpKeyFor()
-  if resolvedKvpKey then return resolvedKvpKey end
-
-  local endpoint = GetCurrentServerEndpoint()
-  if type(endpoint) ~= 'string' or endpoint == '' then
-    -- No endpoint yet: use the old shared key rather than losing caching, and
-    -- do NOT memoise, so the next call can still upgrade to a scoped one.
-    return ('%s_scriptConfig'):format(scriptName)
-  end
-
-  resolvedKvpKey = ('%s_scriptConfig_%s'):format(scriptName, endpoint)
-
-  -- One-time tidy of the shared key this replaces. Left behind it would sit on
-  -- every player's machine forever, unread.
-  local legacy = ('%s_scriptConfig'):format(scriptName)
-  if GetResourceKvpString(legacy) then DeleteResourceKvp(legacy) end
-
-  return resolvedKvpKey
-end
-
+-- Scoping the key by endpoint or a server id was the obvious answer and is the
+-- wrong one - both are defeated by a cloned server, and neither closes the
+-- window, it only narrows it. Holding the blob aside until the server confirms
+-- its hash closes it completely, and costs nothing on the wire: the hash goes
+-- up either way, and a match still returns no payload.
 local fetchFromKVP = function()
-  local raw = GetResourceKvpString(kvpKeyFor())
+  local raw = GetResourceKvpString(('%s_scriptConfig'):format(scriptName))
   if not raw or raw == '' then return nil end
   return json.decode(raw)
 end
 
 local updateKVP = function(ver, data)
-  SetResourceKvp(kvpKeyFor(), json.encode({
+  SetResourceKvp(('%s_scriptConfig'):format(scriptName), json.encode({
     client_version = ver,
     data = data,
   }))
@@ -265,6 +242,8 @@ end
 local RETRY_FIRST_MS, RETRY_MAX_MS = 1000, 30000
 local retrying = false
 local lastAttemptAt, attempts = 0, 0
+-- Read from KVP but NOT applied - see the note above fetchFromKVP.
+local pendingCache = nil
 local reportedFailure = false
 
 --- One attempt.
@@ -293,9 +272,16 @@ local function fetchFromServer()
     return true
   end
 
-  -- Up to date. Whatever KVP hydrated is current by definition - the server
-  -- only says this when its hash matches the one we sent.
-  if reason == nil then return true end
+  -- "Up to date": the server only says this when its hash equals the one we
+  -- sent, so the blob we were holding is provably THIS server's. Apply it now.
+  if reason == nil then
+    if pendingCache then
+      scriptConfig = pendingCache.data or scriptConfig
+      clientVersion = pendingCache.client_version or clientVersion
+      pendingCache = nil
+    end
+    return true
+  end
 
   return false
 end
@@ -344,12 +330,13 @@ local function ensureSettingsLoaded(forceRefresh)
   debugLog(('ensureSettingsLoaded start (forceRefresh=%s)'):format(tostring(forceRefresh)))
 
   if not forceRefresh then
-    local kvp = fetchFromKVP()
-    if kvp then
-      scriptConfig = kvp.data or scriptConfig
-      clientVersion = kvp.client_version or 0
-    end
-    debugLog(('ensureSettingsLoaded kvp hydrate done (hasKvp=%s, version=%s)'):format(tostring(kvp ~= nil), tostring(clientVersion)))
+    -- Held, not applied. Only the hash goes up; the data stays parked until
+    -- the server confirms it, so a blob left by another server can never be
+    -- live - not even for the moment it takes to ask.
+    pendingCache = fetchFromKVP()
+    if pendingCache then clientVersion = pendingCache.client_version or 0 end
+    debugLog(('ensureSettingsLoaded kvp read (hasKvp=%s, version=%s, applied=no)')
+      :format(tostring(pendingCache ~= nil), tostring(clientVersion)))
   end
 
   -- Callers reach this on demand (lib.scriptConfig.get). While a retry thread
@@ -622,7 +609,7 @@ RegisterNetEvent(('%s:updateScriptConfig'):format(scriptName), function(data, ne
   clientVersion = new_version or clientVersion
   settingsLoaded = true
   local changedLeaves = collectChangedLeaves(data, previousSettings, nil, {})
-  SetResourceKvp(kvpKeyFor(), json.encode({
+  SetResourceKvp(('%s_scriptConfig'):format(scriptName), json.encode({
     client_version = clientVersion,
     data = scriptConfig,
   }))
