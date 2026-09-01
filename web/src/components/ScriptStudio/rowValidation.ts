@@ -61,11 +61,19 @@ function walk(
     });
   };
 
-  // `self` for the field being tested, any other key for a sibling in the
-  // same row - the same lookup the settings list uses, so a rule reads the
-  // same wherever it is written.
+  // `self` for the field being tested, `self.<key>` or a bare key for a
+  // sibling in the same row - the same lookup the settings list uses, so a
+  // rule reads the same wherever it is written.
+  //
+  // The `self.` prefix is not optional sugar: an unresolved sibling is treated
+  // as a FAILED comparison by `test`, not as "cannot check", so dropping the
+  // prefix here made every cross-field rule in a row modal report its own
+  // message against valid values - "Min level is above the max level" on a
+  // brand new row where min was 1 and max was 99.
   const lookupFor = (value: unknown) => (path: string) =>
-    (path === 'self' ? value : row[path]);
+    path === 'self'
+      ? value
+      : row[path.startsWith('self.') ? path.slice(5) : path];
 
   for (const column of columns) {
     if (fieldGatedOff(column, row)) continue;
