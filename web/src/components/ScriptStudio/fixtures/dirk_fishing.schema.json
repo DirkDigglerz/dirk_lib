@@ -2961,7 +2961,8 @@
           },
           "infoUnlockLvl": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "description": "Level a player reaches before this fish's details appear in their guidebook. It also sets the fish's difficulty band - 1-15 beginner, 16-40 intermediate, 41+ advanced - which daily challenges draw from, which decides its nibble marker colour, and whether it is exempt from zone spook."
           },
           "biteChance": {
             "type": "number",
@@ -9166,7 +9167,12 @@
                   "catch_species",
                   "catch_weight"
                 ],
-                "description": "Challenge type. catch_count: any N fish. catch_species: N of one randomly-picked species from fishPool. catch_weight: total weight in grams."
+                "description": "Challenge type. catch_count: any N fish. catch_species: N of one randomly-picked species from fishPool. catch_weight: total weight in grams.",
+                "x-enumLabels": {
+                  "catch_count": "Catch any N fish",
+                  "catch_species": "Catch N of one species",
+                  "catch_weight": "Catch N grams in total"
+                }
               },
               "minLevel": {
                 "x-validate": [
@@ -9217,7 +9223,13 @@
                   "tier3"
                 ],
                 "default": "any",
-                "description": "Which fish pool to draw from. Tiers are auto-computed from fish.infoUnlockLvl: tier1 = 1-15, tier2 = 16-40, tier3 = 41+."
+                "description": "Which fish a catch_species challenge picks its species from. The bands come from each fish's Info Unlock Level on the Fish page. Ignored by catch_count and catch_weight, which do not care which fish.",
+                "x-enumLabels": {
+                  "any": "Any fish",
+                  "tier1": "Beginner - unlocks at level 1-15",
+                  "tier2": "Intermediate - level 16-40",
+                  "tier3": "Advanced - level 41+"
+                }
               },
               "xp": {
                 "type": "number",
