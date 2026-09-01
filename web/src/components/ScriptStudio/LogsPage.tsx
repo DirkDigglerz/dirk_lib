@@ -7,7 +7,7 @@ import {
   AlertTriangle, CheckCircle2, ChevronDown, Copy, History, Inbox, Loader2,
   ScrollText, Search, Send, User, XCircle,
 } from 'lucide-react';
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   MOCK_DELIVERY, MOCK_NOW, type LogLevel, type LogRow,
 } from './mockLogs';
@@ -46,6 +46,24 @@ const RANGES: { value: string; label: string; seconds: number | null }[] = [
   { value: '7d', label: 'Last 7 days', seconds: 604800 },
   { value: 'all', label: 'Everything kept', seconds: null },
 ];
+
+/**
+ * Hold a value still until typing stops.
+ *
+ * `useDeferredValue` was here, and it is the wrong tool: it keeps the UI
+ * responsive while a render is expensive, but it does not reduce how many
+ * distinct values come out the other side. Every one of those became a new
+ * React Query key, so every keystroke fetched - typing "rainbow" was seven
+ * GET_LOGS round trips, each running a LIKE over the whole table.
+ */
+function useDebounced<T>(value: T, ms = 300): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const id = setTimeout(() => setSettled(value), ms);
+    return () => clearTimeout(id);
+  }, [value, ms]);
+  return settled;
+}
 
 export function LogsPage({ canEdit }: { canEdit: boolean }) {
   return (
@@ -113,8 +131,8 @@ function EventsTab() {
     const found = RANGES.find((r) => r.value === range);
     return found?.seconds == null ? null : Math.floor(Date.now() / 1000) - found.seconds;
   }, [range]);
-  const deferredSearch = useDeferredValue(search);
-  const deferredPlayer = useDeferredValue(player);
+  const deferredSearch = useDebounced(search);
+  const deferredPlayer = useDebounced(player);
 
   // The real table now, not the mock. Both hooks cache hard and neither
   // polls: a log line does not change once written, and a page that refetches
@@ -380,7 +398,14 @@ function LogRowCard({
                   {/* Every raw identifier captured with the line - licence,
                       discord, steam, fivem. The one above is what filtering
                       matches on; these are what you take to a ban list. */}
-                  {row.player.identifiers?.map((id) => {
+                  {/* Guarded: this is decoded from a TEXT column written by
+                      whatever wrote the row. A shape that is not an array of
+                      "type:value" strings must degrade, not take the expander
+                      down with it - one malformed row would otherwise make
+                      every log line unopenable. */}
+                  {(Array.isArray(row.player.identifiers) ? row.player.identifiers : [])
+                    .filter((id): id is string => typeof id === 'string')
+                    .map((id) => {
                     const [type, ...rest] = id.split(':');
                     return (
                       <Detail
