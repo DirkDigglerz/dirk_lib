@@ -685,6 +685,63 @@ local function collectRemovedLeaves(oldValue, path, out)
   return out
 end
 
+-- The default for a leaf inside an array row, taken from the array's own
+-- `default` list.
+--
+-- Rows are matched by `x-arrayKey` where the array declares one, falling back
+-- to position. Index is not reliable on its own: a customer who deletes a row
+-- shifts every row after it, so index 3 in a saved config is not necessarily
+-- index 3 in the defaults.
+local function defaultFromRow(dotPath)
+  if not settingsSchema then return nil end
+
+  local segments = {}
+  for seg in dotPath:gmatch('[^.]+') do segments[#segments + 1] = seg end
+  if #segments < 3 then return nil end
+
+  -- Walk down looking for the LAST array crossed, remembering where it was.
+  local node, arrayNode, arrayAt = settingsSchema, nil, nil
+  for i = 1, #segments do
+    if type(node) ~= 'table' then return nil end
+    if node.type == 'array' then
+      arrayNode, arrayAt = node, i          -- segments[i] indexes this array
+      node = node.items
+    else
+      if type(node.properties) ~= 'table' then return nil end
+      node = node.properties[segments[i]]
+      if node == nil then return nil end
+    end
+  end
+  if not arrayNode or type(arrayNode.default) ~= 'table' then return nil end
+
+  local rows = arrayNode.default
+  local index = tonumber(segments[arrayAt])
+  if not index then return nil end
+
+  local row = rows[index]
+  local key = arrayNode['x-arrayKey']
+  if key then
+    -- Prefer identity over position when we can resolve the live row's key.
+    local liveRow = getNestedValue(scriptConfig, table.concat(segments, '.', 1, arrayAt))
+    local wanted = type(liveRow) == 'table' and liveRow[key] or nil
+    if wanted ~= nil then
+      row = nil
+      for i = 1, #rows do
+        if type(rows[i]) == 'table' and rows[i][key] == wanted then row = rows[i] break end
+      end
+    end
+  end
+  if type(row) ~= 'table' then return nil end
+
+  -- Everything after the index is the path to the leaf within the row.
+  local value = row
+  for i = arrayAt + 1, #segments do
+    if type(value) ~= 'table' then return nil end
+    value = value[segments[i]]
+  end
+  return value
+end
+
 local function collectChangedLeaves(partial, previous, path, out)
   if type(partial) ~= 'table' then return out end
   out = out or {}
@@ -703,6 +760,16 @@ local function collectChangedLeaves(partial, previous, path, out)
       -- edited. Half the booleans in every schema default to false.
       local defaultValue
       if settingsSchema then defaultValue = getDefaultForPath(settingsSchema, nextPath) end
+
+      -- A field inside an array row usually has no `default` of its own - the
+      -- shipped value lives in the array's default ROW, not on the property.
+      -- Without this, saving any row logged every such field as
+      -- "default -> <value>" even when the value was exactly what shipped:
+      -- baitDig.tools.3.useScenario read as "default -> off" when off IS the
+      -- default. 116 fields in fishing alone have no property-level default.
+      if defaultValue == nil then
+        defaultValue = defaultFromRow(nextPath)
+      end
       local isImplicitDefault = oldValue == nil and defaultValue ~= nil and isEqualValue(defaultValue, value)
 
       if not isImplicitDefault and not isEqualValue(oldValue, value) then
