@@ -351,6 +351,12 @@ local function ensureSettingsLoaded(forceRefresh)
     -- NOT marked loaded. That single line was the bug: it made a failed fetch
     -- permanent, because the early return above then answered every later call.
     startRetrying()
+    -- And NO dispatch: nothing arrived. Dispatching here fed watchers the
+    -- defaults - and a watcher that itself reads config (phone's zoneLabels
+    -- does) re-entered this function, which dispatched again, which re-ran
+    -- the watcher... down to a C stack overflow on every cold boot. Watchers
+    -- get their one real delivery when the retry lands.
+    return scriptConfig
   end
 
   dispatchScriptConfigWatchers(scriptConfig, previousSettings, nil, forceRefresh and 'refresh' or 'load', true)
