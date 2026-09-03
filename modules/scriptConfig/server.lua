@@ -1301,6 +1301,17 @@ local function registerScriptConfig(schema, canEditFn, rules)
   lastPersistedHash = bootHash
   dispatchScriptConfigWatchers(scriptConfig, nil, nil, 'load', true)
 
+  -- Tell everyone already connected that there is now something to fetch.
+  --
+  -- A resource restarting under live players starts BOTH halves at once, so a
+  -- client asked before this point and was told 'NotReady'. It then sat out a
+  -- backoff and asked again - a wasted attempt, a second of running on
+  -- defaults, and a "config arrived after 2 attempts" line on every restart.
+  -- The server knows the exact moment it can answer, so it says so, and a
+  -- waiting client fetches immediately. The backoff stays as the fallback for
+  -- anyone who missed the event (joining mid-boot, say).
+  TriggerClientEvent(('%s:scriptConfigReady'):format(scriptName), -1)
+
   -- Push this consumer's `access` block (if any) to dirk_lib so its access
   -- check honours per-script overrides. Retries because dirk_lib's export may
   -- not be ready this early in boot.

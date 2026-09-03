@@ -135,24 +135,49 @@ local function notifyWatcher(watcher, current, previous, changedPaths, source, f
   return watcher.once == true
 end
 
+--- Guards against a watcher that causes another dispatch while it is running.
+---
+--- A watcher is free to read config, and reading it can reach
+--- ensureSettingsLoaded, which dispatches - so a watcher could re-enter this
+--- function, re-run itself, and recurse until the C stack gave out. That is
+--- exactly what dirk_phone's zoneLabels handler did on every join during the
+--- server's NotReady window.
+---
+--- The nested call is dropped rather than queued: the outer pass is already
+--- delivering the same `current`, so re-running every watcher would only hand
+--- them what they are being handed anyway.
+local dispatching = false
+
 local function dispatchScriptConfigWatchers(current, previous, changedLeaves, source, forceInitial)
   if not next(scriptConfigWatchers) then return end
+  if dispatching then return end
+  dispatching = true
 
-  for watcherId, watcher in pairs(scriptConfigWatchers) do
-    local changedPaths = {}
+  -- pcall'd so the flag ALWAYS clears. A stuck flag would silently drop every
+  -- future config update for this resource - a far worse failure than the
+  -- recursion it guards against, and one with no symptom to trace.
+  local ok, err = pcall(function()
+    for watcherId, watcher in pairs(scriptConfigWatchers) do
+      local changedPaths = {}
 
-    if not forceInitial then
-      for i = 1, #(changedLeaves or {}) do
-        local changedPath = changedLeaves[i].path
-        if pathsOverlap(watcher.path, changedPath) then
-          changedPaths[#changedPaths + 1] = changedPath
+      if not forceInitial then
+        for i = 1, #(changedLeaves or {}) do
+          local changedPath = changedLeaves[i].path
+          if pathsOverlap(watcher.path, changedPath) then
+            changedPaths[#changedPaths + 1] = changedPath
+          end
         end
       end
-    end
 
-    if notifyWatcher(watcher, current, previous, changedPaths, source, forceInitial) then
-      scriptConfigWatchers[watcherId] = nil
+      if notifyWatcher(watcher, current, previous, changedPaths, source, forceInitial) then
+        scriptConfigWatchers[watcherId] = nil
+      end
     end
+  end)
+
+  dispatching = false
+  if not ok then
+    lib.print.error(('[scriptConfig:%s] watcher dispatch failed: %s'):format(scriptName, tostring(err)))
   end
 end
 
@@ -286,6 +311,14 @@ local function fetchFromServer()
   return false
 end
 
+--- Set by the server the moment it has a config to serve, so a waiting client
+--- can stop sitting out a backoff it no longer needs.
+local serverAnnouncedReady = false
+
+RegisterNetEvent(('%s:scriptConfigReady'):format(scriptName), function()
+  serverAnnouncedReady = true
+end)
+
 local function startRetrying()
   if retrying then return end
   retrying = true
@@ -293,7 +326,17 @@ local function startRetrying()
   CreateThread(function()
     local wait = RETRY_FIRST_MS
     while not settingsLoaded do
-      Wait(wait)
+      -- Wait for the backoff OR the server saying it is ready, whichever
+      -- comes first. A resource restarting under live players starts both
+      -- halves at once, so the first ask is always too early - and polling
+      -- blind meant a wasted attempt and a second on defaults every time.
+      -- Now the announcement wakes us the instant there is something to get.
+      local waited = 0
+      while waited < wait and not serverAnnouncedReady do
+        Wait(50)
+        waited += 50
+      end
+      serverAnnouncedReady = false
       wait = math.min(wait * 2, RETRY_MAX_MS)
 
       if fetchFromServer() then
