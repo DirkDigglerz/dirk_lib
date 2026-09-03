@@ -280,38 +280,62 @@ exports('listScriptConfigAdmins', function() return scriptConfigAdmins.all() end
 exports('putScriptConfigAdmin', function(entry) return scriptConfigAdmins.put(entry) end)
 exports('removeScriptConfigAdmin', function(id) return scriptConfigAdmins.remove(id) end)
 
-local function collectRegisteredConfigs(src)
+-- Which started resources are dirk scripts with a parseable schema.
+--
+-- Cached, because this used to run on EVERY /dirk_config: a sweep of all ~120
+-- resources, and for each dirk script a LoadResourceFile of its schema.json
+-- plus a full json.decode whose RESULT WAS THROWN AWAY - it only proved the
+-- file parses. Fishing's schema alone is a quarter of a megabyte, so each
+-- open stalled the server main thread parsing over a megabyte of JSON to
+-- answer a yes/no, which read as lag between the command and the panel.
+--
+-- The set only changes when a resource starts or stops, so that is exactly
+-- when the cache drops.
+local registryCache = nil
+
+local function registeredResources()
+  if registryCache then return registryCache end
+
   local list = {}
   local total = GetNumResources()
+  for i = 0, total - 1 do
+    local name = GetResourceByFindIndex(i)
+    if name and GetResourceState(name) == 'started' and hasScriptConfigTag(name) then
+      local rawSchema = LoadResourceFile(name, 'schema.json')
+      if rawSchema and pcall(json.decode, rawSchema) then
+        list[#list + 1] = {
+          resource = name,
+          label = name,
+          version = GetResourceMetadata(name, 'version', 0) or 'dev',
+        }
+      end
+    end
+  end
+  table.sort(list, function(a, b) return a.resource < b.resource end)
+
+  registryCache = list
+  return list
+end
+
+AddEventHandler('onResourceStart', function() registryCache = nil end)
+AddEventHandler('onResourceStop', function() registryCache = nil end)
+
+local function collectRegisteredConfigs(src)
+  local all = registeredResources()
+  if not src then return all end
 
   -- Resolve the player's match context ONCE for the whole sweep — a single src
   -- is tested against every registered resource. Masters short-circuit inside
   -- canEditResource before ctx is touched, so skip the lookup for them.
   local ctx
-  if src and src ~= 0 and not isMasterEditor(src) then
+  if src ~= 0 and not isMasterEditor(src) then
     ctx = resolveMatchCtx(src)
   end
 
-  for i = 0, total - 1 do
-    local name = GetResourceByFindIndex(i)
-    if name and GetResourceState(name) == 'started' and hasScriptConfigTag(name) then
-      if not src or resolveLevel(src, name, ctx) then
-        local rawSchema = LoadResourceFile(name, 'schema.json')
-        if rawSchema then
-          local ok = pcall(json.decode, rawSchema)
-          if ok then
-            list[#list + 1] = {
-              resource = name,
-              label = name,
-              version = GetResourceMetadata(name, 'version', 0) or 'dev',
-            }
-          end
-        end
-      end
-    end
+  local list = {}
+  for i = 1, #all do
+    if resolveLevel(src, all[i].resource, ctx) then list[#list + 1] = all[i] end
   end
-
-  table.sort(list, function(a, b) return a.resource < b.resource end)
   return list
 end
 

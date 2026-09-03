@@ -1,3 +1,26 @@
+# UPDATE 1.3.0 | 02/09/2026
+
+## New — Script Studio
+
+- **Every dirk script is configured in one panel.** /dirk_config opens it; /<resource_name> opens it with that script already selected. The separate config menu each script used to carry is gone — one search across the lot, one save bar, one change history.
+- **Logs.** Every dirk script's log lines are kept on your own server in a dirk_logs table and read back in the panel — filter by script, event, player, level or time, and open a line for the full payload including every identifier that player had, not just the server ID they happened to hold.
+- **Redirects.** Send matching log lines on to Discord as well as keeping them — to a webhook, or to a channel your bot posts in — filtered by script, event or level. Scripts no longer carry their own webhook settings; an existing one is carried over the first time the script loads.
+- **Any change can now be reverted.** The audit of saved edits — who changed what, and the value before and after — is now readable in the panel alongside everything else, and any line can be put back, which stages it for you to review like any other edit.
+- **Admins.** One place for who can open the panel, replacing the Access tab scripts used to carry. Grants can be a person (picked from who is online, or by identifier for someone offline) or an ACE group. A new **view** level below edit reads settings and logs but can never save and is never sent server-only values such as webhook URLs. Existing per-script grants fold in automatically on first load.
+- **Bridges page.** The overrides you already had, now next to what dirk_lib actually detected on your server, so auto has a face.
+- **Changelogs and announcements in the panel**, fetched from our repo, so you see what changed without leaving the game.
+- **Better controls throughout** — durations, hour-of-day pickers, two-point range sliders, either/or switches that name both sides, and open maps of values. Coordinates and areas are drawn on a real map rather than typed.
+- **A self-check command.** Type dirktest in your server console and the script tests itself against your own inventory and framework — so a bad combination shows up before your players find it, not after.
+
+## Fixes
+
+- **Players could be left running on the wrong settings for a whole session.** A client that asked for its config while the server was still building it was marked as loaded anyway, so it never asked again — it served defaults, or, because that cache is shared by every server running a resource of the same name, another server's settings. Shop hours, drawn zones and the language all come from config, so players saw stale or foreign values while an admin (whose panel forces a fresh fetch) saw the right ones. The client now retries until the server answers, and only ever applies a cached config the server has confirmed is its own.
+- **Change history listed edits nobody made.** Fields inside a list row take their default from the shipped row rather than the field, which the diff did not know, so saving any row logged a pile of "default → …" lines for values that never changed.
+- Settings the schema does not declare are no longer deleted from your stored config.
+- An empty server-only payload is sent as nothing rather than an empty object.
+
+---
+
 # UPDATE 1.2.78 | 17/07/2026
 
 ## Fixes — devix-inventory bridge

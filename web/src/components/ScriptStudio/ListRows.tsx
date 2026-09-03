@@ -19,7 +19,7 @@ type Row = Record<string, unknown>;
  * to edit it in a modal. No drilling required just to read the list.
  */
 export function ListRows({
-  entry, rows, onChange, disabled, rowFilter, resource,
+  entry, rows, onChange, disabled, rowFilter, resource, fill,
 }: {
   entry: SettingEntry;
   /** owning script, so a row editor can resolve cross-referencing fields */
@@ -29,6 +29,15 @@ export function ListRows({
   disabled?: boolean;
   /** panel-wide search, so a query narrows the rows as well as the sections */
   rowFilter?: string;
+  /**
+   * This list IS the page — a workspace with nothing else on it.
+   *
+   * Then the shape is a fixed one: search at the top, rows scrolling in the
+   * middle, Add pinned to the bottom. Sizing the rows to their content instead
+   * (which is right for an inline list) leaves the button floating wherever the
+   * last row happened to end.
+   */
+  fill?: boolean;
 }) {
   const t = useChrome();
   const theme = useMantineTheme();
@@ -161,16 +170,19 @@ export function ListRows({
         />
       )}
 
-      {/* Sized by its rows, scrolling only when they outgrow the space.
+      {/* Two behaviours, on purpose.
         *
-        * `flex: 1` made this take every spare pixel, so eight stores in a tall
-        * workspace left a dead region inside the list - and the Add button
-        * beneath it looked marooned. `0 1 auto` keeps the rows against the
-        * search box and lets the button sit directly under the last row. */}
+        * INLINE (`0 1 auto`): sized by its rows, so a three-row list beside a
+        * label does not claim a screenful, and the Add button sits directly
+        * under the last row rather than marooned below a dead region.
+        *
+        * FILLING (`flex: 1`): the list is the page, so the rows take the height
+        * and the footer stays on the bottom edge where you can always reach it.
+        */}
       <Flex
         direction="column" gap="xxs"
         className="studio-scroll"
-        style={{ flex: '0 1 auto', minHeight: 0, overflowY: 'auto' }}
+        style={{ flex: fill ? 1 : '0 1 auto', minHeight: 0, overflowY: 'auto' }}
       >
       {paged.map((index) => {
         const row = rows[index];
@@ -256,7 +268,19 @@ export function ListRows({
         </Flex>
       )}
 
-      <Flex pt="xxs" style={{ flexShrink: 0 }}>
+      {/* Pinned when the list owns the page: a rule above it so it reads as a
+        * footer rather than as one more row that happens to be a button. */}
+      <Flex
+        pt="xxs"
+        style={{
+          flexShrink: 0,
+          ...(fill ? {
+            marginTop: '0.4vh',
+            paddingTop: '0.9vh',
+            borderTop: `0.1vh solid ${alpha(theme.colors.dark[4], 0.45)}`,
+          } : {}),
+        }}
+      >
         <StudioButton label={`Add ${singular(entry.label)}`} icon={Plus} onClick={addRow} disabled={disabled} grow />
       </Flex>
 
