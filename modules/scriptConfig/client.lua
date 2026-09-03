@@ -566,6 +566,21 @@ if hasUI then
   end)
 end
 
+-- What Script Studio reads instead of re-downloading this resource's config.
+--
+-- The client already HOLDS the client-visible config - hydrated from KVP,
+-- confirmed by hash, kept current by updateScriptConfig pushes. Fetching it
+-- again from the server on every panel open re-sent hundreds of kilobytes to
+-- say what this VM already knew. The panel merges the small server-only
+-- sliver (a separate, permission-gated call) on top of this.
+exports('dirkStudioSnapshot', function()
+  return {
+    loaded = settingsLoaded,
+    config = scriptConfig,
+    client_version = clientVersion,
+  }
+end)
+
 -- ──────────────────────────────────────
 -- EVENTS
 -- ──────────────────────────────────────

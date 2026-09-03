@@ -20,6 +20,7 @@ import { useChrome } from './studioLocale';
  *   "x-control": "difficulty"   0 → 1               Very easy … Brutal
  *   "x-control": "forgiveness"  0 → 1               Brutal … Very forgiving
  *   "x-control": "rarity"       abundance           Legendary … Common
+ *   "x-control": "generosity"   0 → 1               Nothing … Overflowing
  *   "x-control": "balance"      0 → 1, 0.5 normal   Much easier … Much harder
  *   "x-control": "progression"  around 1.0          Much harder … Much easier
  *
@@ -28,7 +29,7 @@ import { useChrome } from './studioLocale';
  * is the thing worth seeing, and in which direction.
  */
 
-export type MeterScale = 'chance' | 'multiplier' | 'difficulty' | 'forgiveness' | 'rarity' | 'balance' | 'progression';
+export type MeterScale = 'chance' | 'multiplier' | 'difficulty' | 'forgiveness' | 'rarity' | 'balance' | 'progression' | 'generosity';
 
 type Band = { key: string; label: string; color: string };
 
@@ -134,6 +135,26 @@ const SCALES: Record<MeterScale, {
           : v <= 1.1 ? { key: 'normal', label: 'Normal', color: '#8B968E' }
             : v < 1.75 ? { key: 'easier', label: 'Easier', color: '#84cc16' }
               : { key: 'muchEasier', label: 'Much easier', color: '#22c55e' }
+    ),
+  },
+
+  /**
+   * HOW MUCH you get, as against `rarity`, which is how good it is.
+   *
+   * The knob a server owner actually wants for a loot source: one bar from
+   * "barely worth the walk" to "overflowing", instead of a screen of per-item
+   * chances and amount ranges that they have to hold in their head all at once
+   * to guess the total.
+   */
+  generosity: {
+    basis: 'fraction',
+    pick: (f) => (
+      f <= 0.08 ? { key: 'nothing', label: 'Almost nothing', color: '#6b7280' }
+        : f <= 0.28 ? { key: 'slim', label: 'Slim pickings', color: '#84cc16' }
+          : f <= 0.5 ? { key: 'modest', label: 'Modest', color: '#eab308' }
+            : f <= 0.72 ? { key: 'decent', label: 'Decent haul', color: '#22c55e' }
+              : f <= 0.9 ? { key: 'rich', label: 'Rich pickings', color: '#3b82f6' }
+                : { key: 'overflowing', label: 'Overflowing', color: '#f59e0b' }
     ),
   },
 

@@ -302,12 +302,24 @@ local function registeredResources()
     local name = GetResourceByFindIndex(i)
     if name and GetResourceState(name) == 'started' and hasScriptConfigTag(name) then
       local rawSchema = LoadResourceFile(name, 'schema.json')
-      if rawSchema and pcall(json.decode, rawSchema) then
-        list[#list + 1] = {
-          resource = name,
-          label = name,
-          version = GetResourceMetadata(name, 'version', 0) or 'dev',
-        }
+      if rawSchema then
+        local ok, schema = pcall(json.decode, rawSchema)
+        if ok and type(schema) == 'table' then
+          list[#list + 1] = {
+            resource = name,
+            label = schema['x-label'] or name,
+            icon = schema['x-icon'] or 'sliders-horizontal',
+            shared = schema['x-shared'] == true,
+            version = GetResourceMetadata(name, 'version', 0) or 'dev',
+            -- The raw TEXT is what travels (JSON.parse keeps the author's key
+            -- order; re-encoding a Lua table shuffles it), the decoded table
+            -- is what autoDefaults walks, and the hash is what lets a client
+            -- skip the transfer when it already holds this exact schema.
+            rawSchema = rawSchema,
+            schema = schema,
+            hash = joaat(rawSchema),
+          }
+        end
       end
     end
   end
@@ -375,57 +387,43 @@ CreateThread(function()
   GlobalState.dirkServerBuild = build or false
 end)
 
-lib.callback.register('dirk_lib:getScriptStudio', function(source)
-  local out = {}
-  local total = GetNumResources()
+lib.callback.register('dirk_lib:getScriptStudio', function(source, knownHashes)
+  -- `knownHashes` is { [resource] = hash } for schemas the client still holds
+  -- in its KVP cache. A matching hash means the client already has this exact
+  -- text, so only the hash goes back - which is what makes a repeat open cost
+  -- almost nothing on the wire. The hash is of the schema CONTENT, not the
+  -- version, so editing a schema and restarting the resource invalidates it
+  -- even without a version bump.
+  knownHashes = type(knownHashes) == 'table' and knownHashes or {}
 
   local ctx
   if source and source ~= 0 and not isMasterEditor(source) then
     ctx = resolveMatchCtx(source)
   end
 
-  for i = 0, total - 1 do
-    local name = GetResourceByFindIndex(i)
-    if name and GetResourceState(name) == 'started' and hasScriptConfigTag(name) then
-      if canEditResource(source, name, ctx) then
-        local rawSchema = LoadResourceFile(name, 'schema.json')
-        if rawSchema then
-          local ok, schema = pcall(json.decode, rawSchema)
-          if ok and type(schema) == 'table' then
-            -- Same pass the engine runs, so a detected default (a server name
-            -- read from server.cfg, say) reads the same in the panel as it
-            -- does at runtime. Without it the panel would call an untouched
-            -- setting "Modified" against a default nothing actually uses.
-            --
-            -- Collected as a path->value map rather than applied to `schema`,
-            -- because `schema` is NOT what gets sent: see below.
-            local autoDefaults = {}
-            collectAutoDefaults(schema, nil, autoDefaults)
-            -- A script NAMES ITSELF in its own schema. Hardcoding
-            -- `name == 'dirk_lib'` here was exactly the per-script knowledge
-            -- inside dirk_lib that this design exists to avoid - and it left
-            -- the shared layer showing as the raw resource name next to the
-            -- scripts it is shared BY.
-            out[#out + 1] = {
-              resource = name,
-              label    = schema['x-label'] or name,
-              icon     = schema['x-icon'] or 'sliders-horizontal',
-              version  = GetResourceMetadata(name, 'version', 0) or 'dev',
-              shared   = schema['x-shared'] == true,
-              -- The RAW text, not the decoded table.
-              --
-              -- Lua tables have no key order, so decoding the schema here and
-              -- re-encoding it for the NUI shuffled every section and every
-              -- setting into whatever order `pairs` felt like — which is why
-              -- the shared settings tabs came out in a different order each
-              -- restart. JSON.parse on the other side keeps the order the
-              -- schema was written in, which is the order the author meant.
-              schemaJson   = rawSchema,
-              autoDefaults = next(autoDefaults) and autoDefaults or nil,
-            }
-          end
-        end
-      end
+  local out = {}
+  local all = registeredResources()
+  for i = 1, #all do
+    local entry = all[i]
+    if canEditResource(source, entry.resource, ctx) then
+      -- Detected defaults (a server name read from server.cfg, say) can change
+      -- without a restart, so they are walked fresh per open - over the cached
+      -- DECODED schema, which is the cheap part. The expensive part, decoding
+      -- a quarter-megabyte of JSON per script, happens once per resource
+      -- start, not once per open.
+      local autoDefaults = {}
+      collectAutoDefaults(entry.schema, nil, autoDefaults)
+
+      out[#out + 1] = {
+        resource = entry.resource,
+        label    = entry.label,
+        icon     = entry.icon,
+        version  = entry.version,
+        shared   = entry.shared,
+        hash     = entry.hash,
+        schemaJson   = knownHashes[entry.resource] ~= entry.hash and entry.rawSchema or nil,
+        autoDefaults = next(autoDefaults) and autoDefaults or nil,
+      }
     end
   end
 

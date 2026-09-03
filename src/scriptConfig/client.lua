@@ -97,36 +97,120 @@ local function closeStudio()
   SetNuiFocus(false, false)
 end
 
+-- Schemas cache locally, keyed by CONTENT hash - so a repeat open transfers
+-- no schema at all, and an edited schema (even without a version bump) misses
+-- the cache and comes down fresh. Safe to share across servers: the key is
+-- the content itself, so a hit is by definition the right text.
+local function schemaKvpKey(resource)
+  return ('dirk_lib_studioSchema_%s'):format(resource)
+end
+
+local function readCachedSchema(resource)
+  local raw = GetResourceKvpString(schemaKvpKey(resource))
+  if not raw or raw == '' then return nil end
+  local ok, decoded = pcall(json.decode, raw)
+  return ok and decoded or nil
+end
+
+-- Overlay the server-only sliver onto the client-visible values, in place.
+local function mergeInto(target, extra)
+  for key, value in pairs(extra) do
+    if type(value) == 'table' and type(target[key]) == 'table' then
+      mergeInto(target[key], value)
+    else
+      target[key] = value
+    end
+  end
+end
+
 RegisterNetEvent('dirk_lib:openScriptStudio', function(focus)
   if studioOpen then return end
   studioOpen = true
 
-  local scripts = lib.callback.await('dirk_lib:getScriptStudio')
+  -- Tell the server which schemas we already hold, so it only sends what
+  -- changed. First ever open pays the full transfer; every one after costs a
+  -- list of hashes.
+  local known, cached = {}, {}
+  do
+    -- The server decides which resources we may see, so ask it cheaply first?
+    -- No - the hashes ARE the ask. Reading a stale KVP entry for a resource
+    -- the server no longer offers just means an unused key.
+    local total = GetNumResources()
+    for i = 0, total - 1 do
+      local name = GetResourceByFindIndex(i)
+      if name then
+        local hit = readCachedSchema(name)
+        if hit and hit.hash and hit.schemaJson then
+          known[name] = hit.hash
+          cached[name] = hit
+        end
+      end
+    end
+  end
+
+  local scripts = lib.callback.await('dirk_lib:getScriptStudio', known)
   if type(scripts) ~= 'table' or #scripts == 0 then
     studioOpen = false
     lib.notify({ type = 'error', description = 'No script settings available.' })
     return
   end
 
-  -- Values one resource at a time. Sequential on purpose: a callback per
-  -- resource all at once would land as a burst of net events, and the panel
-  -- cannot render before the first one arrives anyway.
-  --
-  -- getFullScriptConfig returns THREE values - success, error, payload - so
-  -- `local ok, values = pcall(...)` bound `values` to the success boolean and
-  -- every script arrived with no saved values at all. The panel then showed
-  -- shipped defaults for everything and had nothing to diff a save against.
   for i = 1, #scripts do
     local entry = scripts[i]
-    local ok, success, _err, payload = pcall(function()
-      return lib.callback.await(('%s:getFullScriptConfig'):format(entry.resource))
-    end)
-    local got = (ok and success and type(payload) == 'table') and payload or nil
-    entry.values = (got and type(got.config) == 'table') and got.config or {}
-    -- The version this save will be checked against. Without it a save from a
-    -- stale panel silently overwrites whatever changed underneath it.
-    entry.clientVersion = got and got.clientVersion or nil
+    if entry.schemaJson then
+      -- Fresh from the server: remember it for next time.
+      SetResourceKvp(schemaKvpKey(entry.resource),
+        json.encode({ hash = entry.hash, schemaJson = entry.schemaJson }))
+    else
+      -- The server held it back because our hash matched, so the cached text
+      -- IS this schema.
+      entry.schemaJson = cached[entry.resource] and cached[entry.resource].schemaJson
+    end
   end
+
+  -- Values come from each script's OWN client VM - this client already holds
+  -- every config, kept current by the engine, so nothing is re-downloaded.
+  -- Only the server-only sliver (webhook URLs and the like) comes over the
+  -- wire, per script, permission-gated, and in PARALLEL - the old flow
+  -- re-fetched every full config one after another and held the panel shut
+  -- until the last one landed.
+  local pending = 0
+  for i = 1, #scripts do
+    local entry = scripts[i]
+    pending += 1
+    CreateThread(function()
+      local ok, snap = pcall(function()
+        return exports[entry.resource]:dirkStudioSnapshot()
+      end)
+
+      if ok and type(snap) == 'table' and snap.loaded and type(snap.config) == 'table' then
+        entry.values = lib.table.deepClone(snap.config)
+        entry.clientVersion = snap.client_version
+      else
+        -- The consumer has not finished its own first load (or predates the
+        -- export). The old full fetch still exists and still checks who is
+        -- asking, so fall back to it rather than showing an empty script.
+        local ok2, success, _err, payload = pcall(function()
+          return lib.callback.await(('%s:getFullScriptConfig'):format(entry.resource))
+        end)
+        local got = (ok2 and success and type(payload) == 'table') and payload or nil
+        entry.values = (got and type(got.config) == 'table') and got.config or {}
+        entry.clientVersion = got and got.clientVersion or nil
+      end
+
+      -- The sliver: nil for view-level admins, tiny for editors.
+      local ok3, success3, _err3, extra = pcall(function()
+        return lib.callback.await(('%s:getServerOnlyScriptConfig'):format(entry.resource))
+      end)
+      if ok3 and success3 and type(extra) == 'table' then
+        if type(extra.serverOnly) == 'table' then mergeInto(entry.values, extra.serverOnly) end
+        entry.clientVersion = extra.clientVersion or entry.clientVersion
+      end
+
+      pending -= 1
+    end)
+  end
+  while pending > 0 do Wait(10) end
 
   SetNuiFocus(true, true)
   SendNuiMessage(json.encode({

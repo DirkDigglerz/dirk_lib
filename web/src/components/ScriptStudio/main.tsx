@@ -2272,11 +2272,20 @@ const SettingRow = memo(function SettingRow({
       gap="sm"
       px="sm" py="xs"
       style={{
-        background: alpha(theme.colors.dark[8], staged ? 0.75 : 0.45),
-        border: `0.1vh solid ${problems?.length
+        // A filling list owns the whole pane, so the card around it was a box
+        // inside a box — an outer frame wrapping rows that are already cards.
+        // Only the staged/problem state still needs saying, and a left edge
+        // says it without re-framing the page.
+        background: fill && wide
+          ? 'transparent'
+          : alpha(theme.colors.dark[8], staged ? 0.75 : 0.45),
+        border: fill && wide ? 'none' : `0.1vh solid ${problems?.length
           ? alpha('#ef4444', 0.6)
           : staged ? alpha(color, 0.35) : alpha(theme.colors.dark[5], 0.35)}`,
-        borderRadius: theme.radius.xs,
+        borderLeft: fill && wide && (problems?.length || staged)
+          ? `0.25vh solid ${problems?.length ? alpha('#ef4444', 0.7) : alpha(color, 0.5)}`
+          : undefined,
+        borderRadius: fill && wide ? 0 : theme.radius.xs,
         transition: 'background 0.15s, border-color 0.15s, opacity 0.15s',
         position: wide ? 'relative' : undefined,
         ...(fill && wide ? { flex: 1, minHeight: 0, overflow: 'hidden' } : {}),
@@ -2545,6 +2554,7 @@ const SettingRow = memo(function SettingRow({
             rows={(value as Record<string, unknown>[]) ?? []}
             disabled={!canEdit}
             rowFilter={rowFilter}
+            fill={fill}
             onChange={(next) => setValue(resource, entry, next)}
           />
         )
