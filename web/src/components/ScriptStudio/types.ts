@@ -22,6 +22,7 @@ export type ControlType =
   | 'difficulty'
   | 'forgiveness'
   | 'rarity'
+  | 'generosity'
   | 'balance'
   | 'progression'
   | 'color'
@@ -385,10 +386,17 @@ export type StudioScript = {
  */
 export function tabsAsList(entry: SettingEntry): boolean {
   if (entry.type === 'list') return true;
-  // A script's own control standing in for a list, and a list of references to
-  // other settings - fishing's Misc tab is exactly that - are both still one
-  // of the section's lists and both still want a tab.
-  return (entry.type === 'custom' || entry.type === 'refs') && Array.isArray(entry.value);
+
+  // A script's own control standing in for a LIST wants a page of its own; one
+  // standing in for a SETTING belongs in the settings stack beside the others.
+  // `componentFull` already means exactly that difference - "fills the whole
+  // workspace" - so it is what decides, rather than the value being an array.
+  // A category picker stores an array and is still just a setting.
+  if (entry.type === 'custom') return !!entry.componentFull;
+
+  // A list of references to other settings - fishing's Misc tab is exactly
+  // that - is still one of the section's lists and still wants a tab.
+  return entry.type === 'refs' && Array.isArray(entry.value);
 }
 
 /**

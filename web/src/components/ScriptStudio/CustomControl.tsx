@@ -187,7 +187,18 @@ export function load(resource: string, path: string): Promise<React.ComponentTyp
 
     let module_: { default?: React.ComponentType<CustomProps> };
     try {
-      module_ = await import(/* @vite-ignore */ url);
+      // Raced against a deadline: an nui:// fetch from a resource that is
+      // mid-restart can neither resolve nor reject - the handler is simply
+      // gone - and an import that never settles froze the whole tab until the
+      // panel was closed and reopened. Ten seconds is enough for any real
+      // bundle; after that the error box renders and (because failures are
+      // not cached) the next visit simply tries again.
+      module_ = await Promise.race([
+        import(/* @vite-ignore */ url),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('ImportTimeout')), 10_000);
+        }),
+      ]);
     } catch (error) {
       // The browser's message for a failed module fetch is "Failed to fetch
       // dynamically imported module" and nothing else - true, and useless. Lua

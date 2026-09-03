@@ -422,11 +422,18 @@ export default function ScriptStudio() {
       const loose = groupEntries.filter((entry) => !tabsAsList(entry));
       const isWorkspace = workspaceGroups.has(groupId);
 
-      // TWO or more. A section holding a single list is one page - its own
-      // settings above it and the list below - and giving that a child called
-      // Basic and a child called the-list-again splits one screen in half for
-      // no reason.
-      if (lists.length >= 2) {
+      // TWO or more lists, or a workspace whose ONE list has real settings
+      // beside it.
+      //
+      // A single list with a toggle above it is genuinely one page, and naming
+      // that Basic + the-list-again splits one screen for nothing. But once the
+      // settings are substantial they crowd the list instead of introducing it,
+      // and then each deserves its own place. Same rule as SectionBody's, and
+      // the two have to agree: the body decided to show Basic while the rail
+      // offered no way to reach it, so the section looked like it had no tabs.
+      const splitWorkspace = isWorkspace && lists.length === 1 && loose.length > 1;
+
+      if (lists.length >= 2 || splitWorkspace) {
         const children: { id: string; label: string; count: number; list?: string }[] = [];
 
         // A workspace's own settings are one of its places, so they get a name

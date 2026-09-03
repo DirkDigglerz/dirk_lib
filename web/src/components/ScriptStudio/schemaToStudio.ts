@@ -109,6 +109,7 @@ const CONTROL_TYPES = new Set<string>([
   'blipDisplay', 'ped', 'peds', 'vehicle', 'coords', 'positions', 'time', 'keybind',
   'control', 'controls', 'item', 'list', 'zones', 'palette', 'slider', 'range',
   'chance', 'multiplier', 'difficulty', 'forgiveness', 'rarity', 'balance', 'progression',
+  'generosity',
   'group',
   'tags', 'model', 'account', 'accounts', 'mantineColor', 'shade', 'keyvalue',
   'icon',

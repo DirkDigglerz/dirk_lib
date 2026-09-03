@@ -10,6 +10,7 @@
 - **Bridges page.** The overrides you already had, now next to what dirk_lib actually detected on your server, so auto has a face.
 - **Changelogs and announcements in the panel**, fetched from our repo, so you see what changed without leaving the game.
 - **Better controls throughout** — durations, hour-of-day pickers, two-point range sliders, either/or switches that name both sides, and open maps of values. Coordinates and areas are drawn on a real map rather than typed.
+- **The panel opens fast.** Opening used to re-download every script's schema and config; now your game keeps the schemas cached and already holds the values, so only a small amount of admin-only data travels - and everything loads at once instead of one script at a time.
 - **A self-check command.** Type dirktest in your server console and the script tests itself against your own inventory and framework — so a bad combination shows up before your players find it, not after.
 
 ## Fixes

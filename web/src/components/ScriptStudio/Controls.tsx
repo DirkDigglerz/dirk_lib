@@ -684,6 +684,7 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
 
     case 'chance': case 'multiplier': case 'difficulty':
     case 'forgiveness': case 'rarity': case 'balance': case 'progression':
+    case 'generosity':
       return (
         <ControlShell width="30vh">
           <MeterControl

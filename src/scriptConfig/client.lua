@@ -191,7 +191,9 @@ RegisterNetEvent('dirk_lib:openScriptStudio', function(focus)
         -- export). The old full fetch still exists and still checks who is
         -- asking, so fall back to it rather than showing an empty script.
         local ok2, success, _err, payload = pcall(function()
-          return lib.callback.await(('%s:getFullScriptConfig'):format(entry.resource))
+          -- Short deadline: this resource may be mid-restart, and one script
+          -- being unreachable must cost one empty script, not a frozen open.
+          return lib.callback.awaitTimeout(('%s:getFullScriptConfig'):format(entry.resource), 5000)
         end)
         local got = (ok2 and success and type(payload) == 'table') and payload or nil
         entry.values = (got and type(got.config) == 'table') and got.config or {}
@@ -200,7 +202,7 @@ RegisterNetEvent('dirk_lib:openScriptStudio', function(focus)
 
       -- The sliver: nil for view-level admins, tiny for editors.
       local ok3, success3, _err3, extra = pcall(function()
-        return lib.callback.await(('%s:getServerOnlyScriptConfig'):format(entry.resource))
+        return lib.callback.awaitTimeout(('%s:getServerOnlyScriptConfig'):format(entry.resource), 5000)
       end)
       if ok3 and success3 and type(extra) == 'table' then
         if type(extra.serverOnly) == 'table' then mergeInto(entry.values, extra.serverOnly) end

@@ -13,7 +13,7 @@ RegisterNetEvent(callback_event:format(cache.resource), function(key, ...)
   return cb and cb(...)
 end)
 
-local triggerServerCallback = function(_,event, cb, ...)
+local triggerServerCallback = function(_,event, cb, timeoutMs, ...)
   local key 
   repeat 
     key = ('%s_%s'):format(event, math.random(0, 9999999))
@@ -32,6 +32,22 @@ local triggerServerCallback = function(_,event, cb, ...)
     if cb then 
       cb(table.unpack(response))
     end
+  end
+
+  -- A caller-supplied deadline RESOLVES with (nil, 'Timeout') rather than
+  -- rejecting. The default five-minute timeout is a leak guard - by the time
+  -- it fires the flow is long abandoned, so an error is fine. A short deadline
+  -- is a flow-control decision ("this resource may be mid-restart, give it two
+  -- seconds and move on"), and the caller wants an answer to branch on, not an
+  -- error to trap.
+  if promise and timeoutMs then
+    local timer = SetTimeout(timeoutMs, function()
+      awaitingCallbacks[key] = nil
+      promise:resolve({ nil, 'Timeout', n = 2 })
+    end)
+    local response = Citizen.Await(promise)
+    ClearTimeout(timer)
+    return table.unpack(response, 1, response.n or #response)
   end
 
   if promise then
@@ -66,7 +82,7 @@ lib.callback = setmetatable({}, {
       assert(cbType == 'function', ('Callback %s must have a function for argument 2'):format(event))
     end
 
-    return triggerServerCallback(_, event, cb, ...)
+    return triggerServerCallback(_, event, cb, nil, ...)
   end
 })
 
@@ -83,12 +99,19 @@ lib.callback = setmetatable({}, {
 --- ox delay slot and is dropped. Only `false` - a leading number could be a
 --- real argument, and no callback in practice takes the literal `false` as its
 --- first.
+--- Like await, but gives up after `timeoutMs` and returns nil, 'Timeout'.
+--- For calls at another resource whose state you do not control - it may be
+--- mid-restart, and a panel must degrade for one script rather than freeze.
+lib.callback.awaitTimeout = function(event, timeoutMs, ...)
+  return triggerServerCallback(nil, event, nil, tonumber(timeoutMs) or 5000, ...)
+end
+
 lib.callback.await = function(event, ...)
   local first = ...
   if first == false then
-    return triggerServerCallback(_, event, nil, select(2, ...))
+    return triggerServerCallback(_, event, nil, nil, select(2, ...))
   end
-  return triggerServerCallback(_, event, nil, ...)
+  return triggerServerCallback(_, event, nil, nil, ...)
 end
 
 

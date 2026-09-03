@@ -90,10 +90,13 @@ export function SectionBody({
       );
     }
 
-    // One list: its own settings first, then the list. A store toggle that
-    // switches the whole list off belongs above the thing it switches off,
-    // not behind a tab beside it.
-    if (railLists.length <= 1) {
+    // One list, and at most ONE setting beside it: stack them. A store toggle
+    // that switches the whole list off belongs above the thing it switches
+    // off, not behind a tab beside it.
+    //
+    // Beyond that the settings stop being a preamble and start crowding the
+    // list, so they get the Basic page the rail already knows how to select.
+    if (railLists.length <= 1 && railPlain.length <= 1) {
       return (
         <Flex direction="column" gap="xs" flex={1} style={{ minHeight: 0 }}>
           {railPlain.map((entry, index) => withSubgroup(entry, index, railPlain, renderRow, color, theme))}
