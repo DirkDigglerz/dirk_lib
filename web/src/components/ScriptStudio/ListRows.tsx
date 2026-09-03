@@ -366,6 +366,12 @@ function RowIconButton({
 
 function formatCell(value: unknown, column: SettingColumn): string {
   if (value === null || value === undefined || value === '') return '-';
+  // A secret is a credential - a Discord webhook URL lets anyone who reads it
+  // post as that webhook. The editor masks it behind an eye toggle, but this
+  // summary printed it in full on the list card, where it sat in every
+  // screenshot and stream of the Delivery page. Saying it is set is the whole
+  // of what the card needs to say.
+  if (column.type === 'secret') return '••••••••';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
   if (column.type === 'coords') {
     const c = value as { x?: number; y?: number };

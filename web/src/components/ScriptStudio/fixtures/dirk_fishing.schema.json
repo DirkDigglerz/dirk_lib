@@ -9270,7 +9270,7 @@
           "type": "number",
           "default": 0,
           "minimum": 0,
-          "description": "If a single sale pays out more than this amount, the log entry is flagged with a warning (anti-exploit). 0 disables flagging. Requires the relevant sale event to be enabled."
+          "description": "If a single sale pays out more than this amount, the log entry is flagged with a warning (anti-exploit). 0 disables flagging."
         }
       }
     }
