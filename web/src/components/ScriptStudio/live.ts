@@ -2,6 +2,8 @@ import { fetchNui, isEnvBrowser } from 'dirk-cfx-react';
 import { schemaToStudio } from './schemaToStudio';
 import { MOCK_SCRIPTS } from './mockData';
 import { useStudio } from './store';
+import { notify } from './Toasts';
+import type { DraftValue } from './store';
 import type { StudioScript } from './types';
 
 /**
@@ -145,12 +147,79 @@ export function applyLivePayload(payload: LivePayload[], focus?: string) {
 }
 
 /**
- * Re-read every script from the server, discarding nothing that is staged.
+ * What survives a re-read, of what was staged but not saved.
  *
- * The Refresh button used to be decorative - it had no handler at all. It
- * matters when someone else has saved while this panel was open: the values on
- * screen are then a snapshot of a config that has moved on, and the stored
- * version would reject the next save as a conflict.
+ * A rebuild is not a reset, so staged edits are kept - but only the ones the
+ * rebuilt schema still describes. The rebuild fires when a script RESTARTS,
+ * which during development is usually a restart because the schema itself just
+ * changed: a setting renamed, moved into a different section, or turned from a
+ * number into a list. A staged edit against the old shape would then be
+ * carried forward onto a setting that no longer exists, and the panel would
+ * hold a pending change nothing on screen accounts for - or worse, save it.
+ *
+ * So a path is kept only if it is still there AND is still the same kind of
+ * control. Everything else is dropped, and the admin is told rather than left
+ * to notice the change count went down on its own.
+ *
+ * The undo stack goes with it: its snapshots are whole drafts, so replaying
+ * one would put the pruned paths straight back.
+ */
+function pruneDrafts(scripts: StudioScript[]) {
+  const state = useStudio.getState();
+  const draft = { ...state.draft };
+  const undoStack = { ...state.undoStack };
+  const redoStack = { ...state.redoStack };
+  let dropped = 0;
+
+  for (const [resource, staged] of Object.entries(state.draft)) {
+    const paths = Object.keys(staged ?? {});
+    if (paths.length === 0) continue;
+
+    const rebuilt = scripts.find((s) => s.resource === resource);
+    // The script is gone outright - stopped, or no longer one this admin may
+    // see. There is nothing left to stage against.
+    if (!rebuilt) {
+      dropped += paths.length;
+      delete draft[resource];
+      delete undoStack[resource];
+      delete redoStack[resource];
+      continue;
+    }
+
+    const now = new Map(rebuilt.entries.map((entry) => [entry.path, entry.type]));
+    const before = new Map(
+      (state.scripts.find((s) => s.resource === resource)?.entries ?? [])
+        .map((entry) => [entry.path, entry.type]),
+    );
+
+    const kept: Record<string, DraftValue> = {};
+    for (const path of paths) {
+      const type = now.get(path);
+      const was = before.get(path);
+      if (type !== undefined && (was === undefined || was === type)) {
+        kept[path] = staged[path]!;
+      } else {
+        dropped += 1;
+      }
+    }
+
+    draft[resource] = kept;
+    if (Object.keys(kept).length !== paths.length) {
+      undoStack[resource] = [];
+      redoStack[resource] = [];
+    }
+  }
+
+  return { draft, undoStack, redoStack, dropped };
+}
+
+/**
+ * Re-read every script from the server, keeping what is still valid.
+ *
+ * Two things call this: the Refresh button, and a script restarting underneath
+ * an open panel. Refresh matters when someone else has saved while this panel
+ * was open - the values on screen are then a snapshot of a config that has
+ * moved on, and the stored version would reject the next save as a conflict.
  */
 export async function reloadFromServer() {
   if (isEnvBrowser()) return;
@@ -159,14 +228,24 @@ export async function reloadFromServer() {
 
   const state = useStudio.getState();
   const scripts = toStudioScripts(payload);
+  const { draft, undoStack, redoStack, dropped } = pruneDrafts(scripts);
 
   useStudio.setState({
     scripts,
-    // Whatever you were looking at, and whatever you had staged, survives -
-    // this is a re-read, not a reset.
+    draft,
+    undoStack,
+    redoStack,
+    // Whatever you were looking at survives, unless that script is no longer
+    // one of the ones on offer.
     activeResource: scripts.some((s) => s.resource === state.activeResource)
       ? state.activeResource
       : scripts[0]?.resource ?? '',
     saveError: null,
   });
+
+  if (dropped > 0) {
+    notify('info', dropped === 1
+      ? '1 unsaved change was dropped - that setting has changed'
+      : `${dropped} unsaved changes were dropped - those settings have changed`);
+  }
 }
