@@ -123,10 +123,14 @@ local function mergeInto(target, extra)
   end
 end
 
-RegisterNetEvent('dirk_lib:openScriptStudio', function(focus)
-  if studioOpen then return end
-  studioOpen = true
-
+--- Everything the panel needs: schemas (cached by content hash) and values
+--- (from each script's own client VM, plus its server-only sliver).
+---
+--- Extracted from the open handler so a REFRESH can run exactly the same
+--- gather. The panel had a Refresh button and a reloadFromServer() that asked
+--- for 'GET_SCRIPT_STUDIO' - a NUI callback that was never registered, so it
+--- always got the empty fallback and silently did nothing.
+local function buildStudioPayload()
   -- Tell the server which schemas we already hold, so it only sends what
   -- changed. First ever open pays the full transfer; every one after costs a
   -- list of hashes.
@@ -149,11 +153,7 @@ RegisterNetEvent('dirk_lib:openScriptStudio', function(focus)
   end
 
   local scripts = lib.callback.await('dirk_lib:getScriptStudio', known)
-  if type(scripts) ~= 'table' or #scripts == 0 then
-    studioOpen = false
-    lib.notify({ type = 'error', description = 'No script settings available.' })
-    return
-  end
+  if type(scripts) ~= 'table' or #scripts == 0 then return nil end
 
   for i = 1, #scripts do
     local entry = scripts[i]
@@ -214,10 +214,44 @@ RegisterNetEvent('dirk_lib:openScriptStudio', function(focus)
   end
   while pending > 0 do Wait(10) end
 
+  return scripts
+end
+
+RegisterNetEvent('dirk_lib:openScriptStudio', function(focus)
+  if studioOpen then return end
+  studioOpen = true
+
+  local scripts = buildStudioPayload()
+  if not scripts then
+    studioOpen = false
+    lib.notify({ type = 'error', description = 'No script settings available.' })
+    return
+  end
+
   SetNuiFocus(true, true)
   SendNuiMessage(json.encode({
     action = 'OPEN_SCRIPT_STUDIO',
     data = { scripts = scripts, focus = focus },
+  }))
+end)
+
+--- Re-gather without reopening. Backs the Refresh button, and the automatic
+--- rebuild when a script restarts underneath an open panel.
+RegisterNUICallback('GET_SCRIPT_STUDIO', function(_, cb)
+  cb(buildStudioPayload() or {})
+end)
+
+--- A consumer started or stopped while the panel is open.
+---
+--- The panel re-reads rather than closing: reloadFromServer keeps whatever is
+--- staged and whatever you were looking at, so a restart during an edit costs
+--- nothing. Ignored when the panel is shut, and the server broadcasts to
+--- everyone because it does not track who has it open.
+RegisterNetEvent('dirk_lib:scriptStudioResourcesChanged', function(resource)
+  if not studioOpen then return end
+  SendNuiMessage(json.encode({
+    action = 'SCRIPT_STUDIO_RESOURCES_CHANGED',
+    data = { resource = resource },
   }))
 end)
 

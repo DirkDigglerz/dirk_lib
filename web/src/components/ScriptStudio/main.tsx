@@ -7,6 +7,7 @@ import {
 import { defaultRangeExtractor, useVirtualizer } from '@tanstack/react-virtual';
 import { Fragment, memo, startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useNuiEvent } from '../../hooks/useNuiEvent';
+import { forgetComponents } from './CustomControl';
 import { fetchNui } from '../../utils/fetchNui';
 import { ControlsControl, SettingControl, controlSize, isWideType } from './Controls';
 import { ListRows } from './ListRows';
@@ -50,7 +51,7 @@ import { useAdminToolStore } from 'dirk-cfx-react';
 import { ChangelogPage } from './ChangelogPage';
 import { TestsPage } from './TestsPage';
 import { useAnnouncedResources } from './Dispatch';
-import { BASIC_CHILD, tabsAsList } from './types';
+import { BASIC_CHILD, MAP_CHILD, tabsAsList } from './types';
 import { Toasts } from './Toasts';
 
 // Icons resolve by name from the whole lucide set - see ./Icon. Re-exported
@@ -294,6 +295,23 @@ export default function ScriptStudio() {
 
   useNuiEvent('CLOSE_SCRIPT_STUDIO', () => useStudio.setState({ open: false }));
 
+  /**
+   * A script started or stopped while the panel is open.
+   *
+   * Re-read rather than close. reloadFromServer keeps what is staged and where
+   * you were, so a restart during an edit costs nothing - previously the only
+   * way to see a restarted script was to close the panel and reopen it, which
+   * threw away any unsaved work.
+   *
+   * The component cache is dropped for that resource first: a restart may be
+   * serving a new build, and the cache is keyed by resource and path, so
+   * without this the panel would keep rendering the module it imported before.
+   */
+  useNuiEvent<{ resource?: string }>('SCRIPT_STUDIO_RESOURCES_CHANGED', (data) => {
+    if (data?.resource) forgetComponents(data.resource);
+    void reloadFromServer();
+  });
+
   const script = useMemo(
     () => scripts.find((s) => s.resource === activeResource) ?? scripts[0],
     [scripts, activeResource],
@@ -421,6 +439,51 @@ export default function ScriptStudio() {
       const lists = groupEntries.filter(tabsAsList);
       const loose = groupEntries.filter((entry) => !tabsAsList(entry));
       const isWorkspace = workspaceGroups.has(groupId);
+
+      // A workspace with a MAP and settings of its own is two places, not one
+      // scrolling page. The layers stay together under a single Zones child —
+      // splitting them would defeat the shared canvas.
+      const mapLayers = groupEntries.filter((entry) => entry.type === 'zones');
+      const looseSettings = loose.filter((entry) => entry.type !== 'zones');
+
+      if (isWorkspace && mapLayers.length > 0 && looseSettings.length > 0) {
+        // Every OTHER list in the section still gets its own place.
+        //
+        // This branch used to offer Basic and the map and nothing else, so a
+        // workspace that had a map AND an ordinary list — barn finds, with its
+        // locations on a canvas and its sellers in a table — simply lost the
+        // table. It was in the config, saved fine, and was unreachable.
+        const otherLists = lists.filter((entry) => entry.type !== 'zones');
+
+        map.set(groupId, [
+          {
+            id: BASIC_CHILD,
+            label: t('main.basic', 'Basic'),
+            count: looseSettings.length,
+            list: BASIC_CHILD,
+          },
+          ...otherLists.map((entry) => ({
+            id: entry.path,
+            label: entry.label,
+            count: Array.isArray(entry.value) ? entry.value.length : 0,
+            list: entry.path,
+          })),
+          {
+            id: MAP_CHILD,
+            // Named after what is ON the map when there is only one layer, so
+            // a section of barn find Locations is not called Zones. Several
+            // layers share one canvas and have no single name, so those keep
+            // the generic one.
+            label: mapLayers.length === 1
+              ? mapLayers[0].label
+              : t('main.zones', 'Zones'),
+            count: mapLayers.reduce(
+              (n, entry) => n + (Array.isArray(entry.value) ? entry.value.length : 0), 0),
+            list: MAP_CHILD,
+          },
+        ]);
+        continue;
+      }
 
       // TWO or more lists, or a workspace whose ONE list has real settings
       // beside it.

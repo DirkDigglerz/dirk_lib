@@ -110,6 +110,14 @@ export type CustomProps = {
   onChange: (next: unknown) => void;
   canEdit: boolean;
   /**
+   * The row this control lives in, when it lives in one.
+   *
+   * A field inside a row usually needs its SIBLINGS to say anything useful —
+   * whether a seller's dialogue has been written is a question about its `id`,
+   * not about this field's own value, which may not have one at all.
+   */
+  row?: Record<string, unknown>;
+  /**
    * Open the PANEL's own editor for one row of a list.
    *
    * A script supplies a custom control because it knows how its data should
@@ -150,6 +158,20 @@ export type CustomProps = {
 // One cache per resource+path: a section re-renders constantly, and evaluating
 // a bundle on every render would be absurd.
 const CACHE = new Map<string, Promise<React.ComponentType<CustomProps>>>();
+
+/**
+ * Forget every component loaded from one resource.
+ *
+ * A restarted resource may be serving a NEW build of its component, but the
+ * cache is keyed by resource and path - both unchanged - so without this the
+ * panel would keep the module it imported before the restart and quietly
+ * render yesterday's code.
+ */
+export function forgetComponents(resource: string) {
+  for (const key of [...CACHE.keys()]) {
+    if (key.startsWith(`${resource}:`)) CACHE.delete(key);
+  }
+}
 
 export function load(resource: string, path: string): Promise<React.ComponentType<CustomProps>> {
   const key = `${resource}:${path}`;
@@ -254,10 +276,18 @@ export const REASONS: Record<string, string> = {
 };
 
 export function CustomControl({
-  resource, component, value, onChange, canEdit, entry, bare,
+  resource, component, value, onChange, canEdit, entry, bare, row,
 }: {
   resource: string;
   component: string;
+  /**
+   * The row this control sits in, when it sits in one.
+   *
+   * A field inside a row usually needs its SIBLINGS to say anything useful —
+   * a seller's dialogue coverage is a question about its `id`, not about the
+   * field's own value, which may not have one at all.
+   */
+  row?: Record<string, unknown>;
   /** fill the pane: no frame, no border, no rounding (see x-componentFull) */
   bare?: boolean;
   value: unknown;
@@ -340,6 +370,7 @@ export function CustomControl({
               value={value}
               onChange={onChange}
               canEdit={canEdit}
+              row={row}
               t={t}
               notify={notify}
               {...rowApi}

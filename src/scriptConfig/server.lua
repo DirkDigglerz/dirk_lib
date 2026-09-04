@@ -329,8 +329,24 @@ local function registeredResources()
   return list
 end
 
-AddEventHandler('onResourceStart', function() registryCache = nil end)
-AddEventHandler('onResourceStop', function() registryCache = nil end)
+--- A dirk script started or stopped.
+---
+--- Drops the registry cache, and tells any open panel to re-read itself. The
+--- panel re-gathers rather than closing, so someone editing when a script
+--- restarts underneath them keeps their staged changes and their place -
+--- previously the only way to see a restarted script was to close the panel
+--- and open it again, and any unsaved work went with it.
+---
+--- Broadcast to everyone: the server does not track who has the panel open,
+--- and the client ignores it unless it does. One tiny event on a rare action.
+local function announceRegistryChange(resourceName)
+  registryCache = nil
+  if not resourceName or not hasScriptConfigTag(resourceName) then return end
+  TriggerClientEvent('dirk_lib:scriptStudioResourcesChanged', -1, resourceName)
+end
+
+AddEventHandler('onResourceStart', announceRegistryChange)
+AddEventHandler('onResourceStop', announceRegistryChange)
 
 local function collectRegisteredConfigs(src)
   local all = registeredResources()
