@@ -1648,7 +1648,37 @@ end
 -- CALLBACKS
 -- --------------------------------------------------
 
+--- How long a client's first ask will wait for a config that is still being
+--- built, before being told to come back later.
+local READY_WAIT_MS = 20000
+
 lib.callback.register(('%s:getScriptConfig'):format(scriptName), function(src, client_ver)
+  -- Wait rather than refuse.
+  --
+  -- A resource restarting under live players starts its server and client
+  -- halves at once, so the client's first ask ALWAYS lands before the server
+  -- has merged its config. Answering 'NotReady' made that a wasted round trip
+  -- plus a backoff the client had to sit out - a second on defaults, and a
+  -- "config arrived after 2 attempts" line on every single restart.
+  --
+  -- Broadcasting a ready event was tried first and is not enough on its own:
+  -- the server can finish before the client has even registered a handler, so
+  -- the client misses it and falls back to the backoff anyway. Holding the
+  -- callback open has no such race - the client is already waiting on an
+  -- answer, so it simply gets a slightly later one, and only on the first ask
+  -- after a restart.
+  --
+  -- Callbacks run in their own coroutine, so this yields rather than blocking
+  -- the server. The cap exists so a config that never builds (a broken schema)
+  -- surfaces as NotReady instead of a request that hangs forever.
+  if not scriptConfig then
+    local waited = 0
+    while not scriptConfig and waited < READY_WAIT_MS do
+      Wait(50)
+      waited = waited + 50
+    end
+  end
+
   if not scriptConfig then return nil, 'NotReady' end
   client_ver = tonumber(client_ver) or -1
   -- Use equality: hash ordering is meaningless, client is up-to-date iff hashes match.
