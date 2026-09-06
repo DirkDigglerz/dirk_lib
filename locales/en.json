@@ -616,5 +616,6 @@
   "studio.meter.progression.easier": "Easier",
   "studio.meter.progression.muchEasier": "Much easier",
   "studio.groupGradeControl.rank_and_above": "rank {} and above",
-  "studio.groupGradeControl.done": "Done"
+  "studio.groupGradeControl.done": "Done",
+  "dialog.close": "Close"
 }
