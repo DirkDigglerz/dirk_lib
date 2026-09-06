@@ -174,6 +174,9 @@ function dialog:send()
   SendNuiMessage(json.encode({
     action = 'DIALOG_STATE',
     data = {
+      -- The colours of whoever opened this, resolved at send time so an admin
+      -- changing a theme mid-conversation is reflected on the next state.
+      theme       = lib.themeFor(self.resource),
       id          = self.id,
       title       = self.title,
       subtitle    = self.subtitle,

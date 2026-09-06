@@ -52,6 +52,7 @@ lib.showTextUI = function(text, options)
   end
 
   isOpen = true
+  options.theme = lib.uiTheme(invoking_resource)
   SendNuiMessage(json.encode({
     action = 'SHOW_TEXT_UI',
     data = {

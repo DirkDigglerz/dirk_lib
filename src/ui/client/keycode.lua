@@ -15,6 +15,7 @@ lib.keycode = function(code, opts)
       multipleTries = opts.multipleTries == true,
       allowCancel   = opts.allowCancel ~= false,
       length        = opts.length, -- optional fixed length, auto-submit when reached
+      theme         = lib.uiTheme(GetInvokingResource() or GetCurrentResourceName()),
     },
   }))
 

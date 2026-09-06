@@ -47,9 +47,15 @@ function ContextMenu:open(fromMenu)
   self:sanitizeOptions()
   
   SetNuiFocus(true, true)
+
+  local payload = self:getNuiData()
+  -- Resolved at SEND time, not at register time, so a theme changed while a
+  -- menu is registered is picked up the next time it opens.
+  payload.theme = lib.uiTheme(self.resource)
+
   SendNuiMessage(json.encode({
     action = 'OPEN_CONTEXT',
-    data   = self:getNuiData()
+    data   = payload
   }, { sort_keys = true }))
 end
 
@@ -161,6 +167,17 @@ lib.registerContext = function(id, data)
     data.id = id
     return b.registerContext(data)
   end
+
+  -- Whose menu this is, captured HERE. `GetInvokingResource` only answers for
+  -- the frame that crossed the export boundary, so it has to be read at the
+  -- entry point rather than further down.
+  if type(id) == 'table' then
+    id.resource = GetInvokingResource() or GetCurrentResourceName()
+  else
+    data = data or {}
+    data.resource = GetInvokingResource() or GetCurrentResourceName()
+  end
+
   return ContextMenu.register(id, data)
 end
 

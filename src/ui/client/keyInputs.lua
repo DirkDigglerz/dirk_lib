@@ -106,7 +106,8 @@ lib.showKeys = function(data)
             data = {
               position = data.position,
               direction = data.direction or 'column',
-              inputs = data.inputs
+              inputs = data.inputs,
+              theme = lib.uiTheme(invoking_resource),
             }
           }, {sort_keys = true}))
         end

@@ -26,6 +26,8 @@ local alertId = 0
 ---@param timeout? number Force the dialog to auto-close after `x` milliseconds.
 ---@return 'cancel' | 'confirm' | nil
 function lib.alertDialog(data, timeout)
+    local theme = lib.uiTheme(GetInvokingResource() or GetCurrentResourceName())
+
     local b = getBridge()
     if b and b.alertDialog then return b.alertDialog(data, timeout) end
 
@@ -36,6 +38,7 @@ function lib.alertDialog(data, timeout)
     alert = promise.new()
 
     SetNuiFocus(true, true)
+    data.theme = theme
     SendNuiMessage(json.encode({
         action = 'SHOW_ALERT_DIALOG',
         data = data

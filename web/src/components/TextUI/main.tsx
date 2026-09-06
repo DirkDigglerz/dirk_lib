@@ -4,6 +4,7 @@ import { Flex, Text, Transition, useMantineTheme } from "@mantine/core";
 import { useEffect, useState } from "react";
 import { useNuiEvent } from "../../hooks/useNuiEvent";
 import { getPositionProps, getTranslate, PositionProps } from "../../utils/positioning";
+import { setUiTheme } from '../../stores/uiTheme';
 
 type TextUIOptions = {
   position?: PositionProps
@@ -38,6 +39,10 @@ export default function TextUI(){
     text: string
     options?: TextUIOptions
   }) => {
+    // Whose colours this belongs to. `App` wraps this component in <Themed>,
+    // so the whole thing — body and hooks included — renders in the calling
+    // resource's palette.
+    setUiTheme('textui', (data.options as unknown as { theme?: never } | undefined)?.theme);
     setCurrentText(data.text)
     setOptions(data.options || {})
     setOpened(true) 

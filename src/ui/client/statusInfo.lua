@@ -22,7 +22,8 @@ function StatusInfo:serialize()
     description = self.description,
     time        = self.time,
     progress    = self.progress,
-    progText    = self.progText
+    progText    = self.progText,
+    theme       = lib.uiTheme(self.resource),
   }
 end
 

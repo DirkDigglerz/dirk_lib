@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { InstructionPanel, type InstructionKey } from 'dirk-cfx-react';
 import { useNuiEvent } from '../../hooks/useNuiEvent';
+import { setUiTheme } from '../../stores/uiTheme';
 
 type InstructionSpec = {
   title: string;
@@ -19,6 +20,11 @@ const Instructions: React.FC = () => {
   const [spec, setSpec] = useState<InstructionSpec | null>(null);
 
   useNuiEvent<InstructionSpec>('DIRK_LIB_SHOW_INSTRUCTIONS', (data) => {
+    // Whose colours this belongs to. `App` wraps this component in
+    // <Themed>, so the whole thing — body and hooks included — renders
+    // in the calling resource's palette.
+    setUiTheme('instructions', (data as { theme?: never } | undefined)?.theme);
+
     if (!data || typeof data.title !== 'string') return;
     setSpec({ title: data.title, hint: data.hint, keys: data.keys });
   });

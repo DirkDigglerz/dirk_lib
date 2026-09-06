@@ -10,6 +10,7 @@ import SideBar from "../Generic/SideBar";
 import { Title } from "../Generic/Title";
 import Button from "../Generic/Button";
 import { locale } from "../../stores/locales";
+import { setUiTheme } from '../../stores/uiTheme';
 
 
 
@@ -165,6 +166,10 @@ export default function Input(){
   
 
   useNuiEvent('OPEN_INPUT_DIALOG', (data: {info: InfoProps, inputs: InputProps[]}) => {
+    // Whose colours this belongs to. `App` wraps this component in <Themed>,
+    // so the whole thing — body and hooks included — renders in the calling
+    // resource's palette.
+    setUiTheme('input', (data as unknown as { theme?: never })?.theme);
 
     setMainInfo(data.info)
     setInputs(data.inputs)

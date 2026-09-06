@@ -6,6 +6,7 @@ import { internalEvent } from "../../utils/internalEvent";
 import { getPositionProps, getTranslate, PositionProps } from "../../utils/positioning";
 import KeyIcon from "./KeyButton";
 import { KeyLabel } from "./KeyLabel";
+import { setUiTheme } from '../../stores/uiTheme';
 
 export type KeyInputProps = {
   qwerty: string
@@ -33,6 +34,10 @@ export default function KeyInputs(){
     inputs: KeyInputProps[]
     direction: 'row' | 'column' | 'row-reverse' | 'column-reverse'
   }) => {
+    // Whose colours this belongs to. `App` wraps this component in <Themed>,
+    // so the whole thing — body and hooks included — renders in the calling
+    // resource's palette.
+    setUiTheme('keyinputs', (data as unknown as { theme?: never })?.theme);
     setPosition(data.position)
     setKeyInputs(data.inputs) 
     setDirection(data.direction)

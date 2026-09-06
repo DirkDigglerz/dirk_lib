@@ -7,6 +7,7 @@ import { useNuiEvent } from "../../hooks/useNuiEvent";
 import colorWithAlpha from "../../utils/colorWithAlpha";
 import { fetchNui } from "../../utils/fetchNui";
 import { locale } from "../../stores/locales";
+import { setUiTheme } from '../../stores/uiTheme';
 
 type Status = {
   id: string; 
@@ -34,6 +35,10 @@ export default function StatusInfo(){
 
 
   useNuiEvent('ADD_STATUS', (status: Status) => {
+    // Whose colours this belongs to. `App` wraps this component in <Themed>,
+    // so the whole thing — body and hooks included — renders in the calling
+    // resource's palette.
+    setUiTheme('status', (status as unknown as { theme?: never })?.theme);
     // remove status with the same id
     setStatuses((prev) => prev.filter((s) => s.id !== status.id));
     setStatuses((prev) => [...prev, status]);

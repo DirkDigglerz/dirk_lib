@@ -24,6 +24,8 @@ import ScriptStudio from './ScriptStudio/main';
 import StatusInfo from './StatusInfo/main';
 import TestBed from './TestBed/main';
 import TextUI from './TextUI/main';
+import Themed from './Themed';
+import { useUiTheme } from '../stores/uiTheme';
 
 
 // @ts-expect-error - This is a web component, it doesn't exist in the types
@@ -56,19 +58,32 @@ const App: React.FC = () => {
   return (
     <DirkProvider>
       <TestBed />
-      <ProgressBar />
-      <TextUI />
+
+      {/*
+        Each shared element wears the colours of the resource that opened it.
+
+        Wrapped HERE rather than inside each component, because a component
+        resolves its hooks in its own body — above the JSX it returns — so a
+        wrapper on the return leaves every colour computed up there as
+        dirk_lib's. From out here the whole component is inside the scope and
+        nothing had to be restructured.
+
+        Notifications are deliberately NOT wrapped: they are server furniture
+        and should look the same whichever script raised them.
+      */}
+      <Themed theme={useUiTheme('progress')}><ProgressBar /></Themed>
+      <Themed theme={useUiTheme('textui')}><TextUI /></Themed>
       <Notifications />
-      <Menu />
-      <Quiz />
-      <Dialog />
-      <Input />
-      <KeyInputs />
-      <Keycode />
-      <StatusInfo />
+      <Themed theme={useUiTheme('context')}><Menu /></Themed>
+      <Themed theme={useUiTheme('quiz')}><Quiz /></Themed>
+      <Themed theme={useUiTheme('dialog')}><Dialog /></Themed>
+      <Themed theme={useUiTheme('input')}><Input /></Themed>
+      <Themed theme={useUiTheme('keyinputs')}><KeyInputs /></Themed>
+      <Themed theme={useUiTheme('keycode')}><Keycode /></Themed>
+      <Themed theme={useUiTheme('status')}><StatusInfo /></Themed>
       <GizmoOverlay />
-      <AlertDialog />
-      <Instructions />
+      <Themed theme={useUiTheme('alert')}><AlertDialog /></Themed>
+      <Themed theme={useUiTheme('instructions')}><Instructions /></Themed>
       <ScriptConfigChooser />
       <ScriptStudio />
       <AdminSection />

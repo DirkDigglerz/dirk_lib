@@ -38,6 +38,8 @@ import { useEffect, useState } from "react";
 import { useNuiEvent } from "../../hooks/useNuiEvent";
 import { fetchNui } from "../../utils/fetchNui";
 import { locale } from "../../stores/locales";
+import type { ResourceTheme } from "../Themed";
+import { setUiTheme } from "../../stores/uiTheme";
 
 export type DialogTone = "ok" | "warn" | "bad" | "muted";
 
@@ -63,6 +65,12 @@ export type ResponseProps = {
 
 export type IDialogProps = {
   id: string;
+  /**
+   * The calling resource's palette, sent by the Lua side. Absent for a
+   * resource with no override of its own, which then renders in dirk_lib's
+   * theme exactly as before.
+   */
+  theme?: ResourceTheme | null;
   /** Who is talking. */
   title: string;
   /** Where you are, what this is about — the quiet line under the name. */
@@ -213,6 +221,15 @@ function Pager({ dir, shown, onClick }: {
   );
 }
 
+/** Text in one of the four tones. */
+function ToneText({ tone: t, fallback, style, children }: {
+  tone?: DialogTone; fallback: string;
+  style?: React.CSSProperties; children: React.ReactNode;
+}) {
+  const tone = useTone();
+  return <Text style={{ ...style, color: tone(t, fallback) }}>{children}</Text>;
+}
+
 /* ── one readout on the right ─────────────────────────────────────────────── */
 
 function Readout({ row }: { row: MetadataProps }) {
@@ -255,7 +272,6 @@ function Readout({ row }: { row: MetadataProps }) {
 
 export default function Dialog() {
   const theme = useMantineTheme();
-  const tone = useTone();
   const bad = theme.colors.red[6];
 
   const [data, setData] = useState<IDialogProps | null>(null);
@@ -263,6 +279,9 @@ export default function Dialog() {
   const [page, setPage] = useState(0);
 
   useNuiEvent<IDialogProps | null>("DIALOG_STATE", (next) => {
+    // Reported rather than applied here: `App` wraps this whole component, so
+    // the hooks in its body see the caller's palette too.
+    setUiTheme("dialog", next?.theme);
     setData(next ?? null);
     setBusy(false);
     // A brand new conversation starts on page one; a state update within the
@@ -380,14 +399,17 @@ export default function Dialog() {
                 transition={{ duration: 0.2 }}
                 style={{ width: "100%" }}
               >
-                <Text style={{
-                  fontSize: "1.85vh", lineHeight: 1.4, fontStyle: "italic",
-                  maxWidth: "62ch",
-                  color: tone(data.dialogTone, "rgba(255,255,255,0.9)"),
-                  textShadow: "0 0.1vh 1.4vh rgba(0,0,0,0.9)",
-                }}>
+                <ToneText
+                  tone={data.dialogTone}
+                  fallback="rgba(255,255,255,0.9)"
+                  style={{
+                    fontSize: "1.85vh", lineHeight: 1.4, fontStyle: "italic",
+                    maxWidth: "62ch",
+                    textShadow: "0 0.1vh 1.4vh rgba(0,0,0,0.9)",
+                  }}
+                >
                   {`“${data.dialog}”`}
-                </Text>
+                </ToneText>
               </motion.div>
             </AnimatePresence>
           </Flex>
@@ -409,12 +431,13 @@ export default function Dialog() {
             }}>
               {data.note ? (
                 <Flex align="center" style={{ gridColumn: "1 / -1", gridRow: "1 / -1" }}>
-                  <Text style={{
-                    fontSize: "1.6vh",
-                    color: tone(data.noteTone, "rgba(255,255,255,0.45)"),
-                  }}>
+                  <ToneText
+                    tone={data.noteTone}
+                    fallback="rgba(255,255,255,0.45)"
+                    style={{ fontSize: "1.6vh" }}
+                  >
                     {data.note}
-                  </Text>
+                  </ToneText>
                 </Flex>
               ) : (
                 <>

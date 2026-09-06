@@ -162,6 +162,11 @@ end
 ---@param data ProgressProps
 ---@return boolean?
 function lib.progressBar(data)
+  -- Read FIRST. `GetInvokingResource` answers only for the frame that crossed
+  -- the export boundary, and the wait below ends that frame — after it, every
+  -- progress bar would come back as dirk_lib's.
+  local theme = lib.uiTheme(GetInvokingResource() or GetCurrentResourceName())
+
   local b = getBridge()
   if b and b.progressBar then return b.progressBar(data) end
 
@@ -175,7 +180,8 @@ function lib.progressBar(data)
         duration = data.duration,
         position = data.position or lib.settings.progBarPosition or 'bottom-center',
         icon     = data.icon,
-        description = data.description
+        description = data.description,
+        theme    = theme,
       }
     })
 
@@ -186,6 +192,10 @@ end
 ---@param data ProgressProps
 ---@return boolean?
 function lib.progressCircle(data)
+  -- Read FIRST, same reason as the bar: the wait below ends the frame that
+  -- carried the invoking resource.
+  local theme = lib.uiTheme(GetInvokingResource() or GetCurrentResourceName())
+
   local b = getBridge()
   if b and b.progressCircle then return b.progressCircle(data) end
 
@@ -197,7 +207,8 @@ function lib.progressCircle(data)
       data = {
         duration = data.duration,
         position = data.position or lib.settings.progBarPosition or 'bottom-center',
-        label = data.label
+        label = data.label,
+        theme = theme,
       }
     })
 

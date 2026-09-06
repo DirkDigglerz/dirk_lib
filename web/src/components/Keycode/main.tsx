@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useNuiEvent } from "../../hooks/useNuiEvent";
 import { fetchNui } from "../../utils/fetchNui";
+import { setUiTheme } from '../../stores/uiTheme';
 
 interface KeycodeData {
   code: string;
@@ -34,6 +35,11 @@ export default function Keycode() {
   }, []);
 
   useNuiEvent<KeycodeData>("OPEN_KEYCODE", (incoming) => {
+    // Whose colours this belongs to. `App` wraps this component in
+    // <Themed>, so the whole thing — body and hooks included — renders
+    // in the calling resource's palette.
+    setUiTheme('keycode', (incoming as { theme?: never } | undefined)?.theme);
+
     respondedRef.current = false;
     setData(incoming);
     setEntry("");

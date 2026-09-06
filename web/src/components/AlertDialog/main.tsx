@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNuiEvent } from "../../hooks/useNuiEvent";
 import { fetchNui } from "../../utils/fetchNui";
+import { setUiTheme } from '../../stores/uiTheme';
 
 interface AlertDialogData {
   header: string;
@@ -39,6 +40,11 @@ export default function AlertDialog() {
   );
 
   useNuiEvent<AlertDialogData>("SHOW_ALERT_DIALOG", (incoming) => {
+    // Whose colours this belongs to. `App` wraps this component in
+    // <Themed>, so the whole thing — body and hooks included — renders
+    // in the calling resource's palette.
+    setUiTheme('alert', (incoming as { theme?: never } | undefined)?.theme);
+
     setData(incoming);
     setOpen(true);
   });

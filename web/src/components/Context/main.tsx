@@ -7,6 +7,7 @@ import SideBar from "../Generic/SideBar";
 import { Title } from "../Generic/Title";
 import { ContextItem, ContextItemProps } from "./ContextItem";
 import SearchableContent from "./Searchable";
+import { setUiTheme } from '../../stores/uiTheme';
 
 export type MenuProps = {
   title: string
@@ -28,6 +29,10 @@ export default function Menu(){
     const theme = useMantineTheme();
     
     useNuiEvent('OPEN_CONTEXT', (data: MenuProps) => {
+    // Whose colours this belongs to. `App` wraps this component in <Themed>,
+    // so the whole thing — body and hooks included — renders in the calling
+    // resource's palette.
+    setUiTheme('context', (data as unknown as { theme?: never })?.theme);
       setMenuOpen(data)
     })
 

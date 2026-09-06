@@ -54,6 +54,7 @@ function lib.showInstructions(spec)
     title = spec.title,
     hint  = spec.hint,
     keys  = spec.keys,
+    theme = lib.uiTheme(owner),
   })
 end
 

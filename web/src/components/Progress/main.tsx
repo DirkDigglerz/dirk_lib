@@ -8,6 +8,7 @@ import { locale } from "../../stores/locales";
 import { fetchNui } from "../../utils/fetchNui";
 import { getPositionProps, getTranslate, PositionProps } from "../../utils/positioning";
 import { MotionFlex } from "../App";
+import { setUiTheme } from '../../stores/uiTheme';
 
 type ProgressProps = {
   position: PositionProps 
@@ -51,6 +52,10 @@ export default function ProgressBar() {
   }, [display, options.duration, pause])
   
   useNuiEvent('SHOW_PROGRESS', (data: ProgressProps) => {
+    // Whose colours this belongs to. `App` wraps this component in <Themed>,
+    // so the whole thing — body and hooks included — renders in the calling
+    // resource's palette.
+    setUiTheme('progress', (data as unknown as { theme?: never })?.theme);
     setPause(false)
     setOptions(data)
     setProgress(0)

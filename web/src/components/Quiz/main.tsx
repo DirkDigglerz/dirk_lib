@@ -8,6 +8,7 @@ import SideBar from '../Generic/SideBar'
 import InfoBox from './InfoBox'
 import Questions from './Questions'
 import { QuizInfoProps } from './types'
+import { setUiTheme } from '../../stores/uiTheme';
 
 function QuizTitle(props: {title: string, icon: string}){
   return ( 
@@ -139,6 +140,10 @@ function Quiz(){
   })
   // eslint-disable-next-line
   useNuiEvent('QUIZ_STATE', (data: any) => {
+    // Whose colours this belongs to. `App` wraps this component in <Themed>,
+    // so the whole thing — body and hooks included — renders in the calling
+    // resource's palette.
+    setUiTheme('quiz', (data as unknown as { theme?: never })?.theme);
     if (data.action == 'OPEN') { 
       setOpen(true)
       setAnswers({})

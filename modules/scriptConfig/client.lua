@@ -148,7 +148,39 @@ end
 --- them what they are being handed anyway.
 local dispatching = false
 
+--- Tell dirk_lib what colours this resource wears.
+---
+--- dirk_lib draws every shared UI on ITS OWN page, so without this a dialogue
+--- opened by a resource with its own theme comes up in dirk_lib's colours.
+--- This module is the right place to send it from because it runs inside the
+--- CONSUMER — it is the only code that sees another resource's config at all.
+---
+--- Sent on every application of the config, which covers both moments that
+--- matter: the first hydration and every later edit. No startup special case,
+--- no polling, and nothing for a script author to remember.
+local lastTheme
+local function announceTheme(current)
+  if scriptName == 'dirk_lib' then return end
+
+  local theme = current and current.theme
+  -- A resource with no `theme` block never announces, so dirk_lib has no entry
+  -- for it and falls back to the global appearance. Which is correct, and is
+  -- the behaviour every resource has today.
+  if type(theme) ~= 'table' then return end
+
+  local stamp = json.encode(theme)
+  if stamp == lastTheme then return end
+  lastTheme = stamp
+
+  pcall(function()
+    exports.dirk_lib:registerTheme(GetCurrentResourceName(), theme)
+  end)
+end
+
 local function dispatchScriptConfigWatchers(current, previous, changedLeaves, source, forceInitial)
+  -- Before the watcher guard: a resource with no watchers still has a theme.
+  announceTheme(current)
+
   if not next(scriptConfigWatchers) then return end
   if dispatching then return end
   dispatching = true

@@ -10,6 +10,10 @@ local function getBridge()
 end
 
 lib.inputDialog = function(title, inputs, options)
+  -- Read before anything else can yield: GetInvokingResource only answers for
+  -- the frame that crossed the export boundary.
+  local theme = lib.uiTheme(GetInvokingResource() or GetCurrentResourceName())
+
   local b = getBridge()
   if b and b.inputDialog then return b.inputDialog(title, inputs, options) end
 
@@ -30,6 +34,7 @@ lib.inputDialog = function(title, inputs, options)
         prevDialog  = options.prevDialog
       },
       inputs  = inputs,
+      theme   = theme,
     },
   }))
 
