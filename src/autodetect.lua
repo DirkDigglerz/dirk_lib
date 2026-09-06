@@ -17,7 +17,11 @@ local supportedResources = {
   target            = {'ox_target', 'qb-target', 'q-target', 'bt-target'},
   interact          = {'redm-uiprompt', 'sleepless_interact', 'interact'},
   time              = {'av_weather', 'cd_easytime', 'qb-weathersync', 'Renewed-Weathersync', 'vSync', 'wasabi_wheather'},
-  keys              = {'cd_garage', 'MrNewbVehicleKeys', 't1ger_keys', 'okokGarage', 'qb-vehiclekeys', 'qbx_vehiclekeys', 'qs-vehiclekeys', 'Renewed-Vehiclekeys', 'vehicles_keys', 'wasabi_carlock', 'ludaro-keys'},
+  -- Same `provide` trap as inventory, and it bit: qbx_vehiclekeys declares
+  -- `provide 'qb-vehiclekeys'`, so on every qbx server GetResourceState said
+  -- qb-vehiclekeys was started and dirk_lib picked the generic bridge over the
+  -- real one. The forks go BEFORE the name they impersonate.
+  keys              = {'cd_garage', 'MrNewbVehicleKeys', 't1ger_keys', 'okokGarage', 'qbx_vehiclekeys', 'qb-vehiclekeys', 'qs-vehiclekeys', 'Renewed-Vehiclekeys', 'vehicles_keys', 'wasabi_carlock', 'ludaro-keys'},
   fuel              = {'cdn-fuel', 'LegacyFuel', 'ox_fuel', 'ps-fuel', 'Renewed-Fuel', 'ti_fuel', 'x-fuel', 'wasabi_fuel', 'okokGasStation', 'qs-fuelstations'},
   phone             = {'lb-phone', 'qb-phone', 'gksphone', 'high-phone', 'npwd'},
   -- Real drop-in garages listed before the generic qb-garages they often layer
