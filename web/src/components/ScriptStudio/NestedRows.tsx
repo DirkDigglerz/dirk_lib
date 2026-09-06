@@ -129,7 +129,7 @@ export function NestedRows({
 
             <Flex align="center" gap="xs" style={{ flex: 1, minWidth: 0 }}>
               {summaryKeys.map((child) => {
-                const text = display(row[child.key]);
+                const text = display(row[child.key], child.type);
                 if (!text) return null;
                 return (
                   <Flex key={child.key} align="baseline" gap="0.35vh" style={{ minWidth: 0 }}>
@@ -230,18 +230,37 @@ export function NestedRows({
 }
 
 /** Worth putting on the summary line - a nested table or a slider is not. */
+/** Meter scales, which all read as a proportion rather than a raw number. */
+const METERS = new Set<SettingColumn['type']>([
+  'chance', 'multiplier', 'difficulty', 'forgiveness',
+  'rarity', 'balance', 'progression', 'generosity',
+]);
+
 function isSummarisable(type: SettingColumn['type']): boolean {
-  return type !== 'rows' && type !== 'object' && type !== 'tags'
-    && type !== 'range' && type !== 'zones';
+  // `range` belongs here. A min and a max is one of the most summarisable
+  // things a row carries — "0.2 – 0.7" tells you what the entry IS — and
+  // leaving it out meant a list of cars showed the model and nothing else.
+  return type !== 'rows' && type !== 'object' && type !== 'tags' && type !== 'zones';
 }
 
 /** One short, readable cell value. */
-function display(value: unknown): string {
+function display(value: unknown, type?: SettingColumn['type']): string {
   if (value === null || value === undefined || value === '') return '';
   if (typeof value === 'boolean') return value ? 'on' : 'off';
-  if (typeof value === 'number') return String(value);
+  // A meter is set as a proportion and read as a percentage. 0.05 in a summary
+  // is a number you have to convert in your head to know it means "rare".
+  if (typeof value === 'number') {
+    return type && METERS.has(type) && value >= 0 && value <= 1
+      ? `${Math.round(value * 100)}%`
+      : String(value);
+  }
   if (typeof value === 'string') return value;
-  if (Array.isArray(value)) return String(value.length);
+  // A pair of numbers is a range, and its LENGTH is never the interesting part.
+  if (Array.isArray(value)) {
+    return value.length === 2 && value.every((v) => typeof v === 'number')
+      ? `${value[0]} – ${value[1]}`
+      : String(value.length);
+  }
   return '';
 }
 

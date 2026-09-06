@@ -13,7 +13,7 @@ import { FieldRow, isWideColumn } from './FieldRow';
 import { validateRow } from './rowValidation';
 import { Icon } from './Icon';
 import { PickerDrawer } from './PickerDrawer';
-import { fieldGatedOff, StudioButton } from './ui';
+import { fieldGatedOff, singular, StudioButton } from './ui';
 import type { SettingColumn, SettingEntry } from './types';
 import { useChrome } from './studioLocale';
 import { newRow } from './newRow';
@@ -55,6 +55,14 @@ export function ZoneMap({
   const [editing, setEditing] = useState<{ path: string; index: number } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ path: string; index: number } | null>(null);
   const [drawInto, setDrawInto] = useState<string | null>(null);
+  /**
+   * A row being made, held OUT of the list until it is saved.
+   *
+   * Appending first and opening the editor over it leaves a blank row behind
+   * when you cancel — the ghost the blueprint chooser had. Nothing is written
+   * until there is something worth writing.
+   */
+  const [adding, setAdding] = useState<{ path: string; row: Row } | null>(null);
   const [replaceSingle, setReplaceSingle] = useState<{ path: string; points: Point[] } | null>(null);
 
   // Normalise every mapped shape into one thing the map can draw.
@@ -76,15 +84,50 @@ export function ZoneMap({
 
     const labelKey = layer.entry.rowLabelKey ?? 'label';
 
+    /**
+     * Every position a marker row holds.
+     *
+     * One place per row is the common case and puts `x`/`y` on the row itself.
+     * A row that is genuinely two places — a barn find's owner standing apart
+     * from the car he is selling — declares `points` in `x-mapPaths` and keeps
+     * a `{x,y,z,w}` under each named key. Both draw, and each drags on its own.
+     */
+    const declared = layer.entry.mapPoints;
+    const pinsOf = (row: Row) => {
+      if (!declared?.length) {
+        return typeof row.x === 'number' && typeof row.y === 'number'
+          ? [{ key: null as string | null, label: undefined as string | undefined,
+            color: undefined as string | undefined, point: { x: row.x, y: row.y } as Point }]
+          : [];
+      }
+      return declared.flatMap((spot) => {
+        const at = row[spot.key] as { x?: unknown; y?: unknown } | undefined;
+        if (!at || typeof at.x !== 'number' || typeof at.y !== 'number') return [];
+        return [{
+          key: spot.key as string | null,
+          label: spot.label,
+          color: spot.color,
+          point: { x: at.x, y: at.y } as Point,
+        }];
+      });
+    };
+
     const shapes = isSingle
-      ? [{ index: 0, title: layer.entry.label, points: raw as Point[], row: undefined as Row | undefined }]
+      ? [{
+        index: 0,
+        title: layer.entry.label,
+        // A top-level outline has no pins, but the shape of the two branches
+        // has to match or nothing can read `pins` without narrowing first.
+        pins: [] as ReturnType<typeof pinsOf>,
+        points: raw as Point[],
+        row: undefined as Row | undefined,
+      }]
       : (raw as Row[]).map((row, index) => ({
         index,
         title: String(row[labelKey] ?? row.id ?? row.name ?? `${layer.entry.label} ${index + 1}`),
+        pins: isMarker ? pinsOf(row) : [],
         points: isMarker
-          ? (typeof row.x === 'number' && typeof row.y === 'number'
-            ? [{ x: row.x as number, y: row.y as number }]
-            : [])
+          ? pinsOf(row).map((pin) => pin.point)
           : (Array.isArray(row[polyKey]) ? (row[polyKey] as Point[]) : []),
         row,
       }));
@@ -131,6 +174,25 @@ export function ZoneMap({
     layer.onChange([...rows, template]);
     setSelected({ path: layer.entry.path, index: rows.length });
     setEditing({ path: layer.entry.path, index: rows.length });
+  };
+
+  /**
+   * Pins are placed, not drawn.
+   *
+   * Dragging an outline round a place that IS one point makes no sense, and a
+   * row can hold several positions anyway — which one would the outline be?
+   * So a marker layer adds through its own editor, and the map stays the thing
+   * that shows you where everything ended up.
+   */
+  const startAdd = (path: string) => {
+    const layer = layerFor(path);
+    if (!layer) return;
+    const rows = Array.isArray(layer.value) ? (layer.value as Row[]) : [];
+    const template = newRow(layer.entry.rowTemplate, layer.entry.columns);
+    // Singular: the layer is called Locations, but the thing being made is one
+    // location. "Locations 3" reads like a group of them.
+    template[layer.labelKey] = `${singular(layer.entry.label)} ${rows.length + 1}`;
+    setAdding({ path, row: template });
   };
 
   const deleteShape = (path: string, index: number) => {
@@ -192,15 +254,13 @@ export function ZoneMap({
               {drawInto && <DrawPolygon color={layerFor(drawInto)?.color ?? accent} onDone={commitDrawing} />}
 
               {/* Pins first, so an outline never paints over one. */}
-              {visibleShapes.filter((layer) => layer.isMarker).map((layer) => layer.shapes.map((shape) => {
-                const point = shape.points[0];
-                if (!point) return null;
+              {visibleShapes.filter((layer) => layer.isMarker).map((layer) => layer.shapes.flatMap((shape) => {
                 const active = selected?.path === layer.entry.path && selected.index === shape.index;
                 const style = layer.styleFor(shape.row);
-                return (
+                return shape.pins.map((pin) => (
                   <Marker
-                    key={`${layer.entry.path}:${shape.index}`}
-                    position={gameToMap(point.x, point.y)}
+                    key={`${layer.entry.path}:${shape.index}:${pin.key ?? ''}`}
+                    position={gameToMap(pin.point.x, pin.point.y)}
                     draggable={!disabled}
                     eventHandlers={{
                       click: () => setSelected({ path: layer.entry.path, index: shape.index }),
@@ -211,20 +271,25 @@ export function ZoneMap({
                         const { lat, lng } = (event.target as L.Marker).getLatLng();
                         const game = mapToGame(lat, lng);
                         const rows = [...(layer.value as Row[])];
-                        rows[shape.index] = { ...rows[shape.index], x: game[0], y: game[1] };
+                        const row = rows[shape.index];
+                        // Only x and y move. A height and a heading were set
+                        // standing in the place and the map knows neither.
+                        rows[shape.index] = pin.key
+                          ? { ...row, [pin.key]: { ...(row[pin.key] as object), x: game[0], y: game[1] } }
+                          : { ...row, x: game[0], y: game[1] };
                         layer.onChange(rows);
                       },
                     }}
                     icon={(
                       <PlacePin
-                        label={shape.title}
-                        hex={style?.color ?? layer.color}
+                        label={pin.label ? `${shape.title} · ${pin.label}` : shape.title}
+                        hex={pin.color ?? style?.color ?? layer.color}
                         icon={style?.icon}
                         active={active}
                       />
                     )}
                   />
-                );
+                ));
               }))}
 
               {visibleShapes.filter((layer) => !layer.isMarker).map((layer) => layer.shapes.map((shape) => {
@@ -392,14 +457,18 @@ export function ZoneMap({
 
           <Flex direction="column" gap="xxs" p="xs" style={{ flexShrink: 0 }}>
             <Text ff="Akrobat Bold" size="xxs" tt="uppercase" lts="0.08em" c="rgba(255,255,255,0.3)">
-              {t('zoneMap.draw_new', 'Draw new')}
+              {model.every((layer) => layer.isMarker)
+                ? t('zoneMap.add_new', 'Add new')
+                : t('zoneMap.draw_new', 'Draw new')}
             </Text>
             <Flex gap="xxs" wrap="wrap">
               {model.map((layer) => (
                 <motion.button
                   key={layer.entry.path}
                   type="button"
-                  onClick={() => setDrawInto(drawInto === layer.entry.path ? null : layer.entry.path)}
+                  onClick={() => (layer.isMarker
+                    ? startAdd(layer.entry.path)
+                    : setDrawInto(drawInto === layer.entry.path ? null : layer.entry.path))}
                   disabled={disabled}
                   whileTap={{ scale: 0.97 }}
                   style={{
@@ -442,6 +511,27 @@ export function ZoneMap({
             }}
             onDelete={() => { setConfirmDelete(editing); setEditing(null); }}
             onClose={() => setEditing(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {adding && layerFor(adding.path) && (
+          <ShapeModal
+            entry={layerFor(adding.path)!.entry}
+            resource={resource}
+            row={adding.row}
+            polyKey={layerFor(adding.path)!.polyKey}
+            title={t('zoneMap.add_title', 'New')}
+            disabled={disabled}
+            onSave={(next) => {
+              const layer = layerFor(adding.path)!;
+              const rows = Array.isArray(layer.value) ? [...(layer.value as Row[])] : [];
+              layer.onChange([...rows, next]);
+              setSelected({ path: adding.path, index: rows.length });
+              setAdding(null);
+            }}
+            onClose={() => setAdding(null)}
           />
         )}
       </AnimatePresence>
@@ -653,7 +743,8 @@ function ShapeModal({
   polyKey: string;
   title: string;
   onSave: (next: Row) => void;
-  onDelete: () => void;
+  /** Absent while ADDING — there is nothing yet to delete. */
+  onDelete?: () => void;
   onClose: () => void;
   disabled?: boolean;
 }) {
@@ -765,7 +856,11 @@ function ShapeModal({
                 row={draft}
                 value={draft[column.key]}
                 error={problemFor(column.key)}
-                disabled={disabled || fieldGatedOff(column, draft)}
+                // `readOnly` too, same as RowModal. A generated id is the
+                // key smartMerge matches rows on, so typing over it silently
+                // orphans anything pointing at the row — and this modal was
+                // letting you, because it only ever checked the gate.
+                disabled={disabled || fieldGatedOff(column, draft) || !!column.readOnly}
                 dimmed={fieldGatedOff(column, draft)}
                 onChange={(v) => setDraft((prev) => ({ ...prev, [column.key]: v }))}
                 onPick={() => setPicker(column)}
@@ -777,7 +872,9 @@ function ShapeModal({
             align="center" justify="space-between" px="sm" py="xs"
             style={{ borderTop: `0.1vh solid ${alpha(theme.colors.dark[4], 0.4)}`, flexShrink: 0 }}
           >
-            <StudioButton label={t('zoneMap.delete', 'Delete')} danger icon={Trash2} onClick={onDelete} disabled={disabled} />
+            {onDelete && (
+              <StudioButton label={t('zoneMap.delete', 'Delete')} danger icon={Trash2} onClick={onDelete} disabled={disabled} />
+            )}
             <Flex gap="xs">
               {problems.length > 0 && (
                 <motion.button

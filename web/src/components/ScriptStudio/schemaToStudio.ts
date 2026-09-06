@@ -346,6 +346,15 @@ function columnsFor(node: JsonSchema, rows: unknown[]): { columns: SettingColumn
      */
     enabledWhen?: { path: string; equals?: unknown };
     action?: { label: string; callback: string; icon?: string; sendSection?: boolean };
+    /**
+     * A component the owning script ships, for a field inside a ROW.
+     *
+     * Settings could already have one; row fields could not, so anything a
+     * script wanted to draw its own way had to become a top-level setting or
+     * go without. Same contract as `x-component`, written where row controls
+     * are declared because that is where a row's fields are described.
+     */
+    component?: string;
   };
   const rowControls = (node?.['x-rowControls'] ?? {}) as Record<string, RowControl>;
 
@@ -369,6 +378,10 @@ function columnsFor(node: JsonSchema, rows: unknown[]): { columns: SettingColumn
         key: entry.optionsFrom.key ?? 'name',
         labelKey: entry.optionsFrom.labelKey,
       };
+    }
+    if (entry.component) {
+      target.type = 'custom';
+      target.component = entry.component;
     }
     if (entry.anyLabel) target.anyLabel = entry.anyLabel;
     if (entry.iconSet) target.iconSet = entry.iconSet;
@@ -843,12 +856,19 @@ function defaultForControl(control: ControlType): unknown {
  * Everything after it is the guess, in descending order of confidence.
  */
 /** One entry of `x-mapPaths` in its long form. */
-type MapPathSpec = { path: string; color?: string; shape?: 'polygon' | 'marker' };
+type MapPathSpec = {
+  path: string;
+  color?: string;
+  shape?: 'polygon' | 'marker';
+  /** Named positions within each row, when a row is more than one place. */
+  points?: { key: string; label?: string; color?: string }[];
+};
 
 /** The declared map paths, plus the styling declared alongside them. */
 type MapMeta = Set<string> & {
   colors: Map<string, string>;
   shapes: Map<string, 'polygon' | 'marker'>;
+  points: Map<string, { key: string; label?: string; color?: string }[]>;
 };
 
 /**
@@ -1001,9 +1021,11 @@ export function schemaToStudio(schema: JsonSchema, meta: StudioMeta): StudioScri
   const mapPaths: MapMeta = Object.assign(new Set(meta.mapPaths ?? []), {
     colors: new Map<string, string>(),
     shapes: new Map<string, 'polygon' | 'marker'>(),
+    points: new Map<string, { key: string; label?: string; color?: string }[]>(),
   });
   const mapColors = mapPaths.colors;
   const mapShapes = mapPaths.shapes;
+  const mapPoints = mapPaths.points;
 
   const topLevel: JsonSchema = schema?.properties ?? {};
 
@@ -1042,6 +1064,7 @@ export function schemaToStudio(schema: JsonSchema, meta: StudioMeta): StudioScri
     mapPaths.add(spec.path);
     if (spec.color) mapColors.set(spec.path, spec.color);
     if (spec.shape) mapShapes.set(spec.path, spec.shape);
+    if (spec.points) mapPoints.set(spec.path, spec.points);
   }
 
   siblingLists = new Set(
@@ -1565,6 +1588,7 @@ function buildListEntry(
     // install and there is nothing to judge.
     mapShape: mapPaths.has(path) ? (mapPaths.shapes.get(path) ?? detectMapShape(rows)) : undefined,
     mapColor: mapPaths.has(path) ? mapPaths.colors.get(path) : undefined,
+    mapPoints: mapPaths.has(path) ? mapPaths.points.get(path) : undefined,
     component: node?.['x-component'],
     componentFull: node?.['x-componentFull'] === true,
     group,

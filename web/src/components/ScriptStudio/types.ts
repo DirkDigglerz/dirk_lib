@@ -93,6 +93,13 @@ export type SettingOption = {
   color?: string; value: string; label: string };
 
 export type SettingColumn = {
+  /**
+   * Path to a component the OWNING resource ships, for a field inside a row.
+   *
+   * The row equivalent of `SettingEntry.component`. Declared through
+   * `x-rowControls`, because that is where a row's fields are described.
+   */
+  component?: string;
   /** tags: the items are numbers - declared by the schema, never guessed */
   numeric?: boolean;
   /** see SettingEntry.validateWith */
@@ -207,6 +214,14 @@ export type SettingEntry = {
    * Only set for a path listed in `x-mapPaths`.
    */
   mapShape?: 'polygon' | 'marker';
+  /**
+   * Where a marker row keeps its positions, when it keeps more than one.
+   *
+   * A row with a single place puts `x`/`y` on itself and needs none of this.
+   * A row that IS two places — a barn find's owner and the car he is selling —
+   * holds a `{x,y,z,w}` under each named key, and each one gets its own pin.
+   */
+  mapPoints?: { key: string; label?: string; color?: string }[];
   /** the map colour this layer was given in `x-mapPaths` */
   mapColor?: string;
   /**
@@ -407,3 +422,16 @@ export function tabsAsList(entry: SettingEntry): boolean {
  * are. Not a real path, so it can never collide with one.
  */
 export const BASIC_CHILD = '__basic__';
+
+/**
+ * The id of a workspace's MAP, as a rail child.
+ *
+ * A workspace holding polygon layers AND settings of its own is two places: the
+ * map, and the settings that govern it. Stacking them put a jobs dropdown under
+ * a full-height map, where it reads as part of the map rather than as a
+ * separate thing. Not a real path, so it can never collide with one.
+ *
+ * Every layer stays on ONE canvas under this child — the whole point of the map
+ * section is that the polygons are drawn together.
+ */
+export const MAP_CHILD = '__map__';

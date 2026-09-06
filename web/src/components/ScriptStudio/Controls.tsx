@@ -15,6 +15,7 @@ import { Icon } from './Icon';
 import { notify } from './Toasts';
 import { AnyIcon } from './Icon';
 import { ModelControl } from './ModelControl';
+import { VehicleControl } from './VehicleControl';
 import { PedsField } from './PedControl';
 import type { ControlType, SettingColumn, SettingEntry } from './types';
 import { DiscordChannelControl } from './DiscordChannelControl';
@@ -632,15 +633,26 @@ export function SettingControl({ type, value, onChange, entry, column, disabled,
         </ControlShell>
       );
 
-    case 'ped':
     case 'vehicle':
+      return (
+        <ControlShell>
+          <VehicleControl
+            value={value}
+            onChange={(next) => onChange(next)}
+            disabled={disabled}
+            compact={compact}
+          />
+        </ControlShell>
+      );
+
+    case 'ped':
       return (
         <ControlShell>
           <TextInput
             value={typeof value === 'string' ? value : ''}
             onChange={(e) => onChange(e.currentTarget.value)}
             disabled={disabled}
-            placeholder={type === 'ped' ? 'model name' : 'vehicle model'}
+            placeholder="model name"
             styles={{ ...styles, input: { ...styles.input, fontFamily: 'monospace' } }}
             style={{ flex: 1 }}
           />

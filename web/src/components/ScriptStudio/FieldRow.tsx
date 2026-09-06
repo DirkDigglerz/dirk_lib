@@ -5,6 +5,7 @@ import { RedirectKindControl } from './RedirectKindControl';
 import { ObjectMapControl } from './ObjectMapControl';
 import { SettingControl } from './Controls';
 import { opensPicker } from './PickerDrawer';
+import { CustomControl } from './CustomControl';
 import { RangeControl, SliderControl, TagsControl } from './RichControls';
 import { GroupsControl, KeyValueControl } from './MapControls';
 import { KeybindMapControl } from './KeybindMapControl';
@@ -240,6 +241,19 @@ export function FieldRow({
           </Text>
         )}
       </Flex>
+      )}
+
+      {/* A field the owning script draws itself. Handed the whole row, because
+          what it has to say is usually about a sibling. */}
+      {column.type === 'custom' && column.component && resource && (
+        <CustomControl
+          resource={resource}
+          component={column.component}
+          value={value}
+          onChange={onChange}
+          canEdit={!disabled}
+          row={row}
+        />
       )}
 
       {column.type === 'slider' && (

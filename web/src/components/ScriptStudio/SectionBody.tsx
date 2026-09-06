@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { effectiveValue, setValue, useStudio } from './store';
 import { ZoneMap } from './ZoneMap';
 import type { SettingEntry } from './types';
-import { BASIC_CHILD, tabsAsList } from './types';
+import { BASIC_CHILD, MAP_CHILD, tabsAsList } from './types';
 import { useChrome } from './studioLocale';
 
 /**
@@ -46,6 +46,12 @@ export function SectionBody({
   // strip's one-shot request, this IS the current selection.
   const requestedList = useStudio((state) => state.activeList);
 
+  // Polygon layers all share one canvas rather than getting a map each.
+  // Declared UP HERE because the effect below reads them — leaving them further
+  // down put them in the temporal dead zone and threw on first render.
+  const mapLayers = useMemo(() => entries.filter((e) => e.type === 'zones'), [entries]);
+  const rest = useMemo(() => entries.filter((e) => e.type !== 'zones'), [entries]);
+
   const railLists = useMemo(() => entries.filter(tabsAsList), [entries]);
   const railPlain = useMemo(() => entries.filter((e) => !tabsAsList(e)), [entries]);
 
@@ -60,14 +66,28 @@ export function SectionBody({
     if (!railDriven) return;
     // When the section's own settings are showing, the child that is on screen
     // is Basic - say so, or the rail highlights nothing at all.
+    // A map section reports whichever of its two children is on screen, so the
+    // rail highlights Zones when the map is up rather than falling back to
+    // Basic and pointing at the wrong row.
+    if (mapLayers.length > 0 && rest.length > 0) {
+      // Whichever of its children is actually showing, which is now more than
+      // two of them. Reporting Basic for everything-that-is-not-the-map meant
+      // clicking Sellers changed the page and left the rail pointing at Basic.
+      const picked = railLists.some((entry) => entry.path === requestedList
+        && entry.type !== 'zones');
+
+      useStudio.setState({
+        shownList: requestedList === MAP_CHILD ? MAP_CHILD
+          : picked ? requestedList
+            : BASIC_CHILD,
+      });
+      return;
+    }
     useStudio.setState({
       shownList: railActive?.path ?? (railPlain.length > 0 ? BASIC_CHILD : null),
     });
-  }, [railDriven, railActive?.path, railPlain.length]);
+  }, [railDriven, railActive?.path, railPlain.length, requestedList, mapLayers.length, rest.length, railLists]);
 
-  // Polygon layers all share one canvas rather than getting a map each.
-  const mapLayers = entries.filter((e) => e.type === 'zones');
-  const rest = entries.filter((e) => e.type !== 'zones');
 
   if (railDriven) {
     // A map section FIRST. Being a workspace is exactly what a map section
@@ -75,17 +95,69 @@ export function SectionBody({
     // loose settings - was catching Zones and rendering it as three plain
     // rows before the map was ever considered.
     if (mapLayers.length > 0) {
+      const theMap = (
+        <ZoneMap
+          resource={resource}
+          layers={mapLayers.map((entry) => ({
+            entry,
+            value: effectiveValue(resource, entry),
+            onChange: (next) => setValue(resource, entry, next),
+          }))}
+        />
+      );
+
+      // With settings of its own, the section is two rail children: its
+      // settings, and the map. Stacking them put those settings under a
+      // full-height map, reading as part of it. Every layer still shares the
+      // one canvas - only the map's NEIGHBOURS moved.
+      if (rest.length > 0) {
+        // The map fills its box; the SETTINGS do not.
+        //
+        // Both were being rendered into the same bare column, so a map
+        // section's Basic page came out with its rows jammed together and no
+        // way to reach the ones past the bottom of the panel. They are two
+        // different kinds of content and only one of them wants to be a
+        // full-height canvas.
+        if (requestedList === MAP_CHILD) {
+          return (
+            <Flex direction="column" flex={1} style={{ minHeight: 0 }}>
+              {theMap}
+            </Flex>
+          );
+        }
+
+        // Each rail child is its OWN page.
+        //
+        // Rendering everything that was not the map put the section's settings
+        // and its tables into one long scroll, so Basic and Sellers pointed at
+        // the same screen — the rail offered a choice that changed nothing.
+        const pickedList = railLists.find((entry) => entry.path === requestedList
+          && entry.type !== 'zones');
+
+        if (pickedList) {
+          return (
+            <Flex direction="column" flex={1} style={{ minHeight: 0 }}>
+              <Fragment key={pickedList.path}>{renderRow(pickedList, query || undefined, true)}</Fragment>
+            </Flex>
+          );
+        }
+
+        // Otherwise the section's own settings, which is what Basic means.
+        const basics = rest.filter((entry) => !tabsAsList(entry));
+        return (
+          <Flex
+            direction="column" gap="xs" flex={1}
+            className="studio-scroll"
+            style={{ minHeight: 0, overflowY: 'auto' }}
+          >
+            {basics.map((entry, index) => withSubgroup(entry, index, basics, renderRow, color, theme))}
+          </Flex>
+        );
+      }
+
       return (
         <Flex direction="column" flex={1} style={{ minHeight: 0 }}>
-          <ZoneMap
-            resource={resource}
-            layers={mapLayers.map((entry) => ({
-              entry,
-              value: effectiveValue(resource, entry),
-              onChange: (next) => setValue(resource, entry, next),
-            }))}
-          />
-          {rest.map((entry, index) => withSubgroup(entry, index, rest, renderRow, color, theme))}
+          {theMap}
         </Flex>
       );
     }
